@@ -1,0 +1,1050 @@
+﻿I. Nhóm Tài khoản & Phân quyền (RBAC)
+1. users — Tài khoản người dùng
+Bảng dùng để làm gì?
+Lưu thông tin tài khoản của toàn bộ người dùng trong hệ thống: người thuê, chủ trọ và quản trị viên.
+Ý nghĩa các trường
+* id: Khóa chính, sử dụng UUID.
+* email: Email dùng để đăng nhập/liên hệ.
+* phone: Số điện thoại lliên hệ.
+* password: Mật khẩu đã mã hóa bằng BCrypt.
+* full_name: Họ và tên đầy đủ.
+* avatar_url: URL ảnh đại diện trên Cloudinary.
+* avatar_public_id, public_id của avatar trên Cloudinary, dùng để xóa/quản lý ảnh.
+* citizen_id: Số CCCD/CMND.
+* email_verified_at: Thời điểm xác thực email.
+* phone_verified_at: Thời điểm xác thực số điện thoại.
+* status: [ENUM] Trạng thái tài khoản:
+   * ACTIVE: Đang hoạt động.
+   * INACTIVE: Không hoạt động.
+   * BLOCKED: Bị khóa.
+* Quan hệ
+* 1-N với rooms
+* Một chủ trọ có thể sở hữu nhiều phòng.
+* users (1) -------- (N) rooms
+* rooms.landlord_id tham chiếu users.id.
+________________
+* * 1-N với payments
+* Một chủ trọ có thể thực hiện nhiều giao dịch thanh toán.
+* users (1) -------- (N) payments
+________________
+* * 1-N với rental_requests
+* Một người dùng có thể tạo nhiều yêu cầu thuê hoặc nhận nhiều yêu cầu với tư cách chủ trọ.
+________________
+* * 1-N với rental_agreements
+* Một người dùng có thể tham gia nhiều hợp đồng thuê trong suốt quá trình sử dụng hệ thống.
+________________
+* * 1-N với notifications
+* Một người dùng có thể nhận nhiều thông báo.
+________________
+* * 1-N với reports
+* Một người dùng có thể tạo nhiều báo cáo.
+* Quan hệ với roles
+* N-N thông qua user_roles
+* Một user có thể có nhiều role, ví dụ một tài khoản có thể vừa là TENANT vừa là LANDLORD.
+* Một role cũng được gán cho nhiều user.
+________________
+
+
+2. roles — Vai trò
+Bảng dùng để làm gì?
+Lưu các vai trò của người dùng trong hệ thống.
+Ý nghĩa các trường
+* id: Khóa chính.
+* code: [ENUM] Mã vai trò:
+   * TENANT
+   * LANDLORD
+   * ADMIN
+* name: Tên hiển thị của vai trò.
+Quan hệ
+N-N với users thông qua user_roles.
+Ví dụ:
+TENANT
+  ↓
+nhiều users
+và:
+một user
+  ↓
+TENANT + LANDLORD
+N-N với permissions thông qua role_permissions.
+Một role có nhiều permission.
+Một permission có thể được sử dụng bởi nhiều role.
+________________
+
+
+3. permissions — Quyền
+Bảng dùng để làm gì?
+Lưu các quyền chi tiết phục vụ cơ chế RBAC.
+Ý nghĩa các trường
+* id: Khóa chính.
+* code: Mã quyền, ví dụ LISTING_APPROVE, USER_BLOCK, REPORT_HANDLE.
+* name: Tên quyền.
+Quan hệ
+N-N với roles thông qua role_permissions.
+Ví dụ:
+ADMIN
+ ↓
+LISTING_APPROVE
+USER_BLOCK
+REPORT_HANDLE
+Một permission như LISTING_APPROVE có thể được cấp cho nhiều role khác nhau.
+________________
+
+
+4. user_roles — Phân quyền người dùng
+Bảng dùng để làm gì?
+Bảng trung gian giữa users và roles.
+Ý nghĩa các trường
+* user_id: ID người dùng.
+* role_id: ID vai trò.
+Quan hệ
+N-1 với users
+Nhiều bản ghi user_roles có thể thuộc cùng một user.
+N-1 với roles
+Nhiều bản ghi user_roles có thể cùng tham chiếu một role.
+Ví dụ:
+user_roles
+
+
+user_id    role_id
+   1          1       → TENANT
+   1          2       → LANDLORD
+   2          1       → TENANT
+________________
+
+
+5. role_permissions — Quyền của vai trò
+Bảng dùng để làm gì?
+Bảng trung gian giữa roles và permissions.
+Ý nghĩa các trường
+* role_id: ID vai trò.
+* permission_id: ID quyền.
+Quan hệ
+* N-1 với roles.
+* N-1 với permissions.
+* Hai quan hệ N-1 này kết hợp lại thành:
+* roles N -------- N permissions
+* ________________
+
+
+II. Nhóm Địa chỉ hành chính
+6. provinces — Tỉnh/Thành phố
+Bảng dùng để làm gì?
+Lưu danh sách tỉnh/thành phố mà hệ thống hỗ trợ.
+Ý nghĩa các trường
+* id: Khóa chính.
+* code: Mã tỉnh/thành phố.
+* name: Tên tỉnh/thành phố.
+Quan hệ
+1-N với districts
+Một tỉnh có nhiều quận/huyện.
+provinces 1 -------- N districts
+________________
+
+
+1-N với rooms
+Một tỉnh có nhiều phòng.
+________________
+
+
+1-N với tenant_profiles
+Một tỉnh có thể là địa điểm mong muốn thuê của nhiều người.
+________________
+
+
+7. districts — Quận/Huyện
+Bảng dùng để làm gì?
+Lưu danh sách quận/huyện thuộc các tỉnh/thành phố.
+Ý nghĩa các trường
+* id: Khóa chính.
+* province_id: ID tỉnh/thành phố.
+* code: Mã quận/huyện.
+* name: Tên quận/huyện.
+Quan hệ
+* N-1 với provinces
+* Nhiều quận/huyện thuộc một tỉnh.
+________________
+* * 1-N với wards
+* Một quận/huyện có nhiều phường/xã.
+________________
+* * 1-N với rooms
+* Một quận/huyện có nhiều phòng.
+________________
+* * 1-N với tenant_profiles
+* Một quận/huyện có thể là địa điểm mong muốn thuê của nhiều người.
+* ________________
+
+
+8. wards — Phường/Xã
+Bảng dùng để làm gì?
+Lưu danh sách phường/xã thuộc quận/huyện.
+Ý nghĩa các trường
+* id: Khóa chính.
+* district_id: ID quận/huyện.
+* code: Mã phường/xã.
+* name: Tên phường/xã.
+Quan hệ
+* N-1 với districts
+* Nhiều phường/xã thuộc một quận/huyện.
+________________
+* * 1-N với rooms
+* Một phường/xã có nhiều phòng.
+________________
+* * 1-N với tenant_profiles
+* Một phường/xã có thể là khu vực mong muốn thuê của nhiều người.
+________________
+
+
+III. Nhóm Hồ sơ người thuê & Tìm kiếm
+9. tenant_profiles — Hồ sơ nhu cầu thuê
+Bảng dùng để làm gì?
+Lưu các tiêu chí mà người thuê mong muốn khi tìm phòng.
+Ví dụ: muốn thuê ở Hà Nội, giá 3-5 triệu, diện tích 20-30m².
+Ý nghĩa các trường
+* user_id: ID người dùng, đồng thời là khóa chính và khóa ngoại.
+* desired_province_id: Tỉnh/thành phố mong muốn thuê.
+* desired_district_id: Quận/huyện mong muốn thuê.
+* desired_ward_id: Phường/xã mong muốn thuê.
+* price_min: Giá thuê tối thiểu.
+* price_max: Giá thuê tối đa.
+* area_min: Diện tích tối thiểu.
+* area_max: Diện tích tối đa.
+* desired_room_type_id: Loại phòng mong muốn.
+Quan hệ
+* 1-1 với users
+* Một user có tối đa một hồ sơ nhu cầu thuê.
+* users 1 -------- 1 tenant_profiles
+* Sở dĩ là 1-1 vì mỗi tài khoản người thuê chỉ có một hồ sơ nhu cầu hiện tại.
+________________
+* * N-1 với provinces, districts, wards, room_types.
+* Nhiều tenant profile có thể cùng mong muốn thuê tại một địa điểm hoặc cùng loại phòng.
+________________
+
+
+10. room_types — Loại phòng
+Bảng dùng để làm gì?
+Phân loại phòng để phục vụ đăng tin và tìm kiếm.
+Ví dụ: phòng trọ, studio, căn hộ mini.
+Ý nghĩa các trường
+* id: Khóa chính.
+* name: Tên loại phòng.
+* description: Mô tả loại phòng.
+Quan hệ
+* 1-N với rooms
+* Một loại phòng có thể áp dụng cho nhiều phòng.
+* 1-N với tenant_profiles
+* Một loại phòng có thể là nhu cầu của nhiều người thuê.
+________________
+
+
+11. amenities — Tiện ích
+Bảng dùng để làm gì?
+Lưu danh sách tiện ích mà phòng có.
+Ví dụ: Wifi, điều hòa, máy giặt, nóng lạnh.
+Ý nghĩa các trường
+* id: Khóa chính.
+* name: Tên tiện ích.
+* icon: Icon đại diện.
+Quan hệ
+* N-N với rooms thông qua room_amenities.
+* Một phòng có nhiều tiện ích.
+* Một tiện ích xuất hiện ở nhiều phòng.
+* Ví dụ:
+* Room A → Wifi, Điều hòa
+* Room B → Wifi, Máy giặt
+* Room C → Wifi, Điều hòa, Máy giặt
+________________
+
+
+IV. Nhóm Phòng & Tin đăng
+12. rooms — Phòng
+Bảng dùng để làm gì?
+Lưu thông tin của phòng thực tế thuộc chủ trọ.
+rooms là phòng vật lý, còn listings là tin đăng phòng lên hệ thống.
+Ý nghĩa các trường
+* id: Khóa chính.
+* landlord_id: ID chủ trọ sở hữu phòng.
+* room_type_id: ID loại phòng.
+* price: Giá thuê hiện tại.
+* electricity_price: Giá điện.
+* water_price: Giá nước.
+* service_fee: Phí dịch vụ.
+* default_deposit: Tiền cọc mặc định.
+* area_m2: Diện tích phòng.
+* max_occupants: Số người tối đa.
+* province_id: ID tỉnh/thành phố.
+* district_id: ID quận/huyện.
+* ward_id: ID phường/xã.
+* address_line: Địa chỉ chi tiết.
+* latitude: Vĩ độ.
+* longitude: Kinh độ.
+* rental_status: [ENUM] Trạng thái phòng:
+   * AVAILABLE: Có thể cho thuê.
+   * RENTED: Đã có người thuê.
+   * MAINTENANCE: Đang bảo trì.
+Quan hệ
+N-1 với users
+Một chủ trọ có nhiều phòng.
+N-1 với room_types
+Nhiều phòng có thể cùng loại.
+N-1 với provinces, districts, wards
+Nhiều phòng có thể nằm trong cùng một khu vực.
+N-N với amenities thông qua room_amenities.
+1-N với room_images
+Một phòng có nhiều ảnh.
+1-N với listings
+Một phòng có thể có nhiều tin đăng theo thời gian.
+Ví dụ:
+Room A
+ ├── Listing tháng 1
+ ├── Listing tháng 3
+ └── Listing tháng 6
+Tuy nhiên business rule nên đảm bảo chỉ có tối đa một listing ACTIVE/APPROVED tại một thời điểm.
+1-N với rental_agreements
+Một phòng có thể trải qua nhiều hợp đồng thuê theo thời gian.
+1-N với room_reviews
+Một phòng có thể nhận nhiều đánh giá.
+________________
+
+
+13. room_amenities — Tiện ích của phòng
+Bảng dùng để làm gì?
+Bảng trung gian kết nối phòng với các tiện ích.
+Ý nghĩa các trường
+* room_id: ID phòng.
+* amenity_id: ID tiện ích.
+Quan hệ
+N-1 với rooms.
+N-1 với amenities.
+Hai quan hệ này tạo thành:
+rooms N -------- N amenities
+________________
+
+
+14. room_images — Hình ảnh phòng
+Bảng dùng để làm gì?
+Lưu các ảnh của phòng được upload lên Cloudinary.
+Ý nghĩa các trường
+* id: Khóa chính.
+* room_id: ID phòng.
+* url: URL ảnh trên Cloudinary.
+* public_id: public_id của ảnh trên Cloudinary, dùng để xóa ảnh.
+* sort_order: Thứ tự hiển thị ảnh.
+Quan hệ
+N-1 với rooms.
+Một phòng có nhiều ảnh.
+Một ảnh chỉ thuộc về một phòng.
+rooms 1 -------- N room_images
+________________
+
+
+15. listings — Tin đăng
+Bảng dùng để làm gì?
+Lưu thông tin tin đăng mà người thuê nhìn thấy trên hệ thống.
+Ý nghĩa các trường
+* id: Khóa chính.
+* room_id: ID phòng được đăng.
+* title: Tiêu đề tin.
+* slug: URL thân thiện.
+* description: Nội dung mô tả.
+* status: [ENUM] Trạng thái tin:
+   * PENDING: Chờ duyệt.
+   * APPROVED: Đã duyệt.
+   * REJECTED: Bị từ chối.
+   * HIDDEN: Đang ẩn.
+   * EXPIRED: Đã hết hạn.
+* rejection_reason: Lý do admin từ chối.
+* approved_by: ID admin duyệt tin.
+* approved_at: Thời điểm duyệt.
+* priority_level: Mức ưu tiên hiển thị.
+* view_count: Tổng số lượt xem.
+* contact_count: Tổng số lượt liên hệ.
+* expires_at: Thời điểm tin hết hạn.
+Quan hệ
+N-1 với rooms.
+Một phòng có thể có nhiều listing theo thời gian.
+________________
+
+
+1-N với rental_requests.
+Một tin đăng có thể nhận nhiều yêu cầu thuê.
+________________
+
+
+1-N với listing_contact_events.
+Một tin có thể có nhiều lần người thuê liên hệ.
+________________
+
+
+1-N với listing_daily_stats.
+Một tin có nhiều bản ghi thống kê theo từng ngày.
+________________
+
+
+1-N với chat_conversations.
+Một tin có thể phát sinh nhiều cuộc trò chuyện.
+________________
+
+
+1-N với reports.
+Một tin có thể bị nhiều người báo cáo.
+________________
+
+
+N-N với users thông qua saved_listings.
+Một user có thể lưu nhiều listing và một listing có thể được nhiều user lưu.
+________________
+
+
+N-N với users thông qua listing_view_history.
+Một user có thể xem nhiều listing và một listing có thể được nhiều user xem.
+Lưu ý
+Không lưu landlord_id trong listings.
+Có thể lấy:
+listing
+   ↓
+room
+   ↓
+landlord
+Như vậy tránh duplicate dữ liệu giữa listings.landlord_id và rooms.landlord_id.
+________________
+
+
+V. Nhóm Tương tác & Thống kê
+16. saved_listings — Tin đăng đã lưu
+Bảng dùng để làm gì?
+Lưu những tin đăng mà người thuê đã yêu thích/lưu lại.
+Ý nghĩa các trường
+* tenant_id: ID người thuê.
+* listing_id: ID tin đăng.
+Quan hệ
+Quan hệ
+N-1 với users.
+N-1 với listings.
+Hai quan hệ N-1 tạo thành:
+users N -------- N listings
+thông qua saved_listings.
+Ràng buộc
+Unique:
+(tenant_id, listing_id)
+để cùng một người không lưu cùng một tin nhiều lần.
+________________
+
+
+17. listing_view_history — Lịch sử xem tin
+Bảng dùng để làm gì?
+Lưu từng lần người thuê xem một tin đăng.
+Ý nghĩa các trường
+* id: Khóa chính.
+* tenant_id: ID người xem.
+* listing_id: ID tin được xem.
+Quan hệ
+N-1 với users.
+N-1 với listings.
+Không unique (tenant_id, listing_id) vì:
+User A → xem Listing 1
+User A → xem Listing 1
+User A → xem Listing 1
+đều là những lần xem hợp lệ.
+________________
+
+
+18. listing_contact_events — Lịch sử liên hệ
+Bảng dùng để làm gì?
+Lưu từng lần người thuê thực hiện hành động liên hệ với tin đăng.
+Ví dụ:
+* Xem số điện thoại.
+* Bấm liên hệ.
+* Bắt đầu chat.
+Ý nghĩa các trường
+* id: Khóa chính.
+* listing_id: ID tin đăng.
+* tenant_id: ID người thuê.
+Thời gian event sử dụng createdAt từ BaseEntity.
+Quan hệ
+N-1 với listings.
+N-1 với users.
+Tại sao cần bảng này khi đã có contact_count?
+listings.contact_count chỉ là số tổng hợp.
+listing_contact_events là dữ liệu chi tiết từng event.
+Ví dụ:
+listing.contact_count = 100
+nhưng listing_contact_events lưu 100 event cụ thể.
+________________
+
+
+19. listing_daily_stats — Thống kê tin đăng theo ngày
+Bảng dùng để làm gì?
+Lưu số liệu thống kê được tổng hợp theo từng ngày.
+Ý nghĩa các trường
+* id: Khóa chính.
+* listing_id: ID tin đăng.
+* stat_date: Ngày mà số liệu thuộc về.
+* view_count: Số lượt xem trong ngày.
+* contact_count: Số lượt liên hệ trong ngày.
+createdAt là thời điểm record thống kê được tạo.
+Quan hệ
+N-1 với listings.
+Một listing có nhiều ngày thống kê.
+Tại sao cần stat_date?
+Không thể dùng createdAt thay thế.
+Ví dụ:
+stat_date = 2026-10-19
+createdAt = 2026-10-20 00:05
+Bản ghi được tạo ngày 20 nhưng dữ liệu lại thuộc ngày 19.
+________________
+
+
+VI. Nhóm Yêu cầu thuê & Hợp đồng
+20. rental_requests — Yêu cầu thuê
+Bảng dùng để làm gì?
+Lưu yêu cầu của tenant muốn thuê một phòng/tin đăng.
+Ý nghĩa các trường
+* id: Khóa chính.
+* listing_id: Tin đăng được yêu cầu thuê.
+* tenant_id: Người thuê.
+* landlord_id: Chủ trọ.
+* message: Lời nhắn.
+* proposed_move_in_date: Ngày dự kiến chuyển vào.
+* status: [ENUM]
+   * PENDING: Đang chờ.
+   * ACCEPTED: Được chấp nhận.
+   * REJECTED: Bị từ chối.
+   * EXPIRED: Hết hạn.
+   * CANCELLED: Người thuê hủy.
+* responded_at: Thời điểm chủ trọ phản hồi.
+* expires_at: Thời điểm yêu cầu hết hạn.
+* pending_key: Khóa hỗ trợ kiểm soát yêu cầu pending.
+Quan hệ
+N-1 với listings.
+Một listing có thể nhận nhiều yêu cầu.
+________________
+
+
+N-1 với users — tenant.
+Một tenant có thể tạo nhiều yêu cầu.
+________________
+
+
+N-1 với users — landlord.
+Một landlord có thể nhận nhiều yêu cầu.
+________________
+
+
+1-N với rental_agreements.
+Một yêu cầu thuê có thể dẫn tới hợp đồng.
+Trong thực tế business có thể giới hạn mỗi request chỉ tạo một hợp đồng thành công.
+________________
+
+
+1-N với chat_conversations.
+Một yêu cầu có thể liên quan tới các cuộc trò chuyện.
+Tại sao có landlord_id dù có thể lấy từ listing?
+Vì đây là snapshot của đối tượng giao dịch tại thời điểm tạo request.
+________________
+
+
+21. rental_agreements — Hợp đồng thuê
+Bảng dùng để làm gì?
+Lưu hợp đồng chính thức giữa tenant và landlord.
+Đây cũng là nơi snapshot giá và điều khoản tại thời điểm ký.
+Ý nghĩa các trường
+* id: Khóa chính.
+* agreement_code: Mã hợp đồng.
+* rental_request_id: Request tạo ra hợp đồng.
+* room_id: Phòng được thuê.
+* tenant_id: Người thuê.
+* landlord_id: Chủ trọ.
+* price: Giá thuê trong hợp đồng.
+* deposit: Tiền cọc.
+* electricity_price: Giá điện trong hợp đồng.
+* water_price: Giá nước trong hợp đồng.
+* service_fee: Phí dịch vụ trong hợp đồng.
+* payment_cycle_months: Chu kỳ thanh toán.
+* start_date: Ngày bắt đầu.
+* end_date: Ngày kết thúc.
+* terms_text: Điều khoản.
+* pdf_url: URL PDF trên Cloudinary.
+* pdf_public_id: public_id của PDF trên Cloudinary.
+* status: [ENUM]
+   * DRAFT
+   * PENDING_CONFIRMATION
+   * ACTIVE
+   * EXPIRED
+   * TERMINATED
+   * CANCELLED
+* created_by_role: [ENUM]
+   * LANDLORD
+   * TENANT
+* landlord_confirmed_at: Thời điểm landlord xác nhận.
+* tenant_confirmed_at: Thời điểm tenant xác nhận.
+Quan hệ
+N-1 với rental_requests.
+Một request dẫn tới một hoặc nhiều bản ghi về mặt DB, nhưng business nên kiểm soát request được accept chỉ tạo một hợp đồng.
+________________
+
+
+N-1 với rooms.
+Một phòng có thể được thuê qua nhiều hợp đồng ở những khoảng thời gian khác nhau.
+________________
+
+
+N-1 với users — tenant.
+Một tenant có thể có nhiều hợp đồng.
+________________
+
+
+N-1 với users — landlord.
+Một landlord có thể có nhiều hợp đồng.
+________________
+1-N với các bảng review.
+Một hợp đồng có thể là cơ sở để tạo review.
+________________
+
+
+VII. Nhóm Gói dịch vụ & Thanh toán
+22. service_packages — Gói dịch vụ
+Bảng dùng để làm gì?
+Lưu các gói dịch vụ mà landlord có thể mua.
+Ý nghĩa các trường
+* id: Khóa chính.
+* code: Mã gói.
+* name: Tên gói.
+* max_listings: Số tin tối đa.
+* high_priority_quota: Số lượng tin ưu tiên cao.
+* low_priority_quota: Số lượng tin ưu tiên thấp.
+* has_stats: Có quyền xem thống kê hay không.
+* price: Giá gói.
+* billing_cycle_days: Số ngày sử dụng.
+* is_active: Gói đang được bán hay không.
+Quan hệ
+* 1-N với service_package_subscriptions.
+* Một gói có thể được rất nhiều landlord mua.
+________________
+
+
+23. service_package_subscriptions — Đăng ký gói dịch vụ
+Bảng dùng để làm gì?
+Lưu việc landlord mua và sử dụng service package.
+Ý nghĩa các trường
+* id: Khóa chính.
+* landlord_id: Chủ trọ.
+* package_id: Gói dịch vụ.
+* start_at: Thời điểm bắt đầu.
+* end_at: Thời điểm hết hạn.
+* status: [ENUM]
+   * ACTIVE
+   * EXPIRED
+   * CANCELLED
+* active_flag: Đánh dấu subscription đang hoạt động.
+Quan hệ
+* N-1 với users.
+* Một landlord có thể có nhiều subscription.
+________________
+* * N-1 với service_packages.
+* Một package có nhiều subscription.
+________________
+
+
+24. boost_service_packages — Gói đẩy tin
+Bảng dùng để làm gì?
+Lưu các loại gói giúp tăng mức ưu tiên của listing.
+Ý nghĩa các trường
+* id: Khóa chính.
+* code: Mã gói.
+* name: Tên gói.
+* priority_level: Mức độ ưu tiên.
+* duration_days: Số ngày hiệu lực.
+* price: Giá.
+* is_active: Gói còn được bán hay không.
+Quan hệ
+* 1-N với boost_service_package_subscriptions.
+* Một gói đẩy tin có thể được nhiều landlord mua.
+________________
+
+
+25. boost_service_package_subscriptions — Đăng ký gói đẩy tin
+Bảng dùng để làm gì?
+Lưu việc landlord mua một boost package cho một listing cụ thể.
+Ý nghĩa các trường
+* id: Khóa chính.
+* landlord_id: ID chủ trọ.
+* listing_id: Tin đăng được boost.
+* boost_package_id: Gói boost.
+* start_at: Thời điểm bắt đầu.
+* end_at: Thời điểm kết thúc.
+* status: [ENUM] Trạng thái subscription.
+* price: Giá thực tế tại thời điểm mua.
+Quan hệ
+N-1 với users.
+Một landlord có thể mua nhiều boost.
+________________
+
+
+N-1 với listings.
+Một listing có thể được boost nhiều lần theo thời gian.
+________________
+
+
+N-1 với boost_service_packages.
+Một gói boost có thể được sử dụng cho nhiều listing.
+________________
+
+
+26. payments — Thanh toán
+Bảng dùng để làm gì?
+Lưu tất cả giao dịch thanh toán của landlord với hệ thống.
+Ý nghĩa các trường
+* id: Khóa chính.
+* landlord_id: Người thực hiện thanh toán.
+* type: [ENUM]
+   * SERVICE_PACKAGE
+   * BOOST_PACKAGE
+* reference_id: ID đối tượng được thanh toán.
+* amount: Số tiền.
+* payment_method: [ENUM]
+   * VNPAY
+   * MOMO
+   * BANK_TRANSFER
+* status: [ENUM]
+   * PENDING
+   * SUCCESS
+   * FAILED
+   * REFUNDED
+* provider_txn_id: Mã giao dịch của cổng thanh toán.
+* paid_at: Thời điểm thanh toán thành công.
+Quan hệ
+N-1 với users.
+Một landlord có nhiều payment.
+________________
+
+
+1-N với invoices.
+Một payment có thể liên quan tới invoice.
+Trong business thông thường có thể giới hạn mỗi payment thành công chỉ có một invoice.
+reference_id là gì?
+Đây là polymorphic reference.
+Ví dụ:
+type = SERVICE_PACKAGE
+reference_id = 10
+hoặc:
+type = BOOST_PACKAGE
+reference_id = 20
+Database không thể tạo một FK duy nhất cho cả hai trường hợp.
+Do đó phải validation ở Service.
+________________
+
+
+27. invoices — Hóa đơn
+Bảng dùng để làm gì?
+Lưu hóa đơn được phát hành cho giao dịch thanh toán.
+Ý nghĩa các trường
+* id: Khóa chính.
+* payment_id: Payment liên quan.
+* type: [ENUM]
+   * SERVICE_PACKAGE
+   * BOOST_PACKAGE
+* service_package_id: ID service package nếu hóa đơn thuộc service package.
+* boost_service_package_id: ID boost package nếu hóa đơn thuộc boost package.
+* invoice_no: Số hóa đơn.
+* tax_amount: Tiền thuế.
+* total_amount: Tổng tiền.
+* buyer_name: Tên người mua tại thời điểm xuất hóa đơn.
+* buyer_tax_code: Mã số thuế.
+* issued_at: Thời điểm phát hành hóa đơn.
+Quan hệ
+N-1 với payments.
+Một payment thuộc về một payment transaction; nhiều invoice có thể tham chiếu payment ở mức DB, nhưng business thường giới hạn một invoice/payment.
+________________
+
+
+N-1 với service_packages.
+Nhiều invoice có thể liên quan cùng một package.
+________________
+
+
+N-1 với boost_service_packages.
+Nhiều invoice có thể liên quan cùng một boost package.
+________________
+
+
+VIII. Nhóm Đánh giá
+28. room_reviews — Đánh giá phòng
+Bảng dùng để làm gì?
+Lưu đánh giá của tenant về phòng sau khi thuê.
+Ý nghĩa các trường
+* id: Khóa chính.
+* rental_agreement_id: Hợp đồng làm căn cứ đánh giá.
+* tenant_id: Người đánh giá.
+* room_id: Phòng được đánh giá.
+* rating: Điểm từ 1 đến 5.
+* comment: Nội dung đánh giá.
+* landlord_reply: Phản hồi của chủ trọ.
+* is_hidden: Có bị ẩn hay không.
+* hidden_by: Người thực hiện ẩn.
+Quan hệ
+N-1 với rental_agreements.
+Một hợp đồng có thể có review tương ứng.
+________________
+
+
+N-1 với users.
+Một tenant có thể đánh giá nhiều phòng.
+________________
+
+
+N-1 với rooms.
+Một phòng có nhiều review từ những người thuê khác nhau.
+Ràng buộc
+Nếu hệ thống quy định:
+Một hợp đồng chỉ được đánh giá phòng một lần.
+thì rental_agreement_id nên unique.
+________________
+
+
+29. landlord_reviews — Đánh giá chủ trọ
+Bảng dùng để làm gì?
+Lưu đánh giá của tenant dành cho landlord.
+Ý nghĩa các trường
+* id: Khóa chính.
+* rental_agreement_id: Hợp đồng liên quan.
+* tenant_id: Người đánh giá.
+* landlord_id: Chủ trọ được đánh giá.
+* rating: Điểm từ 1 đến 5.
+* comment: Nội dung.
+* landlord_reply: Phản hồi.
+* is_hidden: Có bị ẩn không.
+* hidden_by: Người thực hiện ẩn.
+Quan hệ
+N-1 với rental_agreements.
+N-1 với users — tenant.
+N-1 với users — landlord.
+Ví dụ:
+Tenant A
+   ↓
+Landlord B
+   ↓
+Review
+________________
+
+
+30. tenant_reviews — Đánh giá người thuê
+Bảng dùng để làm gì?
+Lưu đánh giá của landlord dành cho tenant.
+Ý nghĩa các trường
+* id: Khóa chính.
+* rental_agreement_id: Hợp đồng liên quan.
+* landlord_id: Người đánh giá.
+* tenant_id: Người được đánh giá.
+* rating: Điểm từ 1 đến 5.
+* comment: Nội dung.
+* is_hidden: Có bị ẩn không.
+* hidden_by: Người thực hiện ẩn.
+Quan hệ
+* N-1 với rental_agreements.
+* N-1 với users — landlord.
+* N-1 với users — tenant.
+________________
+
+
+IX. Nhóm Chat & Thông báo
+31. chat_conversations — Cuộc trò chuyện
+Bảng dùng để làm gì?
+Lưu một cuộc hội thoại giữa tenant và landlord.
+Ý nghĩa các trường
+* id: Khóa chính.
+* listing_id: Tin đăng liên quan.
+* rental_request_id: Request liên quan nếu có.
+* tenant_id: Người thuê.
+* landlord_id: Chủ trọ.
+* last_message_at: Thời điểm tin nhắn cuối.
+Quan hệ
+N-1 với listings.
+Một listing có thể có nhiều cuộc trò chuyện.
+________________
+
+
+N-1 với rental_requests.
+Một rental request có thể liên quan tới conversation.
+________________
+
+
+N-1 với users — tenant.
+Một tenant có nhiều conversation.
+________________
+
+
+N-1 với users — landlord.
+Một landlord có nhiều conversation.
+________________
+
+
+1-N với chat_messages.
+Một conversation có nhiều message.
+chat_conversations 1 -------- N chat_messages
+________________
+
+
+32. chat_messages — Tin nhắn
+Bảng dùng để làm gì?
+Lưu từng tin nhắn trong một conversation.
+Ý nghĩa các trường
+* id: Khóa chính.
+* conversation_id: Conversation chứa message.
+* sender_id: Người gửi.
+* content: Nội dung.
+* message_type: [ENUM]
+   * TEXT
+   * IMAGE
+   * SYSTEM
+* is_read: Đã đọc hay chưa.
+Quan hệ
+N-1 với chat_conversations.
+Một conversation có nhiều message.
+________________
+
+
+N-1 với users.
+Một user có thể gửi nhiều message.
+33. notifications — Thông báo
+Bảng dùng để làm gì?
+Lưu thông báo gửi đến người dùng.
+Ý nghĩa các trường
+* id: Khóa chính.
+* user_id: Người nhận.
+* type: [ENUM]
+   * SYSTEM
+   * RENTAL_REQUEST
+   * RENTAL_AGREEMENT
+   * REPORT
+   * CHAT
+* title: Tiêu đề.
+* body: Nội dung.
+* reference_type: Loại entity liên quan.
+* reference_id: ID entity liên quan.
+* is_read: Đã đọc hay chưa.
+Quan hệ
+N-1 với users.
+Một user có thể nhận nhiều notification.
+reference_type + reference_id
+Đây cũng là polymorphic reference.
+Ví dụ:
+reference_type = RENTAL_REQUEST
+reference_id = 100
+→ notification liên quan tới rental request 100.
+Hoặc:
+reference_type = REPORT
+reference_id = 50
+→ notification liên quan tới report 50.
+Không tạo FK vật lý cho reference_id.
+________________
+
+
+X. Nhóm Báo cáo & Khiếu nại
+34. reports — Báo cáo vi phạm
+Bảng dùng để làm gì?
+Lưu báo cáo của tenant về tin đăng/chủ trọ có dấu hiệu vi phạm.
+Ý nghĩa các trường
+* id: Khóa chính.
+* tenant_id: Người gửi báo cáo.
+* landlord_id: Chủ trọ bị báo cáo.
+* listing_id: Tin đăng bị báo cáo.
+* reason_code: Mã lý do báo cáo.
+* description: Nội dung chi tiết.
+* status: [ENUM]
+   * PENDING
+   * PROCESSING
+   * RESOLVED
+   * REJECTED
+* handled_by: Admin xử lý.
+* resolution_note: Ghi chú kết quả xử lý.
+* resolved_at: Thời điểm giải quyết.
+Quan hệ
+N-1 với users — tenant.
+Một tenant có thể gửi nhiều report.
+________________
+
+
+N-1 với users — landlord.
+Một landlord có thể bị nhiều report.
+________________
+
+
+N-1 với listings.
+Một listing có thể bị nhiều người báo cáo.
+________________
+
+
+1-N với report_evidences.
+Một report có thể có nhiều ảnh bằng chứng.
+________________
+
+
+35. report_evidences — Ảnh bằng chứng
+Bảng dùng để làm gì?
+Lưu các ảnh bằng chứng của một report.
+Ý nghĩa các trường
+* id: Khóa chính.
+* report_id: ID report.
+* image_url: URL ảnh trên Cloudinary.
+* image_public_id: public_id trên Cloudinary, dùng để xóa ảnh.
+Quan hệ
+N-1 với reports.
+Một report có nhiều evidence.
+Một evidence chỉ thuộc về một report.
+reports 1 -------- N report_evidences
+________________
+
+
+TỔNG HỢP TOÀN BỘ CÁC TRƯỜNG ENUM
+Đây là phần bạn nên đặc biệt chú ý khi bắt đầu viết Entity Java.
+Bảng
+	Trường
+	Enum
+	users
+	status
+	ACTIVE, INACTIVE, BLOCKED
+	roles
+	code
+	TENANT, LANDLORD, ADMIN*
+	rooms
+	rental_status
+	AVAILABLE, RENTED, MAINTENANCE
+	listings
+	status
+	PENDING, APPROVED, REJECTED, HIDDEN, EXPIRED
+	rental_requests
+	status
+	PENDING, ACCEPTED, REJECTED, EXPIRED, CANCELLED
+	rental_agreements
+	status
+	DRAFT, PENDING_CONFIRMATION, ACTIVE, EXPIRED, TERMINATED, CANCELLED
+	rental_agreements
+	created_by_role
+	LANDLORD, TENANT
+	service_package_subscriptions
+	status
+	ACTIVE, EXPIRED, CANCELLED
+	boost_service_package_subscriptions
+	status
+	trạng thái subscription
+	payments
+	type
+	SERVICE_PACKAGE, BOOST_PACKAGE
+	payments
+	payment_method
+	VNPAY, MOMO, BANK_TRANSFER
+	payments
+	status
+	PENDING, SUCCESS, FAILED, REFUNDED
+	invoices
+	type
+	SERVICE_PACKAGE, BOOST_PACKAGE
+	chat_messages
+	message_type
+	TEXT, IMAGE, SYSTEM
+	notifications
+	type
+	SYSTEM, RENTAL_REQUEST, RENTAL_AGREEMENT, REPORT, CHAT
+	reports
+	status
+	PENDING, PROCESSING, RESOLVED, REJECTED
