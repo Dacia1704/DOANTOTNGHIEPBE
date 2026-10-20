@@ -1,0 +1,1884 @@
+# BACKEND FOUNDATION SETUP
+
+## 1. Mục tiêu
+
+Database `DATN` đã được thiết kế sẵn.
+
+Schema gồm **34 tables**. Nhiệm vụ hiện tại là xây dựng phần foundation của Spring Boot backend dựa chính xác trên database này.
+
+Phạm vi:
+
+1. Tạo toàn bộ Entity từ database.
+2. Tạo Java Enum tương ứng với toàn bộ MySQL `ENUM`.
+3. Đặt Enum trong `common.enums`.
+4. Entity sử dụng `@Enumerated(EnumType.STRING)`.
+5. Tạo `BaseEntity` cho các field audit dùng chung.
+6. Tạo `ApiResponse`.
+7. Tạo `ErrorCode`, `AppException`, `GlobalExceptionHandler`.
+8. Thiết lập Spring Security.
+9. Thiết lập JWT authentication.
+10. Thiết lập Cloudinary.
+11. Compile và kiểm tra toàn bộ Entity mapping.
+
+Không triển khai business logic CRUD trong task này.
+
+---
+
+# 2. Database hiện tại
+
+Database:
+
+```sql
+DATN
+```
+
+MySQL:
+
+```text
+MySQL 8.0+
+```
+
+Database sử dụng:
+
+```text
+VARCHAR(36) UUID
+ENUM
+DECIMAL
+DATETIME
+DATE
+BOOLEAN
+TEXT
+TINYINT
+```
+
+Toàn bộ Entity phải mapping chính xác với schema hiện tại.
+
+---
+
+# 3. Danh sách Entity cần tạo
+
+Phải tạo đủ 34 Entity sau:
+
+```text
+1.  User
+2.  Role
+3.  Permission
+4.  UserRole
+5.  RolePermission
+
+6.  Province
+7.  Ward
+
+8.  RoomType
+9.  TenantProfile
+10. Amenity
+
+11. Room
+12. RoomAmenity
+13. RoomImage
+14. Listing
+
+15. SavedListing
+16. ListingViewHistory
+17. ListingContactEvent
+18. ListingDailyStats
+
+19. RentalRequest
+20. RentalAgreement
+
+21. ServicePackage
+22. ServicePackageSubscription
+23. BoostServicePackage
+24. BoostServicePackageSubscription
+25. Payment
+26. Invoice
+
+27. RoomReview
+28. LandlordReview
+29. TenantReview
+
+30. ChatConversation
+31. ChatMessage
+32. Notification
+
+33. Report
+34. ReportEvidence
+```
+
+Không bỏ sót Entity nào.
+
+---
+
+# 4. Package Entity
+
+Đặt toàn bộ Entity tại:
+
+```text
+entity/
+```
+
+Ví dụ:
+
+```text
+src/main/java/.../
+└── entity/
+    ├── User.java
+    ├── Role.java
+    ├── Permission.java
+    ├── UserRole.java
+    ├── RolePermission.java
+    ├── Province.java
+    ├── Ward.java
+    ├── RoomType.java
+    ├── TenantProfile.java
+    ├── Amenity.java
+    ├── Room.java
+    ├── RoomAmenity.java
+    ├── RoomImage.java
+    ├── Listing.java
+    ├── SavedListing.java
+    ├── ListingViewHistory.java
+    ├── ListingContactEvent.java
+    ├── ListingDailyStats.java
+    ├── RentalRequest.java
+    ├── RentalAgreement.java
+    ├── ServicePackage.java
+    ├── ServicePackageSubscription.java
+    ├── BoostServicePackage.java
+    ├── BoostServicePackageSubscription.java
+    ├── Payment.java
+    ├── Invoice.java
+    ├── RoomReview.java
+    ├── LandlordReview.java
+    ├── TenantReview.java
+    ├── ChatConversation.java
+    ├── ChatMessage.java
+    ├── Notification.java
+    ├── Report.java
+    └── ReportEvidence.java
+```
+
+---
+
+# 5. BaseEntity
+
+Database có một nhóm field audit lặp lại ở hầu hết các bảng:
+
+```text
+created_at
+created_by
+updated_at
+updated_by
+deleted
+```
+
+Tạo:
+
+```text
+common/entity/BaseEntity.java
+```
+
+BaseEntity:
+
+```java
+@MappedSuperclass
+@Getter
+@Setter
+public abstract class BaseEntity {
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "created_by")
+    private String createdBy;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    @Column(name = "updated_by")
+    private String updatedBy;
+
+    @Column(name = "deleted", nullable = false)
+    private Boolean deleted;
+}
+```
+
+Các Entity có đầy đủ các field trên phải:
+
+```java
+extends BaseEntity
+```
+
+Ví dụ:
+
+```java
+@Entity
+@Table(name = "users")
+@Getter
+@Setter
+public class User extends BaseEntity {
+    ...
+}
+```
+
+Không khai báo lại các field:
+
+```text
+createdAt
+createdBy
+updatedAt
+updatedBy
+deleted
+```
+
+trong Entity con.
+
+---
+
+# 6. ID Mapping
+
+Database sử dụng:
+
+```sql
+VARCHAR(36) PRIMARY KEY DEFAULT (UUID())
+```
+
+Do đó sử dụng:
+
+```java
+@Id
+@Column(name = "id", length = 36)
+private String id;
+```
+
+Đối với `tenant_profiles`:
+
+```sql
+user_id VARCHAR(36) PRIMARY KEY
+```
+
+Đây là trường hợp đặc biệt.
+
+Không tạo thêm:
+
+```java
+private String id;
+```
+
+cho `TenantProfile`.
+
+Phải mapping `user_id` là primary key của Entity.
+
+Có thể sử dụng:
+
+```java
+@Id
+@Column(name = "user_id", length = 36)
+private String userId;
+```
+
+hoặc mapping quan hệ `@MapsId` nếu muốn biểu diễn shared primary key.
+
+Ưu tiên mapping đơn giản và rõ ràng trước, không tạo complexity không cần thiết.
+
+---
+
+# 7. Enum Package
+
+Tạo:
+
+```text
+common/
+└── enums/
+```
+
+Toàn bộ Enum phải nằm trong package này.
+
+---
+
+# 8. Danh sách Enum bắt buộc
+
+Từ database hiện tại, tạo các Java Enum sau.
+
+## 8.1. UserStatus
+
+Database:
+
+```sql
+ENUM('ACTIVE', 'INACTIVE', 'BLOCKED')
+```
+
+Java:
+
+```java
+public enum UserStatus {
+    ACTIVE,
+    INACTIVE,
+    BLOCKED
+}
+```
+
+---
+
+## 8.2. RoleCode
+
+Database:
+
+```sql
+ENUM('TENANT', 'LANDLORD', 'ADMIN')
+```
+
+Java:
+
+```java
+public enum RoleCode {
+    TENANT,
+    LANDLORD,
+    ADMIN
+}
+```
+
+---
+
+## 8.3. RentalStatus
+
+Database:
+
+```sql
+ENUM('AVAILABLE', 'RENTED', 'MAINTENANCE')
+```
+
+Java:
+
+```java
+public enum RentalStatus {
+    AVAILABLE,
+    RENTED,
+    MAINTENANCE
+}
+```
+
+Field tương ứng trong `Room`:
+
+```java
+@Enumerated(EnumType.STRING)
+private RentalStatus rentalStatus;
+```
+
+---
+
+## 8.4. ListingStatus
+
+Database:
+
+```sql
+ENUM(
+    'PENDING',
+    'APPROVED',
+    'REJECTED',
+    'HIDDEN',
+    'EXPIRED'
+)
+```
+
+Java:
+
+```java
+public enum ListingStatus {
+    PENDING,
+    APPROVED,
+    REJECTED,
+    HIDDEN,
+    EXPIRED
+}
+```
+
+---
+
+## 8.5. RentalRequestStatus
+
+Database:
+
+```sql
+ENUM(
+    'PENDING',
+    'ACCEPTED',
+    'REJECTED',
+    'EXPIRED',
+    'CANCELLED'
+)
+```
+
+Java:
+
+```java
+public enum RentalRequestStatus {
+    PENDING,
+    ACCEPTED,
+    REJECTED,
+    EXPIRED,
+    CANCELLED
+}
+```
+
+---
+
+## 8.6. RentalAgreementStatus
+
+Database:
+
+```sql
+ENUM(
+    'DRAFT',
+    'PENDING_CONFIRMATION',
+    'ACTIVE',
+    'EXPIRED',
+    'TERMINATED',
+    'CANCELLED'
+)
+```
+
+Java:
+
+```java
+public enum RentalAgreementStatus {
+    DRAFT,
+    PENDING_CONFIRMATION,
+    ACTIVE,
+    EXPIRED,
+    TERMINATED,
+    CANCELLED
+}
+```
+
+---
+
+## 8.7. CreatedByRole
+
+Database:
+
+```sql
+ENUM('LANDLORD', 'TENANT')
+```
+
+Java:
+
+```java
+public enum CreatedByRole {
+    LANDLORD,
+    TENANT
+}
+```
+
+---
+
+## 8.8. ServicePackageSubscriptionStatus
+
+Database:
+
+```sql
+ENUM('ACTIVE', 'EXPIRED', 'CANCELLED')
+```
+
+Java:
+
+```java
+public enum ServicePackageSubscriptionStatus {
+    ACTIVE,
+    EXPIRED,
+    CANCELLED
+}
+```
+
+---
+
+## 8.9. BoostServicePackageSubscriptionStatus
+
+Database:
+
+```sql
+ENUM('ACTIVE', 'EXPIRED', 'CANCELLED')
+```
+
+Java:
+
+```java
+public enum BoostServicePackageSubscriptionStatus {
+    ACTIVE,
+    EXPIRED,
+    CANCELLED
+}
+```
+
+Nếu muốn tránh duplicate enum, có thể dùng chung:
+
+```java
+SubscriptionStatus
+```
+
+với:
+
+```text
+ACTIVE
+EXPIRED
+CANCELLED
+```
+
+Ưu tiên dùng chung `SubscriptionStatus` vì hai bảng có cùng domain values.
+
+---
+
+## 8.10. PaymentType
+
+Database:
+
+```sql
+ENUM('SERVICE_PACKAGE', 'BOOST_PACKAGE')
+```
+
+Java:
+
+```java
+public enum PaymentType {
+    SERVICE_PACKAGE,
+    BOOST_PACKAGE
+}
+```
+
+---
+
+## 8.11. PaymentMethod
+
+Database:
+
+```sql
+ENUM('VNPAY', 'MOMO', 'BANK_TRANSFER')
+```
+
+Java:
+
+```java
+public enum PaymentMethod {
+    VNPAY,
+    MOMO,
+    BANK_TRANSFER
+}
+```
+
+---
+
+## 8.12. PaymentStatus
+
+Database:
+
+```sql
+ENUM('PENDING', 'SUCCESS', 'FAILED', 'REFUNDED')
+```
+
+Java:
+
+```java
+public enum PaymentStatus {
+    PENDING,
+    SUCCESS,
+    FAILED,
+    REFUNDED
+}
+```
+
+---
+
+## 8.13. InvoiceType
+
+Database:
+
+```sql
+ENUM('SERVICE_PACKAGE', 'BOOST_PACKAGE')
+```
+
+Có thể dùng chung:
+
+```java
+PaymentType
+```
+
+vì cùng domain values.
+
+Không tạo Enum duplicate nếu không cần thiết.
+
+---
+
+## 8.14. ChatMessageType
+
+Database:
+
+```sql
+ENUM('TEXT', 'IMAGE', 'SYSTEM')
+```
+
+Java:
+
+```java
+public enum ChatMessageType {
+    TEXT,
+    IMAGE,
+    SYSTEM
+}
+```
+
+---
+
+## 8.15. NotificationType
+
+Database:
+
+```sql
+ENUM(
+    'SYSTEM',
+    'RENTAL_REQUEST',
+    'RENTAL_AGREEMENT',
+    'REPORT',
+    'CHAT'
+)
+```
+
+Java:
+
+```java
+public enum NotificationType {
+    SYSTEM,
+    RENTAL_REQUEST,
+    RENTAL_AGREEMENT,
+    REPORT,
+    CHAT
+}
+```
+
+---
+
+## 8.16. ReportStatus
+
+Database:
+
+```sql
+ENUM('PENDING', 'PROCESSING', 'RESOLVED', 'REJECTED')
+```
+
+Java:
+
+```java
+public enum ReportStatus {
+    PENDING,
+    PROCESSING,
+    RESOLVED,
+    REJECTED
+}
+```
+
+---
+
+# 9. Enum Mapping trong Entity
+
+Tất cả field Enum phải sử dụng:
+
+```java
+@Enumerated(EnumType.STRING)
+```
+
+Ví dụ `User`:
+
+```java
+@Enumerated(EnumType.STRING)
+@Column(name = "status", nullable = false)
+private UserStatus status;
+```
+
+`Role`:
+
+```java
+@Enumerated(EnumType.STRING)
+@Column(name = "code", nullable = false, unique = true)
+private RoleCode code;
+```
+
+`Room`:
+
+```java
+@Enumerated(EnumType.STRING)
+@Column(name = "rental_status", nullable = false)
+private RentalStatus rentalStatus;
+```
+
+Không được sử dụng:
+
+```java
+@Enumerated(EnumType.ORDINAL)
+```
+
+---
+
+# 10. Relationship Mapping
+
+Phải mapping theo đúng Foreign Key trong database.
+
+## User
+
+`users` có quan hệ với:
+
+```text
+user_roles
+tenant_profiles
+rooms
+listings.approved_by
+saved_listings
+listing_view_history
+listing_contact_events
+rental_requests
+rental_agreements
+service_package_subscriptions
+boost_service_package_subscriptions
+payments
+room_reviews
+landlord_reviews
+tenant_reviews
+chat_conversations
+chat_messages
+notifications
+reports
+```
+
+Không bắt buộc phải khai báo tất cả relationship hai chiều ngay lập tức.
+
+Ưu tiên Entity mapping rõ ràng, tránh tạo vòng lặp JSON.
+
+---
+
+# 11. UserRole
+
+Database:
+
+```text
+user_roles
+```
+
+FK:
+
+```text
+user_id → users.id
+role_id → roles.id
+```
+
+Mapping:
+
+```java
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = "user_id", nullable = false)
+private User user;
+
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = "role_id", nullable = false)
+private Role role;
+```
+
+Unique:
+
+```text
+(user_id, role_id)
+```
+
+phải được thể hiện bằng:
+
+```java
+@Table(
+    name = "user_roles",
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_user_roles",
+            columnNames = {"user_id", "role_id"}
+        )
+    }
+)
+```
+
+---
+
+# 12. RolePermission
+
+FK:
+
+```text
+role_id → roles.id
+permission_id → permissions.id
+```
+
+Mapping tương tự `UserRole`.
+
+Unique:
+
+```text
+(role_id, permission_id)
+```
+
+phải được giữ nguyên.
+
+---
+
+# 13. Province và Ward
+
+Quan hệ:
+
+```text
+Province
+    ↓
+Ward
+```
+
+`wards.province_id`:
+
+```java
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = "province_id", nullable = false)
+private Province province;
+```
+
+Không cần cascade từ Province xuống Ward nếu chưa có business requirement.
+
+---
+
+# 14. TenantProfile
+
+Primary key:
+
+```text
+user_id
+```
+
+FK:
+
+```text
+user_id → users.id
+desired_province_id → provinces.id
+desired_ward_id → wards.id
+desired_room_type_id → room_types.id
+```
+
+Các field:
+
+```text
+price_min
+price_max
+area_min
+area_max
+```
+
+sử dụng:
+
+```java
+BigDecimal
+```
+
+---
+
+# 15. Room
+
+Các FK:
+
+```text
+landlord_id → users.id
+room_type_id → room_types.id
+province_id → provinces.id
+ward_id → wards.id
+```
+
+Enum:
+
+```text
+rental_status
+```
+
+Mapping:
+
+```java
+@Enumerated(EnumType.STRING)
+private RentalStatus rentalStatus;
+```
+
+Các field tiền:
+
+```text
+price
+electricity_price
+water_price
+service_fee
+default_deposit
+```
+
+sử dụng:
+
+```java
+BigDecimal
+```
+
+`area_m2`:
+
+```java
+BigDecimal
+```
+
+`max_occupants`:
+
+```java
+Integer
+```
+
+---
+
+# 16. RoomAmenity
+
+FK:
+
+```text
+room_id → rooms.id
+amenity_id → amenities.id
+```
+
+Unique:
+
+```text
+(room_id, amenity_id)
+```
+
+---
+
+# 17. RoomImage
+
+FK:
+
+```text
+room_id → rooms.id
+```
+
+Fields:
+
+```text
+url
+public_id
+sort_order
+```
+
+`sort_order`:
+
+```java
+Integer
+```
+
+---
+
+# 18. Listing
+
+FK:
+
+```text
+room_id → rooms.id
+approved_by → users.id
+```
+
+Enum:
+
+```text
+status
+```
+
+Fields:
+
+```text
+priority_level
+view_count
+contact_count
+```
+
+sử dụng:
+
+```java
+Integer
+```
+
+---
+
+# 19. SavedListing
+
+FK:
+
+```text
+tenant_id → users.id
+listing_id → listings.id
+```
+
+Unique:
+
+```text
+(tenant_id, listing_id)
+```
+
+---
+
+# 20. ListingViewHistory
+
+FK:
+
+```text
+tenant_id → users.id
+listing_id → listings.id
+```
+
+---
+
+# 21. ListingContactEvent
+
+FK:
+
+```text
+listing_id → listings.id
+tenant_id → users.id
+```
+
+---
+
+# 22. ListingDailyStats
+
+FK:
+
+```text
+listing_id → listings.id
+```
+
+Unique:
+
+```text
+(listing_id, stat_date)
+```
+
+`stat_date`:
+
+```java
+LocalDate
+```
+
+---
+
+# 23. RentalRequest
+
+FK:
+
+```text
+listing_id → listings.id
+tenant_id → users.id
+landlord_id → users.id
+```
+
+Enum:
+
+```text
+status
+```
+
+Mapping:
+
+```java
+@Enumerated(EnumType.STRING)
+private RentalRequestStatus status;
+```
+
+Date:
+
+```text
+proposed_move_in_date → LocalDate
+```
+
+Datetime:
+
+```text
+responded_at → LocalDateTime
+expires_at → LocalDateTime
+```
+
+---
+
+# 24. RentalAgreement
+
+FK:
+
+```text
+rental_request_id → rental_requests.id
+room_id → rooms.id
+tenant_id → users.id
+landlord_id → users.id
+```
+
+Enum:
+
+```text
+status
+created_by_role
+```
+
+Money fields sử dụng:
+
+```java
+BigDecimal
+```
+
+Date fields:
+
+```text
+start_date
+end_date
+```
+
+sử dụng:
+
+```java
+LocalDate
+```
+
+Confirmation fields:
+
+```text
+landlord_confirmed_at
+tenant_confirmed_at
+```
+
+sử dụng:
+
+```java
+LocalDateTime
+```
+
+---
+
+# 25. ServicePackage
+
+Fields:
+
+```text
+max_listings
+high_priority_quota
+low_priority_quota
+billing_cycle_days
+```
+
+sử dụng:
+
+```java
+Integer
+```
+
+`has_stats`, `is_active`:
+
+```java
+Boolean
+```
+
+`price`:
+
+```java
+BigDecimal
+```
+
+---
+
+# 26. ServicePackageSubscription
+
+FK:
+
+```text
+landlord_id → users.id
+package_id → service_packages.id
+```
+
+Enum:
+
+```text
+status
+```
+
+Có thể dùng:
+
+```java
+SubscriptionStatus
+```
+
+Fields:
+
+```text
+start_at
+end_at
+```
+
+sử dụng:
+
+```java
+LocalDateTime
+```
+
+---
+
+# 27. BoostServicePackage
+
+Fields:
+
+```text
+priority_level
+duration_days
+```
+
+sử dụng:
+
+```java
+Integer
+```
+
+`price`:
+
+```java
+BigDecimal
+```
+
+`is_active`:
+
+```java
+Boolean
+```
+
+---
+
+# 28. BoostServicePackageSubscription
+
+FK:
+
+```text
+landlord_id → users.id
+listing_id → listings.id
+boost_package_id → boost_service_packages.id
+```
+
+Enum:
+
+```text
+status
+```
+
+Có thể sử dụng:
+
+```java
+SubscriptionStatus
+```
+
+---
+
+# 29. Payment
+
+FK:
+
+```text
+landlord_id → users.id
+```
+
+Enum:
+
+```text
+type
+payment_method
+status
+```
+
+Mapping:
+
+```java
+@Enumerated(EnumType.STRING)
+private PaymentType type;
+
+@Enumerated(EnumType.STRING)
+private PaymentMethod paymentMethod;
+
+@Enumerated(EnumType.STRING)
+private PaymentStatus status;
+```
+
+`amount`:
+
+```java
+BigDecimal
+```
+
+`paid_at`:
+
+```java
+LocalDateTime
+```
+
+---
+
+# 30. Invoice
+
+FK:
+
+```text
+payment_id → payments.id
+service_package_id → service_packages.id
+boost_service_package_id → boost_service_packages.id
+```
+
+Enum:
+
+```text
+type
+```
+
+Có thể dùng chung:
+
+```java
+PaymentType
+```
+
+Money:
+
+```text
+tax_amount
+total_amount
+```
+
+sử dụng:
+
+```java
+BigDecimal
+```
+
+---
+
+# 31. Review Entities
+
+Có 3 Entity:
+
+```text
+RoomReview
+LandlordReview
+TenantReview
+```
+
+Cả 3 đều có:
+
+```text
+rental_agreement_id
+```
+
+và database đặt:
+
+```sql
+UNIQUE
+```
+
+Do đó phải mapping unique.
+
+`rating`:
+
+```java
+Integer
+```
+
+Không tạo Enum cho rating.
+
+Có constraint:
+
+```sql
+rating >= 1 AND rating <= 5
+```
+
+Có thể giữ validation ở Entity bằng:
+
+```java
+@Min(1)
+@Max(5)
+```
+
+nhưng không bắt buộc nếu validation layer sẽ được xử lý ở DTO.
+
+---
+
+# 32. ChatConversation
+
+FK:
+
+```text
+listing_id → listings.id
+rental_request_id → rental_requests.id
+tenant_id → users.id
+landlord_id → users.id
+```
+
+`listing_id` và `rental_request_id` nullable.
+
+`last_message_at`:
+
+```java
+LocalDateTime
+```
+
+---
+
+# 33. ChatMessage
+
+FK:
+
+```text
+conversation_id → chat_conversations.id
+sender_id → users.id
+```
+
+Enum:
+
+```text
+message_type
+```
+
+Mapping:
+
+```java
+@Enumerated(EnumType.STRING)
+private ChatMessageType messageType;
+```
+
+`is_read`:
+
+```java
+Boolean
+```
+
+---
+
+# 34. Notification
+
+FK:
+
+```text
+user_id → users.id
+```
+
+Enum:
+
+```text
+type
+```
+
+Mapping:
+
+```java
+@Enumerated(EnumType.STRING)
+private NotificationType type;
+```
+
+---
+
+# 35. Report
+
+FK:
+
+```text
+tenant_id → users.id
+landlord_id → users.id
+listing_id → listings.id
+handled_by → users.id
+```
+
+Các FK nullable phải mapping đúng.
+
+Enum:
+
+```text
+status
+```
+
+Mapping:
+
+```java
+@Enumerated(EnumType.STRING)
+private ReportStatus status;
+```
+
+---
+
+# 36. ReportEvidence
+
+FK:
+
+```text
+report_id → reports.id
+```
+
+Fields:
+
+```text
+image_url
+image_public_id
+```
+
+Cloudinary sẽ sử dụng:
+
+```text
+image_url
+image_public_id
+```
+
+---
+
+# 37. ApiResponse
+
+Tạo:
+
+```text
+common/response/ApiResponse.java
+```
+
+```java
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ApiResponse<T> {
+
+    private int code;
+
+    private String message;
+
+    private T result;
+}
+```
+
+Response thành công:
+
+```json
+{
+    "code": 200,
+    "message": "Success",
+    "result": {}
+}
+```
+
+---
+
+# 38. Exception
+
+Tạo:
+
+```text
+exception/
+├── AppException.java
+├── ErrorCode.java
+└── GlobalExceptionHandler.java
+```
+
+Global handler sử dụng:
+
+```java
+@RestControllerAdvice
+```
+
+Phải xử lý:
+
+```text
+AppException
+MethodArgumentNotValidException
+ConstraintViolationException
+AccessDeniedException
+AuthenticationException
+Exception
+```
+
+Tất cả error response sử dụng:
+
+```text
+ApiResponse
+```
+
+---
+
+# 39. Security
+
+Tạo:
+
+```text
+config/SecurityConfig.java
+```
+
+và nếu sử dụng JWT:
+
+```text
+security/
+├── JwtService.java
+├── JwtAuthenticationFilter.java
+└── CustomUserDetailsService.java
+```
+
+Password:
+
+```java
+BCryptPasswordEncoder
+```
+
+Không lưu plaintext password.
+
+Security phải hỗ trợ RBAC dựa trên:
+
+```text
+TENANT
+LANDLORD
+ADMIN
+```
+
+Nguồn role lấy từ:
+
+```text
+users
+→ user_roles
+→ roles
+```
+
+Permission lấy từ:
+
+```text
+roles
+→ role_permissions
+→ permissions
+```
+
+Chưa cần triển khai toàn bộ authorization nghiệp vụ ở task này, nhưng Entity relationship phải đủ để phục vụ RBAC.
+
+---
+
+# 40. Cloudinary
+
+Tạo:
+
+```text
+config/CloudinaryConfig.java
+service/CloudinaryService.java
+```
+
+Configuration:
+
+```yaml
+cloudinary:
+  cloud-name: ${CLOUDINARY_CLOUD_NAME}
+  api-key: ${CLOUDINARY_API_KEY}
+  api-secret: ${CLOUDINARY_API_SECRET}
+```
+
+Không hard-code credentials.
+
+CloudinaryService tối thiểu:
+
+```text
+uploadImage()
+deleteImage()
+```
+
+Upload result:
+
+```text
+url
+publicId
+```
+
+Các database field liên quan:
+
+```text
+users.avatar_url
+users.avatar_public_id
+
+room_images.url
+room_images.public_id
+
+rental_agreements.pdf_url
+rental_agreements.pdf_public_id
+
+report_evidences.image_url
+report_evidences.image_public_id
+```
+
+---
+
+# 41. Package Structure
+
+Sau khi hoàn thành:
+
+```text
+src/main/java/.../
+│
+├── common/
+│   ├── entity/
+│   │   └── BaseEntity.java
+│   │
+│   ├── enums/
+│   │   ├── UserStatus.java
+│   │   ├── RoleCode.java
+│   │   ├── RentalStatus.java
+│   │   ├── ListingStatus.java
+│   │   ├── RentalRequestStatus.java
+│   │   ├── RentalAgreementStatus.java
+│   │   ├── CreatedByRole.java
+│   │   ├── SubscriptionStatus.java
+│   │   ├── PaymentType.java
+│   │   ├── PaymentMethod.java
+│   │   ├── PaymentStatus.java
+│   │   ├── ChatMessageType.java
+│   │   ├── NotificationType.java
+│   │   └── ReportStatus.java
+│   │
+│   └── response/
+│       └── ApiResponse.java
+│
+├── config/
+│   ├── SecurityConfig.java
+│   └── CloudinaryConfig.java
+│
+├── entity/
+│   ├── User.java
+│   ├── Role.java
+│   ├── Permission.java
+│   ├── UserRole.java
+│   ├── RolePermission.java
+│   ├── Province.java
+│   ├── Ward.java
+│   ├── RoomType.java
+│   ├── TenantProfile.java
+│   ├── Amenity.java
+│   ├── Room.java
+│   ├── RoomAmenity.java
+│   ├── RoomImage.java
+│   ├── Listing.java
+│   ├── SavedListing.java
+│   ├── ListingViewHistory.java
+│   ├── ListingContactEvent.java
+│   ├── ListingDailyStats.java
+│   ├── RentalRequest.java
+│   ├── RentalAgreement.java
+│   ├── ServicePackage.java
+│   ├── ServicePackageSubscription.java
+│   ├── BoostServicePackage.java
+│   ├── BoostServicePackageSubscription.java
+│   ├── Payment.java
+│   ├── Invoice.java
+│   ├── RoomReview.java
+│   ├── LandlordReview.java
+│   ├── TenantReview.java
+│   ├── ChatConversation.java
+│   ├── ChatMessage.java
+│   ├── Notification.java
+│   ├── Report.java
+│   └── ReportEvidence.java
+│
+├── exception/
+│   ├── AppException.java
+│   ├── ErrorCode.java
+│   └── GlobalExceptionHandler.java
+│
+├── security/
+│   ├── JwtService.java
+│   ├── JwtAuthenticationFilter.java
+│   └── CustomUserDetailsService.java
+│
+├── service/
+│   └── CloudinaryService.java
+│
+├── repository/
+│
+└── controller/
+```
+
+---
+
+# 42. Không làm trong task này
+
+Không triển khai:
+
+```text
+CRUD API
+DTO nghiệp vụ
+Service nghiệp vụ
+Repository query nghiệp vụ
+Pagination
+Search
+Filter
+Rental workflow
+Listing approval workflow
+Payment workflow
+VNPay integration
+MoMo integration
+Chat WebSocket
+Notification business logic
+Report business logic
+```
+
+Chỉ tạo foundation.
+
+---
+
+# 43. Kiểm tra cuối cùng
+
+Sau khi hoàn thành phải chạy:
+
+```powershell
+.\mvnw.cmd clean compile
+```
+
+Kiểm tra:
+
+```text
+[ ] 34/34 Entity đã được tạo
+[ ] Tất cả table đều được mapping
+[ ] PK mapping chính xác
+[ ] FK mapping chính xác
+[ ] Nullable chính xác
+[ ] Unique constraint chính xác
+[ ] BigDecimal được sử dụng cho DECIMAL
+[ ] LocalDate được sử dụng cho DATE
+[ ] LocalDateTime được sử dụng cho DATETIME
+[ ] Boolean được sử dụng cho BOOLEAN
+[ ] Enum được đặt trong common.enums
+[ ] Enum sử dụng @Enumerated(EnumType.STRING)
+[ ] Không sử dụng EnumType.ORDINAL
+[ ] BaseEntity được sử dụng đúng
+[ ] ApiResponse đã được tạo
+[ ] GlobalExceptionHandler đã được tạo
+[ ] SecurityConfig đã được tạo
+[ ] PasswordEncoder sử dụng BCrypt
+[ ] JWT configuration đã được tạo nếu project sử dụng JWT
+[ ] CloudinaryConfig đã được tạo
+[ ] CloudinaryService đã được tạo
+[ ] Không hard-code Cloudinary credentials
+[ ] Project clean compile thành công
+```
+
+---
+
+# 44. Nguyên tắc cuối cùng
+
+Database là source of truth.
+
+Nếu có bất kỳ điểm nào không rõ khi mapping Entity, phải kiểm tra lại SQL schema trước.
+
+Không được tự ý thay đổi database design trong quá trình tạo Entity.
+
+Không thêm business logic vào Entity nếu chưa được yêu cầu.
+
+Ưu tiên:
+
+```text
+Simple
+Clear
+Correct mapping
+Maintainable
+```
+
+trước khi triển khai business logic.

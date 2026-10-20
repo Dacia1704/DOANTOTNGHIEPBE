@@ -33,9 +33,9 @@ build/
 .vscode/
 
 ### Docker secrets ###
-.env
-.env.docker
-!.env.docker.example
+# .env
+# .env.docker
+# !.env.docker.example
 
 ### Logs ###
 *.log
