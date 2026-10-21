@@ -1,8 +1,4 @@
-CREATE DATABASE IF NOT EXISTS DATN
-    CHARACTER SET utf8mb4
-    COLLATE utf8mb4_unicode_ci;
-
-USE DATN;
+USE rental_db;
 
 -- =============================================================================
 -- THIẾT LẬP CƠ SỞ DỮ LIỆU MYSQL 8.0+
