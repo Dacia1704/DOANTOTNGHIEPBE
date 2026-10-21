@@ -36,6 +36,7 @@ public enum ErrorCode {
     ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "Phòng không tồn tại"),
     ROOM_TYPE_NOT_FOUND(HttpStatus.NOT_FOUND, "Loại phòng không tồn tại"),
     AMENITY_NOT_FOUND(HttpStatus.NOT_FOUND, "Tiện ích không tồn tại"),
+    AMENITY_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "Tên tiện ích đã tồn tại"),
     ROOM_IMAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "Hình ảnh phòng không tồn tại"),
     ROOM_NOT_AVAILABLE(HttpStatus.BAD_REQUEST, "Phòng không còn trống"),
     ROOM_ALREADY_RENTED(HttpStatus.BAD_REQUEST, "Phòng đã có người thuê"),
