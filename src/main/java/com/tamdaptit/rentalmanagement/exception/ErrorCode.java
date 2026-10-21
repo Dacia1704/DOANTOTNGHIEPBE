@@ -5,6 +5,14 @@ import org.springframework.http.HttpStatus;
 
 @Getter
 public enum ErrorCode {
+    CURRENT_PASSWORD_INCORRECT(HttpStatus.BAD_REQUEST, "Mật khẩu hiện tại không đúng"),
+    PASSWORD_CONFIRMATION_MISMATCH(HttpStatus.BAD_REQUEST, "Xác nhận mật khẩu mới không khớp"),
+    PASSWORD_UNCHANGED(HttpStatus.BAD_REQUEST, "Mật khẩu mới phải khác mật khẩu hiện tại"),
+    USER_IN_USE(HttpStatus.CONFLICT, "Người dùng đang có dữ liệu liên quan, hãy khóa tài khoản thay vì xóa"),
+    PROTECTED_ADMIN(HttpStatus.CONFLICT, "Không thể xóa hoặc vô hiệu hóa tài khoản admin"),
+    CLOUDINARY_NOT_CONFIGURED(HttpStatus.SERVICE_UNAVAILABLE, "Chưa cấu hình Cloudinary"),
+    AVATAR_UPLOAD_FAILED(HttpStatus.BAD_GATEWAY, "Không thể tải avatar lên Cloudinary"),
+    AVATAR_INVALID(HttpStatus.BAD_REQUEST, "Avatar phải là ảnh JPEG/PNG hợp lệ, tối đa 5MB và 4096x4096 pixel"),
     ADDRESS_CODE_EXISTS(HttpStatus.CONFLICT, "Administrative unit code already exists"),
     ADDRESS_IN_USE(HttpStatus.CONFLICT, "Ward is referenced by rooms or tenant profiles"),
     ADDRESS_SYNC_FAILED(HttpStatus.BAD_GATEWAY, "Unable to fetch valid administrative units"),

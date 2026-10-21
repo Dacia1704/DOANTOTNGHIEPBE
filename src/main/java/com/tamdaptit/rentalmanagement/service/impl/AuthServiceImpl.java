@@ -189,6 +189,12 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public RefreshTokenResponse refreshToken(RefreshTokenRequest request) {
 
+        io.jsonwebtoken.Claims claims;
+        try {
+            claims = jwtTokenService.validateToken(request.getRefreshToken());
+            if (!"refresh".equals(claims.get("type", String.class))) throw new IllegalArgumentException();
+        } catch (RuntimeException ex) { throw new AppException(ErrorCode.INVALID_REFRESH_TOKEN); }
+
         // 1. Tim refresh token trong DB
         RefreshToken refreshToken = refreshTokenRepository
                 .findByTokenAndRevokedFalse(request.getRefreshToken())
@@ -203,8 +209,14 @@ public class AuthServiceImpl implements AuthService {
 
         // 3. Nap user kem roles + permissions
         User user = userRepository
-                .findByIdWithRolesAndPermissions(refreshToken.getUser().getId())
+                .findByIdForUpdate(refreshToken.getUser().getId())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        Number version = (Number) claims.get("authVersion");
+        if (user.getAuthVersion() != (version == null ? 0 : version.intValue())) {
+            throw new AppException(ErrorCode.INVALID_REFRESH_TOKEN);
+        }
+        if (user.getStatus() == UserStatus.INACTIVE) throw new AppException(ErrorCode.USER_INACTIVE);
 
         if (user.getStatus() == UserStatus.BLOCKED) {
             throw new AppException(ErrorCode.USER_BLOCKED);
