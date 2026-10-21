@@ -35,6 +35,10 @@ public enum ErrorCode {
     // ===== ROOM =====
     ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "Phòng không tồn tại"),
     ROOM_TYPE_NOT_FOUND(HttpStatus.NOT_FOUND, "Loại phòng không tồn tại"),
+    ROOM_TYPE_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "Tên loại phòng đã tồn tại"),
+    ROOM_TYPE_HAS_CHILDREN(HttpStatus.BAD_REQUEST, "Không thể xóa loại phòng đang có loại con"),
+    ROOM_TYPE_IN_USE(HttpStatus.BAD_REQUEST, "Không thể xóa loại phòng đang được sử dụng bởi phòng"),
+    INVALID_ROOM_TYPE_PARENT(HttpStatus.BAD_REQUEST, "Loại phòng cha không hợp lệ"),
     AMENITY_NOT_FOUND(HttpStatus.NOT_FOUND, "Tiện ích không tồn tại"),
     AMENITY_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "Tên tiện ích đã tồn tại"),
     ROOM_IMAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "Hình ảnh phòng không tồn tại"),
