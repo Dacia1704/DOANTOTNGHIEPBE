@@ -5,6 +5,9 @@ import org.springframework.http.HttpStatus;
 
 @Getter
 public enum ErrorCode {
+    ADDRESS_CODE_EXISTS(HttpStatus.CONFLICT, "Administrative unit code already exists"),
+    ADDRESS_IN_USE(HttpStatus.CONFLICT, "Ward is referenced by rooms or tenant profiles"),
+    ADDRESS_SYNC_FAILED(HttpStatus.BAD_GATEWAY, "Unable to fetch valid administrative units"),
     // ===== AUTHENTICATION / AUTHORIZATION =====
     UNAUTHENTICATED(HttpStatus.UNAUTHORIZED, "Xác minh người dùng thất bại"),
     UNAUTHORIZED(HttpStatus.FORBIDDEN, "Bạn không có quyền truy cập tài nguyên này"),
