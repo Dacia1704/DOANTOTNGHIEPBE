@@ -22,5 +22,6 @@ public interface UserMapper {
     @Mapping(target = "phone", source = "phone")
     @Mapping(target = "fullName", source = "fullName")
     @Mapping(target = "citizenId", source = "citizenId")
+    @Mapping(target = "status", constant = "ACTIVE")
     User toUser(RegisterRequest request);
 }

@@ -6,7 +6,9 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+
 import java.util.UUID;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -27,24 +29,13 @@ import org.hibernate.annotations.UuidGenerator;
 public class Province {
 
     @Id
-    @GeneratedValue
-    @UuidGenerator(style = UuidGenerator.Style.AUTO)
-    @Column(columnDefinition = "CHAR(36)", updatable = false, nullable = false)
-    String id;
+    @UuidGenerator
+    @Column(length = 36)
+    private String id;
 
-    @Column(nullable = false, length = 20)
-    String code;
+    @Column(nullable = false, unique = true, length = 50)
+    private String code;
 
     @Column(nullable = false, length = 100)
-    String name;
-
-    @Column(name = "is_deleted", nullable = false)
-    @Builder.Default
-    Boolean isDeleted = false;
-
-    @PrePersist
-    void prePersist() {
-        if (id == null) id = UUID.randomUUID().toString();
-        if (isDeleted == null) isDeleted = false;
-    }
+    private String name;
 }

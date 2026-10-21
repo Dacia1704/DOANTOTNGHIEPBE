@@ -11,10 +11,12 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,6 +24,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
 @Entity
@@ -35,38 +39,27 @@ import org.hibernate.annotations.UuidGenerator;
 public class Role {
 
     @Id
-    @GeneratedValue
-    @UuidGenerator(style = UuidGenerator.Style.AUTO)
-    @Column(columnDefinition = "CHAR(36)", updatable = false, nullable = false)
-    String id;
+    @UuidGenerator
+    @Column(length = 36)
+    private String id;
 
-    /** TENANT / LANDLORD / ADMIN */
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, unique = true, length = 20)
     RoleCode code;
 
-    @Column(nullable = false, length = 50)
-    String name;
+    @Column(nullable = false, length = 100)
+    private String name;
 
-    @Column(length = 255)
-    String description;
-
-    @Column(name = "is_deleted", nullable = false)
-    @Builder.Default
-    Boolean isDeleted = false;
-
+    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    LocalDateTime createdAt;
+    private LocalDateTime createdAt;
 
-    /** N-N voi permissions qua bang role_permissions */
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
     @OneToMany(mappedBy = "role", fetch = FetchType.LAZY)
     @Builder.Default
-    Set<RolePermission> rolePermissions = new HashSet<>();
+    private Set<RolePermission> rolePermissions = new HashSet<>();
 
-    @PrePersist
-    void prePersist() {
-        if (id == null) id = UUID.randomUUID().toString();
-        if (createdAt == null) createdAt = LocalDateTime.now();
-        if (isDeleted == null) isDeleted = false;
-    }
 }

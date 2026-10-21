@@ -21,6 +21,7 @@ public interface AuthMapper {
         }
         return user.getUserRoles()
                 .stream()
+                .filter(Objects::nonNull)
                 .map(UserRole::getRole)
                 .filter(Objects::nonNull)
                 .map(r -> r.getCode())
@@ -36,6 +37,7 @@ public interface AuthMapper {
         }
         return user.getUserRoles()
                 .stream()
+                .filter(Objects::nonNull)
                 .map(UserRole::getRole)
                 .filter(Objects::nonNull)
                 .map(r -> r.getCode())

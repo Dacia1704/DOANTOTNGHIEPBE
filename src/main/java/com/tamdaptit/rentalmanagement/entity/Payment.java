@@ -15,9 +15,11 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,6 +27,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
 /**
@@ -43,61 +47,45 @@ import org.hibernate.annotations.UuidGenerator;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class Payment {
 
+
     @Id
-    @GeneratedValue
-    @UuidGenerator(style = UuidGenerator.Style.AUTO)
-    @Column(columnDefinition = "CHAR(36)", updatable = false, nullable = false)
-    String id;
+    @UuidGenerator
+    @Column(length = 36)
+    private String id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "landlord_id", nullable = false)
-    User landlord;
+    private User landlord;
 
-    /** SERVICE_PACKAGE / BOOST_PACKAGE */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     PaymentType type;
 
-    /** ID doi tuong duoc thanh toan (polymorphic) */
-    @Column(name = "reference_id", nullable = false, columnDefinition = "CHAR(36)")
-    String referenceId;
+    @Column(name = "reference_id", nullable = false, length = 36)
+    private String referenceId;
 
     @Column(nullable = false, precision = 12, scale = 2)
-    BigDecimal amount;
+    private BigDecimal amount;
 
-    /** VNPAY / MOMO / BANK_TRANSFER */
     @Enumerated(EnumType.STRING)
-    @Column(name = "payment_method", nullable = false, length = 20)
+    @Column(name = "payment_method", nullable = false, length = 30)
     PaymentMethod paymentMethod;
 
-    /** PENDING / SUCCESS / FAILED / REFUNDED */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    @Builder.Default
     PaymentStatus status = PaymentStatus.PENDING;
 
     @Column(name = "provider_txn_id", length = 255)
-    String providerTxnId;
+    private String providerTxnId;
 
     @Column(name = "paid_at")
-    LocalDateTime paidAt;
+    private LocalDateTime paidAt;
 
+    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    LocalDateTime createdAt;
+    private LocalDateTime createdAt;
 
+    @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
-    LocalDateTime updatedAt;
-
-    @PrePersist
-    protected void onCreate() {
-        if (id == null) id = UUID.randomUUID().toString();
-        if (createdAt == null) createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-        if (status == null) status = PaymentStatus.PENDING;
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
+    private LocalDateTime updatedAt;
 }

@@ -10,9 +10,11 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -28,13 +30,7 @@ import org.hibernate.annotations.UuidGenerator;
  * Unique (listing_id, stat_date) dam bao 1 listing co nhieu ban ghi theo ngay.
  */
 @Entity
-@Table(
-    name = "listing_daily_stats",
-    uniqueConstraints = @UniqueConstraint(
-        name = "UQ_lds_listing_date",
-        columnNames = {"listing_id", "stat_date"}
-    )
-)
+@Table(name = "listing_daily_stats")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -44,34 +40,20 @@ import org.hibernate.annotations.UuidGenerator;
 public class ListingDailyStat {
 
     @Id
-    @GeneratedValue
-    @UuidGenerator(style = UuidGenerator.Style.AUTO)
-    @Column(columnDefinition = "CHAR(36)", updatable = false, nullable = false)
-    String id;
+    @UuidGenerator
+    @Column(length = 36)
+    private String id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "listing_id", nullable = false)
-    Listing listing;
+    private Listing listing;
 
     @Column(name = "stat_date", nullable = false)
-    LocalDate statDate;
+    private LocalDate statDate;
 
-    @Column(name = "view_count", nullable = false)
-    @Builder.Default
-    Long viewCount = 0L;
+    @Column(name = "view_count")
+    private Integer viewCount = 0;
 
-    @Column(name = "contact_count", nullable = false)
-    @Builder.Default
-    Long contactCount = 0L;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    LocalDateTime createdAt;
-
-    @PrePersist
-    protected void onCreate() {
-        if (id == null) id = UUID.randomUUID().toString();
-        if (createdAt == null) createdAt = LocalDateTime.now();
-        if (viewCount == null) viewCount = 0L;
-        if (contactCount == null) contactCount = 0L;
-    }
+    @Column(name = "contact_count")
+    private Integer contactCount = 0;
 }

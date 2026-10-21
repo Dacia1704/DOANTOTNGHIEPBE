@@ -12,9 +12,11 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,6 +24,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
 @Entity
@@ -35,54 +38,45 @@ import org.hibernate.annotations.UuidGenerator;
 public class Invoice {
 
     @Id
-    @GeneratedValue
-    @UuidGenerator(style = UuidGenerator.Style.AUTO)
-    @Column(columnDefinition = "CHAR(36)", updatable = false, nullable = false)
-    String id;
+    @UuidGenerator
+    @Column(length = 36)
+    private String id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "payment_id", nullable = false)
-    Payment payment;
+    private Payment payment;
 
-    /** SERVICE_PACKAGE / BOOST_PACKAGE */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     InvoiceType type;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "service_package_id")
-    ServicePackage servicePackage;
+    private ServicePackage servicePackage;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "boost_service_package_id")
-    BoostServicePackage boostServicePackage;
+    private BoostServicePackage boostServicePackage;
 
-    @Column(name = "invoice_no", nullable = false, length = 50, unique = true)
-    String invoiceNo;
+    @Column(name = "invoice_no", nullable = false, unique = true, length = 100)
+    private String invoiceNo;
 
-    @Column(name = "tax_amount", nullable = false, precision = 12, scale = 2)
-    @Builder.Default
-    BigDecimal taxAmount = BigDecimal.ZERO;
+    @Column(name = "tax_amount", precision = 12, scale = 2)
+    private BigDecimal taxAmount = BigDecimal.ZERO;
 
     @Column(name = "total_amount", nullable = false, precision = 12, scale = 2)
-    BigDecimal totalAmount;
+    private BigDecimal totalAmount;
 
-    @Column(name = "buyer_name", nullable = false, length = 100)
-    String buyerName;
+    @Column(name = "buyer_name", length = 255)
+    private String buyerName;
 
-    @Column(name = "buyer_tax_code", length = 20)
-    String buyerTaxCode;
+    @Column(name = "buyer_tax_code", length = 50)
+    private String buyerTaxCode;
 
-    @Column(name = "issued_at", nullable = false)
-    LocalDateTime issuedAt;
+    @Column(name = "issued_at")
+    private LocalDateTime issuedAt;
 
+    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    LocalDateTime createdAt;
-
-    @PrePersist
-    protected void onCreate() {
-        if (id == null) id = UUID.randomUUID().toString();
-        if (createdAt == null) createdAt = LocalDateTime.now();
-        if (taxAmount == null) taxAmount = BigDecimal.ZERO;
-    }
+    private LocalDateTime createdAt;
 }

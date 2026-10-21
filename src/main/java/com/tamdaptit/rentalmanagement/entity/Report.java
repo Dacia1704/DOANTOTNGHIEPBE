@@ -13,8 +13,10 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+
 import java.time.LocalDateTime;
 import java.util.UUID;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,6 +24,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
 @Entity
@@ -35,65 +39,48 @@ import org.hibernate.annotations.UuidGenerator;
 public class Report {
 
     @Id
-    @GeneratedValue
-    @UuidGenerator(style = UuidGenerator.Style.AUTO)
-    @Column(columnDefinition = "CHAR(36)", updatable = false, nullable = false)
-    String id;
+    @UuidGenerator
+    @Column(length = 36)
+    private String id;
 
-    /** Nguoi gui bao cao */
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "tenant_id", nullable = false)
-    User tenant;
+    private User tenant;
 
-    /** Chu tro bi bao cao */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "landlord_id", nullable = false)
-    User landlord;
+    @JoinColumn(name = "landlord_id")
+    private User landlord;
 
-    /** Tin dang bi bao cao */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "listing_id")
-    Listing listing;
+    private Listing listing;
 
-    @Column(name = "reason_code", nullable = false, length = 50)
-    String reasonCode;
+    @Column(name = "reason_code", nullable = false, length = 100)
+    private String reasonCode;
 
     @Column(columnDefinition = "TEXT")
-    String description;
+    private String description;
 
-    /** PENDING / PROCESSING / RESOLVED / REJECTED */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    @Builder.Default
     ReportStatus status = ReportStatus.PENDING;
 
-    /** Admin xu ly */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "handled_by")
-    User handledBy;
+    private User handledBy;
 
     @Column(name = "resolution_note", columnDefinition = "TEXT")
-    String resolutionNote;
+    private String resolutionNote;
 
     @Column(name = "resolved_at")
-    LocalDateTime resolvedAt;
+    private LocalDateTime resolvedAt;
 
+    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    LocalDateTime createdAt;
+    private LocalDateTime createdAt;
 
+    @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
-    LocalDateTime updatedAt;
+    private LocalDateTime updatedAt;
 
-    @PrePersist
-    protected void onCreate() {
-        if (id == null) id = UUID.randomUUID().toString();
-        if (createdAt == null) createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-        if (status == null) status = ReportStatus.PENDING;
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
 }

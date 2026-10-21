@@ -9,9 +9,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface PermissionRepository extends JpaRepository<Permission, String> {
 
-    List<Permission> findAllByIsDeletedFalse();
+    List<Permission> findAll();
 
-    Optional<Permission> findByCodeAndIsDeletedFalse(String code);
+    Optional<Permission> findByCode(String code);
 
-    boolean existsByCodeAndIsDeletedFalse(String code);
+    boolean existsByCode(String code);
 }

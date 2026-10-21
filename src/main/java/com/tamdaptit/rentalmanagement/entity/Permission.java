@@ -5,8 +5,10 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+
 import java.time.LocalDateTime;
 import java.util.UUID;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -14,6 +16,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
 @Entity
@@ -25,33 +29,22 @@ import org.hibernate.annotations.UuidGenerator;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class Permission {
-
     @Id
-    @GeneratedValue
-    @UuidGenerator(style = UuidGenerator.Style.AUTO)
-    @Column(columnDefinition = "CHAR(36)", updatable = false, nullable = false)
-    String id;
+    @UuidGenerator
+    @Column(length = 36)
+    private String id;
 
-    @Column(nullable = false, length = 50)
-    String code;
+    @Column(nullable = false, unique = true, length = 100)
+    private String code;
 
     @Column(nullable = false, length = 255)
-    String name;
+    private String name;
 
-    @Column(length = 255)
-    String description;
-
-    @Column(name = "is_deleted", nullable = false)
-    @Builder.Default
-    Boolean isDeleted = false;
-
+    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    LocalDateTime createdAt;
+    private LocalDateTime createdAt;
 
-    @jakarta.persistence.PrePersist
-    void prePersist() {
-        if (createdAt == null) createdAt = LocalDateTime.now();
-        if (isDeleted == null) isDeleted = false;
-        if (id == null) id = UUID.randomUUID().toString();
-    }
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
 }

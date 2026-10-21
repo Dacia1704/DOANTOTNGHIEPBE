@@ -17,7 +17,7 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Stri
 
     boolean existsByToken(String token);
 
-    List<RefreshToken> findAllByUserIdAndRevokedFalse(String userId);
+    List<RefreshToken> findAllByUser_IdAndRevokedFalse(String userId);
 
     /**
      * Revoke tat ca token cua mot user (dang xuat o moi thiet bi).

@@ -11,8 +11,10 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,6 +22,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.UuidGenerator;
 
 /**
  * 1-1 voi users: user_id vua la khoa chinh vua la khoa ngoai.
@@ -35,56 +40,37 @@ import lombok.experimental.FieldDefaults;
 public class TenantProfile {
 
     @Id
-    @Column(name = "user_id", columnDefinition = "CHAR(36)")
-    String userId;
+    @UuidGenerator
+    @Column(length = 36)
+    private String id;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @MapsId
-    @JoinColumn(name = "user_id")
-    User user;
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false, unique = true)
+    private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "desired_province_id")
-    Province desiredProvince;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "desired_district_id")
-    District desiredDistrict;
-
+    private Province desiredProvince;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "desired_ward_id")
-    Ward desiredWard;
-
+    private Ward desiredWard;
     @Column(name = "price_min", precision = 12, scale = 2)
-    BigDecimal priceMin;
-
+    private BigDecimal priceMin;
     @Column(name = "price_max", precision = 12, scale = 2)
-    BigDecimal priceMax;
-
-    @Column(name = "area_min", precision = 6, scale = 2)
-    BigDecimal areaMin;
-
-    @Column(name = "area_max", precision = 6, scale = 2)
-    BigDecimal areaMax;
-
+    private BigDecimal priceMax;
+    @Column(name = "area_min", precision = 8, scale = 2)
+    private BigDecimal areaMin;
+    @Column(name = "area_max", precision = 8, scale = 2)
+    private BigDecimal areaMax;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "desired_room_type_id")
-    RoomType desiredRoomType;
+    private RoomType desiredRoomType;
 
+    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    LocalDateTime createdAt;
+    private LocalDateTime createdAt;
 
+    @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
-    LocalDateTime updatedAt;
-
-    @PrePersist
-    protected void onCreate() {
-        if (createdAt == null) createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
+    private LocalDateTime updatedAt;
 }

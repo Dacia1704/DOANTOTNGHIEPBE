@@ -14,10 +14,12 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,6 +27,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
 /**
@@ -37,116 +41,84 @@ import org.hibernate.annotations.UuidGenerator;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@FieldDefaults(level = AccessLevel.PRIVATE)
 public class RentalAgreement {
 
     @Id
-    @GeneratedValue
-    @UuidGenerator(style = UuidGenerator.Style.AUTO)
-    @Column(columnDefinition = "CHAR(36)", updatable = false, nullable = false)
-    String id;
+    @UuidGenerator
+    @Column(length = 36)
+    private String id;
 
-    @Column(name = "agreement_code", nullable = false, length = 30, unique = true)
-    String agreementCode;
+    @Column(name = "agreement_code", nullable = false, unique = true, length = 50)
+    private String agreementCode;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "rental_request_id")
-    RentalRequest rentalRequest;
+    private RentalRequest rentalRequest;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "room_id", nullable = false)
-    Room room;
+    private Room room;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "tenant_id", nullable = false)
-    User tenant;
+    private User tenant;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "landlord_id", nullable = false)
-    User landlord;
+    private User landlord;
 
-    /** Snapshot gia thue */
     @Column(nullable = false, precision = 12, scale = 2)
-    BigDecimal price;
+    private BigDecimal price;
 
-    /** Snapshot tien coc */
-    @Column(nullable = false, precision = 12, scale = 2)
-    @Builder.Default
-    BigDecimal deposit = BigDecimal.ZERO;
+    @Column(precision = 12, scale = 2)
+    private BigDecimal deposit;
 
-    /** Snapshot gia dien */
-    @Column(name = "electricity_price", nullable = false, precision = 10, scale = 2)
-    @Builder.Default
-    BigDecimal electricityPrice = BigDecimal.ZERO;
+    @Column(name = "electricity_price", precision = 10, scale = 2)
+    private BigDecimal electricityPrice;
 
-    /** Snapshot gia nuoc */
-    @Column(name = "water_price", nullable = false, precision = 10, scale = 2)
-    @Builder.Default
-    BigDecimal waterPrice = BigDecimal.ZERO;
+    @Column(name = "water_price", precision = 10, scale = 2)
+    private BigDecimal waterPrice;
 
-    /** Snapshot phi dich vu */
-    @Column(name = "service_fee", nullable = false, precision = 10, scale = 2)
-    @Builder.Default
-    BigDecimal serviceFee = BigDecimal.ZERO;
+    @Column(name = "service_fee", precision = 10, scale = 2)
+    private BigDecimal serviceFee;
 
-    /** Chu ky thanh toan (thang) */
-    @Column(name = "payment_cycle_months", nullable = false)
-    @Builder.Default
-    Integer paymentCycleMonths = 1;
+    @Column(name = "payment_cycle_months")
+    private Integer paymentCycleMonths = 1;
 
     @Column(name = "start_date", nullable = false)
-    LocalDate startDate;
+    private LocalDate startDate;
 
     @Column(name = "end_date", nullable = false)
-    LocalDate endDate;
+    private LocalDate endDate;
 
     @Column(name = "terms_text", columnDefinition = "TEXT")
-    String termsText;
+    private String termsText;
 
-    @Column(name = "pdf_url", length = 500)
-    String pdfUrl;
+    @Column(name = "pdf_url", length = 255)
+    private String pdfUrl;
 
     @Column(name = "pdf_public_id", length = 255)
-    String pdfPublicId;
+    private String pdfPublicId;
 
-    /** DRAFT / PENDING_CONFIRMATION / ACTIVE / EXPIRED / TERMINATED / CANCELLED */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
-    @Builder.Default
-    RentalAgreementStatus status = RentalAgreementStatus.DRAFT;
+    private RentalAgreementStatus status = RentalAgreementStatus.DRAFT;
 
-    /** LANDLORD / TENANT */
     @Enumerated(EnumType.STRING)
-    @Column(name = "created_by_role", length = 20)
-    CreatedByRole createdByRole;
+    @Column(name = "created_by_role", nullable = false, length = 20)
+    private CreatedByRole createdByRole;
 
     @Column(name = "landlord_confirmed_at")
-    LocalDateTime landlordConfirmedAt;
+    private LocalDateTime landlordConfirmedAt;
 
     @Column(name = "tenant_confirmed_at")
-    LocalDateTime tenantConfirmedAt;
+    private LocalDateTime tenantConfirmedAt;
 
+    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    LocalDateTime createdAt;
+    private LocalDateTime createdAt;
 
+    @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
-    LocalDateTime updatedAt;
-
-    @PrePersist
-    protected void onCreate() {
-        if (id == null) id = UUID.randomUUID().toString();
-        if (createdAt == null) createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-        if (status == null) status = RentalAgreementStatus.DRAFT;
-        if (paymentCycleMonths == null) paymentCycleMonths = 1;
-        if (deposit == null) deposit = BigDecimal.ZERO;
-        if (electricityPrice == null) electricityPrice = BigDecimal.ZERO;
-        if (waterPrice == null) waterPrice = BigDecimal.ZERO;
-        if (serviceFee == null) serviceFee = BigDecimal.ZERO;
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
+    private LocalDateTime updatedAt;
 }

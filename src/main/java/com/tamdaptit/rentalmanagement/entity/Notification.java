@@ -12,8 +12,10 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+
 import java.time.LocalDateTime;
 import java.util.UUID;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -21,6 +23,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
 /**
@@ -38,45 +41,35 @@ import org.hibernate.annotations.UuidGenerator;
 public class Notification {
 
     @Id
-    @GeneratedValue
-    @UuidGenerator(style = UuidGenerator.Style.AUTO)
-    @Column(columnDefinition = "CHAR(36)", updatable = false, nullable = false)
-    String id;
+    @UuidGenerator
+    @Column(length = 36)
+    private String id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
-    User user;
+    private User user;
 
-    /** SYSTEM / RENTAL_REQUEST / RENTAL_AGREEMENT / REPORT / CHAT */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     NotificationType type;
 
     @Column(nullable = false, length = 255)
-    String title;
+    private String title;
 
-    @Column(columnDefinition = "TEXT")
-    String body;
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String body;
 
-    /** Loai entity lien quan (VD: RENTAL_REQUEST, REPORT) */
     @Column(name = "reference_type", length = 50)
-    String referenceType;
+    private String referenceType;
 
-    /** ID entity lien quan (polymorphic) */
-    @Column(name = "reference_id", columnDefinition = "CHAR(36)")
-    String referenceId;
+    @Column(name = "reference_id", length = 36)
+    private String referenceId;
 
-    @Column(name = "is_read", nullable = false)
-    @Builder.Default
-    Boolean isRead = false;
+    @Column(name = "is_read")
+    private Boolean read = false;
 
+    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    LocalDateTime createdAt;
+    private LocalDateTime createdAt;
 
-    @PrePersist
-    protected void onCreate() {
-        if (id == null) id = UUID.randomUUID().toString();
-        if (createdAt == null) createdAt = LocalDateTime.now();
-        if (isRead == null) isRead = false;
-    }
 }

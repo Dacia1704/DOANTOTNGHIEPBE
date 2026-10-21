@@ -11,7 +11,6 @@ import com.tamdaptit.rentalmanagement.entity.RefreshToken;
 import com.tamdaptit.rentalmanagement.entity.Role;
 import com.tamdaptit.rentalmanagement.entity.User;
 import com.tamdaptit.rentalmanagement.entity.UserRole;
-import com.tamdaptit.rentalmanagement.entity.UserRoleId;
 import com.tamdaptit.rentalmanagement.entity.enums.RoleCode;
 import com.tamdaptit.rentalmanagement.entity.enums.UserStatus;
 import com.tamdaptit.rentalmanagement.exception.AppException;
@@ -27,7 +26,7 @@ import com.tamdaptit.rentalmanagement.service.JwtTokenService;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Set;
+
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -62,7 +61,7 @@ public class AuthServiceImpl implements AuthService {
     public RegisterResponse register(RegisterRequest request) {
 
         // 1. Validate email chua ton tai
-        if (userRepository.existsByEmailAndIsDeletedFalse(request.getEmail())) {
+        if (userRepository.existsByEmail(request.getEmail())) {
             throw new AppException(
                     ErrorCode.EMAIL_ALREADY_EXISTS,
                     String.format("Email %s đã tồn tại", request.getEmail())
@@ -72,7 +71,7 @@ public class AuthServiceImpl implements AuthService {
         // 2. Validate so dien thoai chua ton tai
         if (request.getPhone() != null
                 && !request.getPhone().isBlank()
-                && userRepository.existsByPhoneAndIsDeletedFalse(request.getPhone())) {
+                && userRepository.existsByPhone(request.getPhone())) {
 
             throw new AppException(
                     ErrorCode.PHONE_ALREADY_EXISTS,
@@ -83,7 +82,7 @@ public class AuthServiceImpl implements AuthService {
         // 3. Validate CCCD chua ton tai (neu co)
         if (request.getCitizenId() != null
                 && !request.getCitizenId().isBlank()
-                && userRepository.existsByCitizenIdAndIsDeletedFalse(request.getCitizenId())) {
+                && userRepository.existsByCitizenId(request.getCitizenId())) {
 
             throw new AppException(
                     ErrorCode.CITIZEN_ID_ALREADY_EXISTS,
@@ -93,7 +92,7 @@ public class AuthServiceImpl implements AuthService {
 
         // 4. Chi cho phep dang ky voi TENANT hoac LANDLORD (khong cho ADMIN)
         RoleCode roleCode = request.getRoleCode();
-        if (roleCode == RoleCode.ADMIN) {
+        if (roleCode != RoleCode.TENANT && roleCode != RoleCode.LANDLORD) {
             throw new AppException(
                     ErrorCode.INVALID_REGISTER_ROLE,
                     "Không thể đăng ký tài khoản với vai trò quản trị viên"
@@ -101,7 +100,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // 5. Tim role trong DB
-        Role role = roleRepository.findByCodeAndIsDeletedFalse(roleCode)
+        Role role = roleRepository.findByCode(roleCode)
                 .orElseThrow(() -> new AppException(
                         ErrorCode.ROLE_NOT_FOUND,
                         String.format("Không tìm thấy vai trò %s", roleCode)
@@ -111,8 +110,6 @@ public class AuthServiceImpl implements AuthService {
         User user = userMapper.toUser(request);
 
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setStatus(UserStatus.ACTIVE);
-        user.setIsDeleted(false);
         user.setEmailVerifiedAt(null);
         user.setPhoneVerifiedAt(null);
 
@@ -120,14 +117,10 @@ public class AuthServiceImpl implements AuthService {
 
         // 7. Gan role qua bang trung gian user_roles
         UserRole userRole = UserRole.builder()
-                .id(UserRoleId.builder()
-                        .userId(savedUser.getId())
-                        .roleId(role.getId())
-                        .build())
                 .user(savedUser)
                 .role(role)
                 .build();
-
+        savedUser.getUserRoles().add(userRole);
         userRoleRepository.save(userRole);
 
         // 8. Nap lai user kem roles + permissions de build authorities
@@ -159,9 +152,6 @@ public class AuthServiceImpl implements AuthService {
                 ));
 
         // 2. Kiem tra trang thai tai khoan
-        if (Boolean.TRUE.equals(user.getIsDeleted())) {
-            throw new AppException(ErrorCode.USER_DELETED);
-        }
         if (user.getStatus() == UserStatus.BLOCKED) {
             throw new AppException(ErrorCode.USER_BLOCKED);
         }
@@ -216,9 +206,6 @@ public class AuthServiceImpl implements AuthService {
                 .findByIdWithRolesAndPermissions(refreshToken.getUser().getId())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        if (Boolean.TRUE.equals(user.getIsDeleted())) {
-            throw new AppException(ErrorCode.USER_DELETED);
-        }
         if (user.getStatus() == UserStatus.BLOCKED) {
             throw new AppException(ErrorCode.USER_BLOCKED);
         }
@@ -248,6 +235,9 @@ public class AuthServiceImpl implements AuthService {
                 .findByTokenAndRevokedFalse(request.getRefreshToken())
                 .orElseThrow(() -> new AppException(ErrorCode.INVALID_REFRESH_TOKEN));
 
+        if (!refreshToken.getUser().getId().equals(userIdFromSecurity())) {
+            throw new AppException(ErrorCode.INVALID_REFRESH_TOKEN);
+        }
         refreshToken.setRevoked(true);
         refreshTokenRepository.save(refreshToken);
     }
@@ -261,5 +251,14 @@ public class AuthServiceImpl implements AuthService {
                         .revoked(false)
                         .build()
         );
+    }
+
+    private String userIdFromSecurity() {
+        var authentication = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AppException(ErrorCode.INVALID_REFRESH_TOKEN);
+        }
+        return authentication.getName();
     }
 }

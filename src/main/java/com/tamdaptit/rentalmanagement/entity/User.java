@@ -12,10 +12,12 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,6 +25,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 import com.tamdaptit.rentalmanagement.entity.enums.UserStatus;
 
@@ -37,88 +41,50 @@ import com.tamdaptit.rentalmanagement.entity.enums.UserStatus;
 public class User {
 
     @Id
-    @GeneratedValue
-    @UuidGenerator(style = UuidGenerator.Style.AUTO)
-    @Column(columnDefinition = "CHAR(36)", updatable = false, nullable = false)
-    String id;
+    @UuidGenerator
+    @Column(length = 36)
+    private String id;
 
-    @Column(nullable = false, length = 100)
-    String email;
+    @Column(nullable = false, unique = true, length = 255)
+    private String email;
 
     @Column(length = 20)
-    String phone;
+    private String phone;
 
-    /** BCrypt hash */
     @Column(nullable = false, length = 255)
-    String password;
+    private String password;
 
-    @Column(name = "full_name", nullable = false, length = 100)
-    String fullName;
+    @Column(name = "full_name", length = 100)
+    private String fullName;
 
-    @Column(name = "avatar_url", length = 500)
-    String avatarUrl;
+    @Column(name = "avatar_url", length = 255)
+    private String avatarUrl;
 
     @Column(name = "avatar_public_id", length = 255)
-    String avatarPublicId;
+    private String avatarPublicId;
 
     @Column(name = "citizen_id", length = 20)
-    String citizenId;
+    private String citizenId;
 
     @Column(name = "email_verified_at")
-    LocalDateTime emailVerifiedAt;
+    private LocalDateTime emailVerifiedAt;
 
     @Column(name = "phone_verified_at")
-    LocalDateTime phoneVerifiedAt;
+    private LocalDateTime phoneVerifiedAt;
 
-    /** ACTIVE / INACTIVE / BLOCKED */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    @Builder.Default
     UserStatus status = UserStatus.ACTIVE;
 
-    @Column(name = "is_deleted", nullable = false)
-    @Builder.Default
-    Boolean isDeleted = false;
-
+    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    LocalDateTime createdAt;
+    private LocalDateTime createdAt;
 
+    @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
-    LocalDateTime updatedAt;
+    private LocalDateTime updatedAt;
 
-    /**
-     * Quan he N:N toi Role qua bang trung gian user_roles.
-     * Mot user co the vua la TENANT vua la LANDLORD dong thoi.
-     */
-    @OneToMany(
-            mappedBy = "user",
-            cascade = CascadeType.ALL,
-            orphanRemoval = true,
-            fetch = FetchType.LAZY
-    )
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     @Builder.Default
-    Set<UserRole> userRoles = new HashSet<>();
-
-    @OneToMany(
-            mappedBy = "user",
-            cascade = CascadeType.ALL,
-            orphanRemoval = true,
-            fetch = FetchType.LAZY
-    )
-    @Builder.Default
-    Set<RefreshToken> refreshTokens = new HashSet<>();
-
-    @PrePersist
-    protected void onCreate() {
-        if (id == null) id = UUID.randomUUID().toString();
-        if (createdAt == null) createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-        if (status == null) status = UserStatus.ACTIVE;
-        if (isDeleted == null) isDeleted = false;
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
+    private Set<UserRole> userRoles = new HashSet<>();
 }

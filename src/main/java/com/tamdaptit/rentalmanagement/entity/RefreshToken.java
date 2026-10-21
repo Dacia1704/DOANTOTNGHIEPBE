@@ -21,7 +21,11 @@ import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.UuidGenerator;
 
 @Entity
-@Table(name = "refresh_tokens")
+@Table(name = "refresh_tokens", indexes = {
+        @jakarta.persistence.Index(name = "IX_refresh_tokens_token", columnList = "token"),
+        @jakarta.persistence.Index(name = "IX_refresh_tokens_user_id", columnList = "user_id"),
+        @jakarta.persistence.Index(name = "IX_refresh_tokens_expires_at", columnList = "expires_at")
+})
 @Getter
 @Setter
 @NoArgsConstructor

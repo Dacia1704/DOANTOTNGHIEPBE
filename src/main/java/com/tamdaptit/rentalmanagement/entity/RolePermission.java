@@ -1,12 +1,6 @@
 package com.tamdaptit.rentalmanagement.entity;
 
-import jakarta.persistence.EmbeddedId;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.MapsId;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -14,9 +8,13 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.UuidGenerator;
 
 @Entity
-@Table(name = "role_permissions")
+@Table(name = "role_permissions", uniqueConstraints = @UniqueConstraint(
+        name = "UX_role_permissions_role_permission",
+        columnNames = {"role_id", "permission_id"}
+))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -25,16 +23,16 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class RolePermission {
 
-    @EmbeddedId
-    RolePermissionId id;
+    @Id
+    @UuidGenerator
+    @Column(length = 36)
+    private String id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("roleId")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "role_id", nullable = false)
-    Role role;
+    private Role role;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("permissionId")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "permission_id", nullable = false)
-    Permission permission;
+    private Permission permission;
 }

@@ -6,9 +6,11 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,6 +18,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
 @Entity
@@ -27,41 +31,34 @@ import org.hibernate.annotations.UuidGenerator;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class BoostServicePackage {
-
     @Id
-    @GeneratedValue
-    @UuidGenerator(style = UuidGenerator.Style.AUTO)
-    @Column(columnDefinition = "CHAR(36)", updatable = false, nullable = false)
-    String id;
+    @UuidGenerator
+    @Column(length = 36)
+    private String id;
 
-    @Column(nullable = false, length = 30, unique = true)
-    String code;
+    @Column(nullable = false, unique = true, length = 50)
+    private String code;
 
     @Column(nullable = false, length = 100)
-    String name;
+    private String name;
 
-    @Column(name = "priority_level", nullable = false)
-    @Builder.Default
-    Integer priorityLevel = 0;
+    @Column(name = "priority_level")
+    private Integer priorityLevel = 1;
 
-    @Column(name = "duration_days", nullable = false)
-    Integer durationDays;
+    @Column(name = "duration_days")
+    private Integer durationDays = 1;
 
     @Column(nullable = false, precision = 12, scale = 2)
-    BigDecimal price;
+    private BigDecimal price;
 
-    @Column(name = "is_active", nullable = false)
-    @Builder.Default
-    Boolean isActive = true;
+    @Column(name = "is_active")
+    private Boolean active = true;
 
+    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    LocalDateTime createdAt;
+    private LocalDateTime createdAt;
 
-    @PrePersist
-    protected void onCreate() {
-        if (id == null) id = UUID.randomUUID().toString();
-        if (createdAt == null) createdAt = LocalDateTime.now();
-        if (priorityLevel == null) priorityLevel = 0;
-        if (isActive == null) isActive = true;
-    }
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
 }

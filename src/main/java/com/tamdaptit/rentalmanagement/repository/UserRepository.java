@@ -13,19 +13,17 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface UserRepository extends JpaRepository<User, String>, JpaSpecificationExecutor<User> {
 
-    Optional<User> findByEmailAndIsDeletedFalse(String email);
+    Optional<User> findByEmail(String email);
 
-    boolean existsByEmailAndIsDeletedFalse(String email);
+    boolean existsByEmail(String email);
 
-    Optional<User> findByPhoneAndIsDeletedFalse(String phone);
+    Optional<User> findByPhone(String phone);
 
-    boolean existsByPhoneAndIsDeletedFalse(String phone);
+    boolean existsByPhone(String phone);
 
-    boolean existsByCitizenIdAndIsDeletedFalse(String citizenId);
+    boolean existsByCitizenId(String citizenId);
 
-    Optional<User> findByIdAndIsDeletedFalse(String id);
-
-    List<User> findAllByIsDeletedFalse();
+    Optional<User> findById(String id);
 
     /**
      * Load user kem Role va Permission qua user_roles -> role_permissions.
@@ -38,7 +36,7 @@ public interface UserRepository extends JpaRepository<User, String>, JpaSpecific
             LEFT JOIN FETCH ur.role r
             LEFT JOIN FETCH r.rolePermissions rp
             LEFT JOIN FETCH rp.permission p
-            WHERE u.id = :id AND u.isDeleted = false
+            WHERE u.id = :id
             """)
     Optional<User> findByIdWithRolesAndPermissions(@Param("id") String id);
 
@@ -49,7 +47,7 @@ public interface UserRepository extends JpaRepository<User, String>, JpaSpecific
             LEFT JOIN FETCH ur.role r
             LEFT JOIN FETCH r.rolePermissions rp
             LEFT JOIN FETCH rp.permission p
-            WHERE u.email = :email AND u.isDeleted = false
+            WHERE u.email = :email
             """)
     Optional<User> findByEmailWithRolesAndPermissions(@Param("email") String email);
 }

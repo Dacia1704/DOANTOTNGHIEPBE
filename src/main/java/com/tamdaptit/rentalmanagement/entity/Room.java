@@ -12,9 +12,11 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,6 +24,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 import com.tamdaptit.rentalmanagement.entity.enums.RoomRentalStatus;
 
@@ -36,96 +40,66 @@ import com.tamdaptit.rentalmanagement.entity.enums.RoomRentalStatus;
 public class Room {
 
     @Id
-    @GeneratedValue
-    @UuidGenerator(style = UuidGenerator.Style.AUTO)
-    @Column(columnDefinition = "CHAR(36)", updatable = false, nullable = false)
-    String id;
+    @UuidGenerator
+    @Column(length = 36)
+    private String id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "landlord_id", nullable = false)
-    User landlord;
+    private User landlord;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "room_type_id", nullable = false)
-    RoomType roomType;
+    private RoomType roomType;
 
     @Column(nullable = false, precision = 12, scale = 2)
-    BigDecimal price;
+    private BigDecimal price;
 
-    @Column(name = "electricity_price", nullable = false, precision = 10, scale = 2)
-    @Builder.Default
-    BigDecimal electricityPrice = BigDecimal.ZERO;
+    @Column(name = "electricity_price", precision = 10, scale = 2)
+    private BigDecimal electricityPrice;
 
-    @Column(name = "water_price", nullable = false, precision = 10, scale = 2)
-    @Builder.Default
-    BigDecimal waterPrice = BigDecimal.ZERO;
+    @Column(name = "water_price", precision = 10, scale = 2)
+    private BigDecimal waterPrice;
 
-    @Column(name = "service_fee", nullable = false, precision = 10, scale = 2)
-    @Builder.Default
-    BigDecimal serviceFee = BigDecimal.ZERO;
+    @Column(name = "service_fee", precision = 10, scale = 2)
+    private BigDecimal serviceFee;
 
-    @Column(name = "default_deposit", nullable = false, precision = 12, scale = 2)
-    @Builder.Default
-    BigDecimal defaultDeposit = BigDecimal.ZERO;
+    @Column(name = "default_deposit", precision = 12, scale = 2)
+    private BigDecimal defaultDeposit;
 
-    @Column(name = "area_m2", precision = 6, scale = 2)
-    BigDecimal areaM2;
+    @Column(name = "area_m2", nullable = false, precision = 8, scale = 2)
+    private BigDecimal areaM2;
 
     @Column(name = "max_occupants")
-    Integer maxOccupants;
+    private Integer maxOccupants = 1;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "province_id", nullable = false)
-    Province province;
+    private Province province;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "district_id", nullable = false)
-    District district;
-
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "ward_id", nullable = false)
-    Ward ward;
+    private Ward ward;
 
-    @Column(name = "address_line", nullable = false, length = 500)
-    String addressLine;
+    @Column(name = "address_line", nullable = false, length = 255)
+    private String addressLine;
 
-    @Column(precision = 10, scale = 7)
-    BigDecimal latitude;
+    @Column(precision = 10, scale = 8)
+    private BigDecimal latitude;
 
-    @Column(precision = 10, scale = 7)
-    BigDecimal longitude;
+    @Column(precision = 11, scale = 8)
+    private BigDecimal longitude;
 
-    /** AVAILABLE / RENTED / MAINTENANCE */
     @Enumerated(EnumType.STRING)
     @Column(name = "rental_status", nullable = false, length = 20)
-    @Builder.Default
     RoomRentalStatus rentalStatus = RoomRentalStatus.AVAILABLE;
 
-    @Column(name = "is_deleted", nullable = false)
-    @Builder.Default
-    Boolean isDeleted = false;
-
+    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    LocalDateTime createdAt;
+    private LocalDateTime createdAt;
 
+    @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
-    LocalDateTime updatedAt;
+    private LocalDateTime updatedAt;
 
-    @PrePersist
-    protected void onCreate() {
-        if (id == null) id = UUID.randomUUID().toString();
-        if (createdAt == null) createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-        if (rentalStatus == null) rentalStatus = RoomRentalStatus.AVAILABLE;
-        if (isDeleted == null) isDeleted = false;
-        if (electricityPrice == null) electricityPrice = BigDecimal.ZERO;
-        if (waterPrice == null) waterPrice = BigDecimal.ZERO;
-        if (serviceFee == null) serviceFee = BigDecimal.ZERO;
-        if (defaultDeposit == null) defaultDeposit = BigDecimal.ZERO;
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
 }

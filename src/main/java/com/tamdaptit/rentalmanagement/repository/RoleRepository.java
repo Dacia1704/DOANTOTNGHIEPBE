@@ -12,11 +12,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface RoleRepository extends JpaRepository<Role, String> {
 
-    Optional<Role> findByCodeAndIsDeletedFalse(RoleCode code);
-
     Optional<Role> findByCode(RoleCode code);
 
-    List<Role> findAllByIsDeletedFalse();
+    List<Role> findAll();
 
     @Query("""
             SELECT DISTINCT r
