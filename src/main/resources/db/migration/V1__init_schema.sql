@@ -1,51 +1,16 @@
--- =====================================================================
--- V1__init_schema.sql  (MySQL 8.0.16+)  -  Rental Management System
--- ---------------------------------------------------------------------
--- Quy uoc:
---  * KHONG dung kieu ENUM(...) cua MySQL: dung VARCHAR + CHECK constraint
---    => JPA map enum de doc, va MySQL version khac van chay duoc.
---  * CHI XOA MEM: moi bang nghiep vu co is_deleted (BOOLEAN, mac dinh FALSE).
---  * MySQL KHONG ho tro filtered index (CREATE INDEX ... WHERE ...).
---    => Dung GENERATED COLUMN de lam UNIQUE co dieu kien:
---      - Cot `<ten>_uk` GENERATED ALWAYS AS (IF(is_deleted, NULL, <cot>)).
---      - MySQL cho phep NHIEU NULL trong UNIQUE index, nen nhieu ban ghi
---        da xoa mem van khong chan tao lai gia tri trung.
---  * Chuoi tieng Viet: utf8mb4 / utf8mb4_unicode_ci (mac dinh MySQL 8).
---  * Khoa chinh nghiep vu: CHAR(36) UUID. Bang trung gian: Composite PK.
---  * Thoi gian: DATETIME(6) + CURRENT_TIMESTAMP(6).
---  * CHECK constraint yeu cau MySQL >= 8.0.16 (da thuc thi).
--- =====================================================================
+USE rental_db;
 
--- =====================================================================
--- I. NHOM TAI KHOAN & PHAN QUYEN (RBAC)
--- =====================================================================
--- =====================================================================
--- V1__init_schema.sql
--- MySQL 8.0+
+-- =============================================================================
+-- THIẾT LẬP CƠ SỞ DỮ LIỆU MYSQL 8.0+
 -- ĐỒ ÁN: HỆ THỐNG CHO THUÊ PHÒNG TRỌ TRỰC TUYẾN
--- =====================================================================
 --
 -- Quy ước:
 -- 1. Không sử dụng BaseEntity dùng chung.
 -- 2. Không sử dụng created_by / updated_by / deleted.
--- 3. Không sử dụng soft delete.
--- 4. Các bảng mapping có id riêng.
--- 5. Dùng ENUM cho các trạng thái nghiệp vụ.
--- 6. created_at / updated_at chỉ xuất hiện ở những bảng cần thiết.
--- 7. UUID được sinh trực tiếp bởi MySQL.
--- =====================================================================
-
-
--- =====================================================================
--- DATABASE
--- =====================================================================
-
-CREATE DATABASE IF NOT EXISTS DATN
-    CHARACTER SET utf8mb4
-    COLLATE utf8mb4_unicode_ci;
-
-USE DATN;
-
+-- 3. created_at / updated_at chỉ giữ ở những bảng cần thiết.
+-- 4. Các bảng mapping không sử dụng timestamp.
+-- 5. Các entity có trạng thái nghiệp vụ riêng không dùng soft delete.
+-- =============================================================================
 
 -- =====================================================================
 -- I. NHÓM TÀI KHOẢN & PHÂN QUYỀN (RBAC)
@@ -86,6 +51,8 @@ CREATE TABLE users (
 -- 2. ROLES
 -- ---------------------------------------------------------------------
 
+
+-- 2. roles
 CREATE TABLE roles (
     id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
 
@@ -104,10 +71,7 @@ CREATE TABLE roles (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
--- ---------------------------------------------------------------------
--- 3. PERMISSIONS
--- ---------------------------------------------------------------------
-
+-- 3. permissions
 CREATE TABLE permissions (
     id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
 
@@ -122,10 +86,7 @@ CREATE TABLE permissions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
--- ---------------------------------------------------------------------
--- 4. USER_ROLES
--- ---------------------------------------------------------------------
-
+-- 4. user_roles
 CREATE TABLE user_roles (
     id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
 
@@ -281,6 +242,7 @@ CREATE TABLE tenant_profiles (
 -- 10. AMENITIES
 -- ---------------------------------------------------------------------
 
+-- 10. amenities
 CREATE TABLE amenities (
     id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
 
@@ -567,10 +529,7 @@ CREATE TABLE listing_daily_stats (
 -- =====================================================================
 
 
--- ---------------------------------------------------------------------
--- 19. RENTAL_REQUESTS
--- ---------------------------------------------------------------------
-
+-- 19. rental_requests
 CREATE TABLE rental_requests (
     id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
 
@@ -699,10 +658,9 @@ CREATE TABLE rental_agreements (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
--- =====================================================================
+-- =============================================================================
 -- VII. NHÓM GÓI DỊCH VỤ & THANH TOÁN
--- =====================================================================
-
+-- =============================================================================
 
 -- ---------------------------------------------------------------------
 -- 21. SERVICE_PACKAGES
@@ -1100,10 +1058,9 @@ CREATE TABLE tenant_reviews (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
--- =====================================================================
+-- =============================================================================
 -- IX. NHÓM CHAT & THÔNG BÁO
--- =====================================================================
-
+-- =============================================================================
 
 -- ---------------------------------------------------------------------
 -- 30. CHAT_CONVERSATIONS
@@ -1220,10 +1177,9 @@ CREATE TABLE notifications (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
--- =====================================================================
+-- =============================================================================
 -- X. NHÓM BÁO CÁO & KHIẾU NẠI
--- =====================================================================
-
+-- =============================================================================
 
 -- ---------------------------------------------------------------------
 -- 33. REPORTS
@@ -1304,448 +1260,8 @@ CREATE TABLE report_evidences (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
--- =====================================================================
--- XI. SEED DATA
--- =====================================================================
+-- =============================================================================
+-- HOÀN TẤT
+-- =============================================================================
 
 
--- =====================================================================
--- ROLES
--- =====================================================================
-
-INSERT INTO roles (id, code, name) VALUES
-    (UUID(), 'TENANT', 'Người thuê'),
-    (UUID(), 'LANDLORD', 'Chủ trọ'),
-    (UUID(), 'ADMIN', 'Quản trị viên');
-
-
--- =====================================================================
--- PERMISSIONS
--- =====================================================================
-
-INSERT INTO permissions (id, code, name) VALUES
-
-    -- Tài khoản
-    (UUID(), 'USER_READ',
-        'Xem tài khoản người dùng'),
-
-    (UUID(), 'USER_WRITE',
-        'Cập nhật tài khoản người dùng'),
-
-    (UUID(), 'USER_BLOCK',
-        'Khóa tài khoản người dùng'),
-
-    -- Role / Permission
-    (UUID(), 'ROLE_READ',
-        'Xem vai trò'),
-
-    (UUID(), 'ROLE_WRITE',
-        'Cập nhật vai trò'),
-
-    (UUID(), 'PERMISSION_READ',
-        'Xem quyền'),
-
-    (UUID(), 'PERMISSION_WRITE',
-        'Cập nhật quyền'),
-
-    -- Địa chỉ
-    (UUID(), 'PROVINCE_READ',
-        'Xem tỉnh/thành'),
-
-    (UUID(), 'WARD_READ',
-        'Xem phường/xã'),
-
-    -- Phòng
-    (UUID(), 'ROOM_READ',
-        'Xem phòng'),
-
-    (UUID(), 'ROOM_WRITE',
-        'Quản lý phòng'),
-
-    (UUID(), 'ROOM_TYPE_READ',
-        'Xem loại phòng'),
-
-    (UUID(), 'AMENITY_READ',
-        'Xem tiện ích'),
-
-    -- Tin đăng
-    (UUID(), 'LISTING_READ',
-        'Xem tin đăng'),
-
-    (UUID(), 'LISTING_WRITE',
-        'Quản lý tin đăng'),
-
-    (UUID(), 'LISTING_APPROVE',
-        'Duyệt tin đăng'),
-
-    -- Yêu cầu thuê
-    (UUID(), 'RENTAL_REQUEST_READ',
-        'Xem yêu cầu thuê'),
-
-    (UUID(), 'RENTAL_REQUEST_WRITE',
-        'Xử lý yêu cầu thuê'),
-
-    -- Hợp đồng
-    (UUID(), 'RENTAL_AGREEMENT_READ',
-        'Xem hợp đồng thuê'),
-
-    (UUID(), 'RENTAL_AGREEMENT_WRITE',
-        'Quản lý hợp đồng thuê'),
-
-    -- Thanh toán
-    (UUID(), 'PAYMENT_READ',
-        'Xem thanh toán'),
-
-    (UUID(), 'PAYMENT_WRITE',
-        'Quản lý thanh toán'),
-
-    (UUID(), 'INVOICE_READ',
-        'Xem hóa đơn'),
-
-    -- Gói dịch vụ
-    (UUID(), 'SERVICE_PACKAGE_READ',
-        'Xem gói dịch vụ'),
-
-    (UUID(), 'SERVICE_PACKAGE_WRITE',
-        'Quản lý gói dịch vụ'),
-
-    (UUID(), 'BOOST_PACKAGE_READ',
-        'Xem gói đẩy tin'),
-
-    -- Đánh giá
-    (UUID(), 'REVIEW_READ',
-        'Xem đánh giá'),
-
-    (UUID(), 'REVIEW_WRITE',
-        'Quản lý đánh giá'),
-
-    -- Chat
-    (UUID(), 'CHAT_READ',
-        'Xem hội thoại'),
-
-    -- Notification
-    (UUID(), 'NOTIFICATION_READ',
-        'Xem thông báo'),
-
-    (UUID(), 'NOTIFICATION_WRITE',
-        'Quản lý thông báo'),
-
-    -- Report
-    (UUID(), 'REPORT_READ',
-        'Xem báo cáo'),
-
-    (UUID(), 'REPORT_HANDLE',
-        'Xử lý báo cáo'),
-
-    -- Statistics
-    (UUID(), 'STATISTICS_READ',
-        'Xem thống kê');
-
-
--- =====================================================================
--- ROLE PERMISSIONS - ADMIN
--- =====================================================================
-
-INSERT INTO role_permissions (id, role_id, permission_id)
-SELECT
-    UUID(),
-    r.id,
-    p.id
-FROM roles r
-CROSS JOIN permissions p
-WHERE r.code = 'ADMIN';
-
-
--- =====================================================================
--- ROLE PERMISSIONS - LANDLORD
--- =====================================================================
-
-INSERT INTO role_permissions (id, role_id, permission_id)
-SELECT
-    UUID(),
-    r.id,
-    p.id
-FROM roles r
-JOIN permissions p
-    ON p.code IN (
-        'USER_READ',
-
-        'PROVINCE_READ',
-        'WARD_READ',
-
-        'ROOM_READ',
-        'ROOM_WRITE',
-        'ROOM_TYPE_READ',
-        'AMENITY_READ',
-
-        'LISTING_READ',
-        'LISTING_WRITE',
-
-        'RENTAL_REQUEST_READ',
-        'RENTAL_REQUEST_WRITE',
-
-        'RENTAL_AGREEMENT_READ',
-        'RENTAL_AGREEMENT_WRITE',
-
-        'PAYMENT_READ',
-        'INVOICE_READ',
-
-        'SERVICE_PACKAGE_READ',
-        'BOOST_PACKAGE_READ',
-
-        'REVIEW_READ',
-        'REVIEW_WRITE',
-
-        'CHAT_READ',
-
-        'NOTIFICATION_READ',
-        'NOTIFICATION_WRITE',
-
-        'REPORT_READ',
-
-        'STATISTICS_READ'
-    )
-WHERE r.code = 'LANDLORD';
-
-
--- =====================================================================
--- ROLE PERMISSIONS - TENANT
--- =====================================================================
-
-INSERT INTO role_permissions (id, role_id, permission_id)
-SELECT
-    UUID(),
-    r.id,
-    p.id
-FROM roles r
-JOIN permissions p
-    ON p.code IN (
-        'USER_READ',
-        'USER_WRITE',
-
-        'PROVINCE_READ',
-        'WARD_READ',
-
-        'ROOM_READ',
-        'ROOM_TYPE_READ',
-        'AMENITY_READ',
-
-        'LISTING_READ',
-
-        'RENTAL_REQUEST_READ',
-        'RENTAL_REQUEST_WRITE',
-
-        'RENTAL_AGREEMENT_READ',
-
-        'PAYMENT_READ',
-
-        'REVIEW_READ',
-        'REVIEW_WRITE',
-
-        'CHAT_READ',
-
-        'NOTIFICATION_READ',
-        'NOTIFICATION_WRITE',
-
-        'REPORT_READ',
-
-        'STATISTICS_READ'
-    )
-WHERE r.code = 'TENANT';
-
-
--- =====================================================================
--- USERS DEMO
--- =====================================================================
---
--- Password:
--- Rental@123
---
--- BCrypt hash:
--- $2a$10$rESLuXqKgAf6GT2oG7.IkeXQlsAxhNJvhYe9C1SNgDhGvnqplgJEO
---
--- =====================================================================
-
-INSERT INTO users (
-    id,
-    email,
-    phone,
-    password,
-    full_name,
-    status
-) VALUES
-
-(
-    UUID(),
-    'admin@rental.local',
-    '0900000001',
-    '$2a$10$rESLuXqKgAf6GT2oG7.IkeXQlsAxhNJvhYe9C1SNgDhGvnqplgJEO',
-    'Quản trị viên',
-    'ACTIVE'
-),
-
-(
-    UUID(),
-    'landlord@rental.local',
-    '0900000002',
-    '$2a$10$rESLuXqKgAf6GT2oG7.IkeXQlsAxhNJvhYe9C1SNgDhGvnqplgJEO',
-    'Chủ trọ demo',
-    'ACTIVE'
-),
-
-(
-    UUID(),
-    'tenant@rental.local',
-    '0900000003',
-    '$2a$10$rESLuXqKgAf6GT2oG7.IkeXQlsAxhNJvhYe9C1SNgDhGvnqplgJEO',
-    'Người thuê demo',
-    'ACTIVE'
-);
-
-
--- =====================================================================
--- USER ROLES
--- =====================================================================
-
-INSERT INTO user_roles (
-    id,
-    user_id,
-    role_id
-)
-SELECT
-    UUID(),
-    u.id,
-    r.id
-FROM users u
-JOIN roles r
-    ON r.code = 'ADMIN'
-WHERE u.email = 'admin@rental.local';
-
-
-INSERT INTO user_roles (
-    id,
-    user_id,
-    role_id
-)
-SELECT
-    UUID(),
-    u.id,
-    r.id
-FROM users u
-JOIN roles r
-    ON r.code = 'LANDLORD'
-WHERE u.email = 'landlord@rental.local';
-
-
-INSERT INTO user_roles (
-    id,
-    user_id,
-    role_id
-)
-SELECT
-    UUID(),
-    u.id,
-    r.id
-FROM users u
-JOIN roles r
-    ON r.code = 'TENANT'
-WHERE u.email = 'tenant@rental.local';
-
-
--- =====================================================================
--- ROOM TYPES DEMO
--- =====================================================================
-
-INSERT INTO room_types (
-    id,
-    name,
-    description
-) VALUES
-
-(
-    UUID(),
-    'Phòng trọ',
-    'Phòng trọ đơn giản, đầy đủ tiện ích cơ bản'
-),
-
-(
-    UUID(),
-    'Studio',
-    'Căn hộ studio cho thuê'
-),
-
-(
-    UUID(),
-    'Căn hộ mini',
-    'Căn hộ mini 1-2 phòng ngủ'
-),
-
-(
-    UUID(),
-    'Phòng chung',
-    'Phòng trọ chung, nhiều người cùng thuê'
-);
-
-
--- =====================================================================
--- AMENITIES DEMO
--- =====================================================================
-
-INSERT INTO amenities (
-    id,
-    name,
-    icon
-) VALUES
-
-(
-    UUID(),
-    'Wifi',
-    'wifi'
-),
-
-(
-    UUID(),
-    'Điều hòa',
-    'air-conditioner'
-),
-
-(
-    UUID(),
-    'Máy giặt',
-    'washing-machine'
-),
-
-(
-    UUID(),
-    'Nóng lạnh',
-    'water-heater'
-),
-
-(
-    UUID(),
-    'Bếp',
-    'kitchen'
-),
-
-(
-    UUID(),
-    'Tủ lạnh',
-    'refrigerator'
-),
-
-(
-    UUID(),
-    'Ban công',
-    'balcony'
-),
-
-(
-    UUID(),
-    'Gửi xe',
-    'parking'
-);
-
-
--- =====================================================================
--- HOÀN TẤT V1
--- =====================================================================
