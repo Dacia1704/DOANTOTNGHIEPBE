@@ -54,6 +54,10 @@ public class User {
     @Column(nullable = false, length = 255)
     private String password;
 
+    @Builder.Default
+    @Column(name = "auth_version", nullable = false)
+    private int authVersion = 0;
+
     @Column(name = "full_name", length = 100)
     private String fullName;
 
@@ -74,6 +78,7 @@ public class User {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
+    @Builder.Default
     UserStatus status = UserStatus.ACTIVE;
 
     @CreationTimestamp

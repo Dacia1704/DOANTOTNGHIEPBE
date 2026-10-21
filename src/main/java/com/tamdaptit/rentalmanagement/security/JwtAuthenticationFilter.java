@@ -20,6 +20,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenService jwtTokenService;
+    private final com.tamdaptit.rentalmanagement.repository.UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(
@@ -41,10 +42,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             Claims claims = jwtTokenService.validateToken(token);
 
             String userId = claims.getSubject();
+            if (!"access".equals(claims.get("type", String.class))) {
+                throw new IllegalArgumentException("Access token required");
+            }
+            var user = userRepository.findByIdWithRolesAndPermissions(userId).orElseThrow();
+            Number version = (Number) claims.get("authVersion");
+            if (user.getStatus() != com.tamdaptit.rentalmanagement.entity.enums.UserStatus.ACTIVE
+                    || user.getAuthVersion() != (version == null ? 0 : version.intValue())) {
+                throw new IllegalArgumentException("Token revoked or account inactive");
+            }
 
             List<SimpleGrantedAuthority> authorities =
                     jwtTokenService
-                            .getAuthorities(claims)
+                            .buildAuthorities(user)
                             .stream()
                             .map(SimpleGrantedAuthority::new)
                             .toList();

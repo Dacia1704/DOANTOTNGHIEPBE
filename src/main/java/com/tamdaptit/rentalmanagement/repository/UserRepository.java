@@ -13,6 +13,14 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface UserRepository extends JpaRepository<User, String>, JpaSpecificationExecutor<User> {
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT u FROM User u WHERE u.id = :id")
+    Optional<User> findByIdForUpdate(@Param("id") String id);
+
+    boolean existsByEmailIgnoreCaseAndIdNot(String email, String id);
+    boolean existsByPhoneAndIdNot(String phone, String id);
+    boolean existsByCitizenIdAndIdNot(String citizenId, String id);
+
     Optional<User> findByEmail(String email);
 
     boolean existsByEmail(String email);

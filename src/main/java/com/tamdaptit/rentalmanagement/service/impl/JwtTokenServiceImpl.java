@@ -71,6 +71,7 @@ public class JwtTokenServiceImpl implements JwtTokenService {
 
         return Jwts.builder()
                 .subject(user.getId())                       // UUID string
+                .claim("authVersion", user.getAuthVersion())
                 .claim(CLAIM_SCOPE, String.join(" ", authorities))
                 .claim(CLAIM_TYPE, TYPE_ACCESS)
                 .claim(CLAIM_JTI, UUID.randomUUID().toString())
@@ -88,6 +89,7 @@ public class JwtTokenServiceImpl implements JwtTokenService {
 
         return Jwts.builder()
                 .subject(user.getId())
+                .claim("authVersion", user.getAuthVersion())
                 .claim(CLAIM_TYPE, TYPE_REFRESH)
                 .claim(CLAIM_JTI, UUID.randomUUID().toString())
                 .issuer(issuer)
