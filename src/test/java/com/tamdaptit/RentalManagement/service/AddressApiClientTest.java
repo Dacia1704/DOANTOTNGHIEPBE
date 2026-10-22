@@ -1,6 +1,6 @@
 package com.tamdaptit.RentalManagement.service;
 
-import com.tamdaptit.rentalmanagement.service.AddressApiClient;
+import com.tamdaptit.rentalmanagement.service.impl.AddressApiClientImpl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
@@ -11,7 +11,7 @@ import java.nio.charset.StandardCharsets;
 import static org.junit.jupiter.api.Assertions.*;
 
 class AddressApiClientTest {
-    private final AddressApiClient client = new AddressApiClient(new ObjectMapper(), "http://localhost");
+    private final AddressApiClientImpl client = new AddressApiClientImpl(new ObjectMapper(), "http://localhost");
     private static final String DATA = """
             [{"code":1,"name":"Thành phố Hà Nội","wards":[{"code":4,"name":"Phường Ba Đình"}]}]
             """;
@@ -47,9 +47,9 @@ class AddressApiClientTest {
         server.start();
         try {
             String url = "http://127.0.0.1:" + server.getAddress().getPort();
-            var fetched = new AddressApiClient(new ObjectMapper(), url + "/ok").fetch();
+            var fetched = new AddressApiClientImpl(new ObjectMapper(), url + "/ok").fetch();
             assertEquals("Thành phố Hà Nội", fetched.provinces().getFirst().name());
-            assertThrows(AppException.class, () -> new AddressApiClient(new ObjectMapper(), url + "/error").fetch());
+            assertThrows(AppException.class, () -> new AddressApiClientImpl(new ObjectMapper(), url + "/error").fetch());
         } finally { server.stop(0); }
     }
 }

@@ -1,6 +1,7 @@
 package com.tamdaptit.RentalManagement.service;
 
 import com.cloudinary.*;
+import com.tamdaptit.rentalmanagement.service.impl.CloudinaryAvatarStorage;
 import com.tamdaptit.rentalmanagement.exception.*;
 import com.tamdaptit.rentalmanagement.service.*;
 import org.junit.jupiter.api.Test;

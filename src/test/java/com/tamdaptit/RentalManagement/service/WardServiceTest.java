@@ -1,5 +1,7 @@
 package com.tamdaptit.RentalManagement.service;
 
+import com.tamdaptit.rentalmanagement.service.impl.WardServiceImpl;
+
 import com.tamdaptit.rentalmanagement.service.WardService;
 
 import com.tamdaptit.rentalmanagement.dto.address.WardRequest;
@@ -14,7 +16,7 @@ import static org.mockito.Mockito.*;
 class WardServiceTest {
     private final WardRepository wards = mock(WardRepository.class);
     private final ProvinceRepository provinces = mock(ProvinceRepository.class);
-    private final WardService service = new WardService(wards, provinces);
+    private final WardService service = new WardServiceImpl(wards, provinces);
 
     @Test void refusesDeleteWhenWardIsReferenced() {
         when(wards.findById("w")).thenReturn(Optional.of(Ward.builder().id("w").build()));

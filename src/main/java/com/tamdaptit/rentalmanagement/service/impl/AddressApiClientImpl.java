@@ -1,10 +1,11 @@
-package com.tamdaptit.rentalmanagement.service;
+package com.tamdaptit.rentalmanagement.service.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tamdaptit.rentalmanagement.dto.address.AddressSnapshot;
 import com.tamdaptit.rentalmanagement.dto.address.AddressSnapshot.*;
 import com.tamdaptit.rentalmanagement.exception.*;
+import com.tamdaptit.rentalmanagement.service.AddressService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import java.net.URI;
@@ -13,17 +14,18 @@ import java.time.Duration;
 import java.util.*;
 
 @Component
-public class AddressApiClient {
+public class AddressApiClientImpl implements AddressService {
     private final URI source;
     private final ObjectMapper mapper;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
-    public AddressApiClient(ObjectMapper mapper,
-            @Value("${app.address-sync.url:https://provinces.open-api.vn/api/v2/?depth=2}") String url) {
+    public AddressApiClientImpl(ObjectMapper mapper,
+                                @Value("${app.address-sync.url:https://provinces.open-api.vn/api/v2/?depth=2}") String url) {
         this.mapper = mapper;
         this.source = URI.create(url);
     }
 
+    @Override
     public AddressSnapshot fetch() {
         try {
             var request = HttpRequest.newBuilder(source).timeout(Duration.ofSeconds(60))
@@ -40,6 +42,7 @@ public class AddressApiClient {
     }
 
     // Validate the complete snapshot before starting any database transaction.
+    @Override
     public AddressSnapshot parse(String json) throws java.io.IOException {
         JsonNode root = mapper.readTree(json);
         if (root == null || !root.isArray() || root.isEmpty()) throw invalid();

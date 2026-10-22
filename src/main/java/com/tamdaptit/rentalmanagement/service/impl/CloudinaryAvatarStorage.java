@@ -1,4 +1,6 @@
-package com.tamdaptit.rentalmanagement.service;
+package com.tamdaptit.rentalmanagement.service.impl;
+
+import com.tamdaptit.rentalmanagement.service.AvatarStorage;
 
 import com.cloudinary.Cloudinary;
 import com.tamdaptit.rentalmanagement.exception.*;
