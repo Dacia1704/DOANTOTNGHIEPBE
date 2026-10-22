@@ -18,7 +18,9 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      # V1__baseline.sql là nguồn sự thật duy nhất cho schema.
+      # validate buộc ứng dụng không khởi động nếu entity lệch với migration.
+      ddl-auto: validate
     open-in-view: false
     properties:
       hibernate:
@@ -27,7 +29,10 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
-    baseline-on-migrate: false
+    # Chấp nhận database đã tồn tại từ trước khi Flyway được bật.
+    baseline-on-migrate: true
+    baseline-version: 0
+    schemas: ${DB_NAME:rental_db}
 
   data:
     redis:
@@ -56,8 +61,9 @@ spring:
 
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 20MB
+      # Giới hạn 5MB khớp với ImageValidator trong module storage.
+      max-file-size: 5MB
+      max-request-size: 25MB
 
 logging:
   level:
@@ -68,9 +74,9 @@ logging:
 
 app:
   cloudinary:
-    cloud-name: ${CLOUDINARY_CLOUD_NAME:}
-    api-key: ${CLOUDINARY_API_KEY:}
-    api-secret: ${CLOUDINARY_API_SECRET:}
+    cloud-name: vhbnmvru
+    api-key: "143753777698223"
+    api-secret: qtNpfp2NplN2khqiOu9UmC_eJUc
   jwt:
     secret: ${JWT_SECRET:c2VjdXJlLWRldmVsb3BtZW50LXNlY3JldC1rZXktZm9yLXRlc3Rpbmctand0LXNpZ25pbmctMzItYnl0ZXMtbWluaW11bQ==}
     issuer: rental-management
