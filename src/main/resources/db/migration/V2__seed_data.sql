@@ -1,7 +1,17 @@
--- Bootstrap authentication data in the backend database.
-USE rental_db;
+-- =============================================================================
+-- DỮ LIỆU KHỞI TẠO
+--
+-- Lưu ý:
+-- 1. Không dùng "USE rental_db" — schema do spring.flyway.schemas quyết định.
+-- 2. users.auth_version đã nằm trực tiếp trong V1__baseline.sql nên không cần ALTER.
+-- 3. Tài khoản admin dưới đây chỉ dùng cho môi trường phát triển.
+--    Đổi mật khẩu ngay sau lần đăng nhập đầu tiên.
+-- =============================================================================
 
--- Bootstrap roles. Preserve IDs if a role was already created by the application.
+-- ---------------------------------------------------------------------
+-- Vai trò
+-- ---------------------------------------------------------------------
+
 INSERT INTO roles (id, code, name, created_at, updated_at)
 VALUES
     (UUID(), 'ADMIN', 'Administrator', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -9,7 +19,10 @@ VALUES
     (UUID(), 'TENANT', 'Tenant', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON DUPLICATE KEY UPDATE name = roles.name;
 
--- Three permissions per resource: READ, WRITE (create/update), DELETE.
+-- ---------------------------------------------------------------------
+-- Quyền: mỗi tài nguyên có 3 quyền READ / WRITE / DELETE
+-- ---------------------------------------------------------------------
+
 INSERT INTO permissions (id, code, name, created_at, updated_at)
 VALUES
     (UUID(), 'USER_READ', 'Read users', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -23,9 +36,13 @@ VALUES
     (UUID(), 'ROOM_DELETE', 'Delete rooms', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON DUPLICATE KEY UPDATE name = permissions.name;
 
--- Development bootstrap account: admin@rental.local / Admin@123456.
--- BCrypt cost 10, matching PasswordEncoderConfig. Change after first login.
--- Do not overwrite an existing account or promote it to administrator.
+-- ---------------------------------------------------------------------
+-- Tài khoản quản trị phát triển
+-- Email: admin@rental.local / Mật khẩu: Admin@123456
+-- BCrypt cost 10, khớp với PasswordEncoderConfig.
+-- Không ghi đè tài khoản đã tồn tại và không tự nâng quyền lên ADMIN.
+-- ---------------------------------------------------------------------
+
 INSERT INTO users (id, email, password, full_name, status, email_verified_at, created_at, updated_at)
 SELECT
     '00000000-0000-4000-8000-000000000001',
@@ -52,7 +69,11 @@ WHERE u.id = '00000000-0000-4000-8000-000000000001'
       WHERE ur.user_id = u.id AND ur.role_id = r.id
   );
 
--- Only ADMIN receives permissions here. Other role policies are configured separately.
+-- ---------------------------------------------------------------------
+-- Chỉ ADMIN được gán quyền ở đây.
+-- Chính sách quyền của LANDLORD và TENANT được cấu hình riêng.
+-- ---------------------------------------------------------------------
+
 INSERT INTO role_permissions (id, role_id, permission_id)
 SELECT UUID(), r.id, p.id
 FROM roles r
@@ -67,7 +88,3 @@ WHERE r.code = 'ADMIN'
       SELECT 1 FROM role_permissions rp
       WHERE rp.role_id = r.id AND rp.permission_id = p.id
   );
-
--- Invalidates access tokens after password/status changes.
-ALTER TABLE users
-    ADD COLUMN auth_version INT NOT NULL DEFAULT 0;
