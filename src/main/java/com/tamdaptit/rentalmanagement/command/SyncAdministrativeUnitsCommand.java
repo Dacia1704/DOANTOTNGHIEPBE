@@ -1,6 +1,7 @@
 package com.tamdaptit.rentalmanagement.command;
 
 import com.tamdaptit.rentalmanagement.service.*;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -14,7 +15,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 @Slf4j
 public class SyncAdministrativeUnitsCommand implements ApplicationRunner {
-    private final AddressApiClient client;
+    private final AddressService client;
     private final AddressImporter importer;
     private final ConfigurableApplicationContext context;
 

@@ -1,5 +1,7 @@
 package com.tamdaptit.RentalManagement.service;
 
+import com.tamdaptit.rentalmanagement.service.impl.AddressImporterImpl;
+
 import com.tamdaptit.rentalmanagement.service.AddressImporter;
 
 import com.tamdaptit.rentalmanagement.dto.address.*;
@@ -19,7 +21,7 @@ class AddressImporterTest {
         var w = Ward.builder().id("ward-id").code("4").name("Old ward").province(p).build();
         when(provinces.findAll()).thenReturn(List.of(p));
         when(wards.findAll()).thenReturn(List.of(w));
-        var importer = new AddressImporter(provinces, wards);
+        var importer = new AddressImporterImpl(provinces, wards);
         var snapshot = new AddressSnapshot(List.of(new ProvinceData("01", "Hà Nội",
                 List.of(new WardData("00004", "Ba Đình")))));
         assertEquals(new AddressSyncResult(0, 1, 0, 1), importer.apply(snapshot));
@@ -37,7 +39,7 @@ class AddressImporterTest {
         when(provinces.findAll()).thenReturn(List.of(
                 Province.builder().code("1").build(), Province.builder().code("01").build()));
         assertThrows(IllegalStateException.class,
-                () -> new AddressImporter(provinces, wards).apply(new AddressSnapshot(List.of())));
+                () -> new AddressImporterImpl(provinces, wards).apply(new AddressSnapshot(List.of())));
         verifyNoInteractions(wards);
     }
 }

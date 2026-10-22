@@ -1,5 +1,7 @@
 package com.tamdaptit.RentalManagement.service;
 
+import com.tamdaptit.rentalmanagement.service.impl.UserServiceImpl;
+
 import com.tamdaptit.rentalmanagement.dto.user.*;
 import com.tamdaptit.rentalmanagement.entity.*;
 import com.tamdaptit.rentalmanagement.entity.enums.*;
@@ -23,7 +25,7 @@ class UserServiceTest {
     final AvatarStorage avatars = mock(AvatarStorage.class);
     final UserDeletionGuard guard = mock(UserDeletionGuard.class);
     final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(4);
-    final UserService service = new UserService(users, roles, links, tokens, encoder, avatars, guard);
+    final UserService service = new UserServiceImpl(users, roles, links, tokens, encoder, avatars, guard);
     User user;
 
     @BeforeEach void setup() {
