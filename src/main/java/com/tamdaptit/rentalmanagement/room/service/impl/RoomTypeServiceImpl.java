@@ -106,9 +106,11 @@ public class RoomTypeServiceImpl implements RoomTypeService {
 
     @Override
     public List<RoomTypeCategoryResponse> getCategoriesWithRooms() {
+        var roomsByType = roomRepository.findAllForCategories().stream()
+                .collect(java.util.stream.Collectors.groupingBy(room -> room.getRoomType().getId()));
         return roomTypeRepository.findAll(Sort.by(Sort.Direction.ASC, "name")).stream()
-                .map(type -> roomTypeMapper.toCategoryResponse(
-                        type, roomRepository.findAllForRoomType(type.getId())))
+                .map(type -> roomTypeMapper.toCategoryResponse(type,
+                        roomsByType.getOrDefault(type.getId(), java.util.List.of())))
                 .toList();
     }
 
