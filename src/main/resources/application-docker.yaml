@@ -52,6 +52,19 @@ spring:
           initial-interval: 2000
         default-requeue-rejected: false
 
+  # MailHog container
+  mail:
+    host: ${MAIL_HOST:mailhog}
+    port: ${MAIL_PORT:1025}
+    username: ""
+    password: ""
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+
   web:
     pageable:
       default-page-size: 10
@@ -75,3 +88,9 @@ app:
     issuer: rental-management
     access-expiration-ms: 1800000
     refresh-expiration-ms: 604800000
+  otp:
+    expiration-seconds: 300
+    cooldown-seconds: 60
+    length: 6
+  mail:
+    from: ${MAIL_FROM:noreply@rental.local}

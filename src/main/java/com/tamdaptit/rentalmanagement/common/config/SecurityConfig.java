@@ -33,6 +33,12 @@ public class SecurityConfig {
             "/api/auth/register",
             "/api/auth/login",
             "/api/auth/refresh",
+            // OTP - Quen mat khau
+            "/api/auth/forgot-password",
+            "/api/auth/reset-password",
+            // OTP - Xac thuc email
+            "/api/auth/send-verify-email",
+            "/api/auth/verify-email",
             // Swagger / OpenAPI
             "/v3/api-docs/**",
             "/swagger-ui/**",
