@@ -36,6 +36,12 @@ public class SecurityConfig {
             "/api/rooms/filter",
             "/api/amenities/filter",
             "/api/room-types/filter",
+            // OTP - Quen mat khau
+            "/api/auth/forgot-password",
+            "/api/auth/reset-password",
+            // OTP - Xac thuc email
+            "/api/auth/send-verify-email",
+            "/api/auth/verify-email",
             // Swagger / OpenAPI
             "/v3/api-docs/**",
             "/swagger-ui/**",

@@ -2,20 +2,27 @@ package com.tamdaptit.rentalmanagement.auth.service.impl;
 
 import jakarta.validation.constraints.Email;
 import lombok.RequiredArgsConstructor;
+import com.tamdaptit.rentalmanagement.auth.dto.request.ForgotPasswordRequest;
 import com.tamdaptit.rentalmanagement.auth.dto.request.LoginRequest;
 import com.tamdaptit.rentalmanagement.auth.dto.request.LogoutRequest;
 import com.tamdaptit.rentalmanagement.auth.dto.request.RefreshTokenRequest;
 import com.tamdaptit.rentalmanagement.auth.dto.request.RegisterRequest;
+import com.tamdaptit.rentalmanagement.auth.dto.request.ResetPasswordRequest;
+import com.tamdaptit.rentalmanagement.auth.dto.request.SendVerifyEmailRequest;
+import com.tamdaptit.rentalmanagement.auth.dto.request.VerifyEmailRequest;
 import com.tamdaptit.rentalmanagement.auth.dto.response.LoginResponse;
 import com.tamdaptit.rentalmanagement.auth.dto.response.RefreshTokenResponse;
 import com.tamdaptit.rentalmanagement.auth.dto.response.RegisterResponse;
 import com.tamdaptit.rentalmanagement.auth.entity.RefreshToken;
+import com.tamdaptit.rentalmanagement.auth.entity.enums.OtpPurpose;
 import com.tamdaptit.rentalmanagement.auth.mapper.AuthMapper;
 import com.tamdaptit.rentalmanagement.auth.repository.RefreshTokenRepository;
 import com.tamdaptit.rentalmanagement.auth.service.AuthService;
 import com.tamdaptit.rentalmanagement.auth.service.JwtTokenService;
+import com.tamdaptit.rentalmanagement.auth.service.OtpService;
 import com.tamdaptit.rentalmanagement.common.exception.AppException;
 import com.tamdaptit.rentalmanagement.common.exception.ErrorCode;
+import com.tamdaptit.rentalmanagement.common.service.EmailService;
 import com.tamdaptit.rentalmanagement.common.util.HashUtils;
 import com.tamdaptit.rentalmanagement.identity.entity.Role;
 import com.tamdaptit.rentalmanagement.identity.entity.User;
@@ -53,6 +60,8 @@ public class AuthServiceImpl implements AuthService {
     private final UserMapper userMapper;
     private final AuthMapper authMapper;
     private final JwtTokenService jwtTokenService;
+    private final OtpService otpService;
+    private final EmailService emailService;
 
     @Value("${app.jwt.refresh-expiration-ms}")
     private long refreshExpiration;
@@ -264,5 +273,95 @@ public class AuthServiceImpl implements AuthService {
             throw new AppException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
         return authentication.getName();
+    }
+
+    // =========================================================
+    // FORGOT PASSWORD
+    // =========================================================
+
+    @Override
+    @Transactional(readOnly = true)
+    public void forgotPassword(ForgotPasswordRequest request) {
+        String email = normalizeEmail(request.email());
+
+        // Kiem tra cooldown truoc khi lam gi khac
+        otpService.checkCooldown(email, OtpPurpose.FORGOT_PASSWORD);
+
+        // Chi gui OTP neu email ton tai; khong tiet lo thong tin neu khong tim thay
+        userRepository.findByEmailIgnoreCase(email).ifPresent(user -> {
+            String otp = otpService.generateAndSave(email, OtpPurpose.FORGOT_PASSWORD);
+            emailService.sendOtpEmail(email, otp, OtpPurpose.FORGOT_PASSWORD);
+        });
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        if (!request.newPassword().equals(request.confirmPassword())) {
+            throw new AppException(
+                    ErrorCode.PASSWORD_CONFIRMATION_MISMATCH,
+                    "Xac nhan mat khau moi khong khop");
+        }
+
+        String email = normalizeEmail(request.email());
+
+        // Xac thuc OTP (nem exception neu sai / het han)
+        otpService.verify(email, request.otp(), OtpPurpose.FORGOT_PASSWORD);
+
+        User user = userRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new AppException(ErrorCode.EMAIL_NOT_FOUND));
+
+        if (passwordEncoder.matches(request.newPassword(), user.getPassword())) {
+            throw new AppException(
+                    ErrorCode.PASSWORD_UNCHANGED,
+                    "Mat khau moi phai khac mat khau hien tai");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.newPassword()));
+        // Tang authVersion de vo hieu hoa tat ca token cu dang luu hanh
+        user.setAuthVersion(user.getAuthVersion() + 1);
+        userRepository.save(user);
+    }
+
+    // =========================================================
+    // EMAIL VERIFICATION
+    // =========================================================
+
+    @Override
+    @Transactional(readOnly = true)
+    public void sendVerifyEmail(SendVerifyEmailRequest request) {
+        String email = normalizeEmail(request.email());
+
+        // Kiem tra cooldown
+        otpService.checkCooldown(email, OtpPurpose.EMAIL_VERIFY);
+
+        User user = userRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new AppException(ErrorCode.EMAIL_NOT_FOUND));
+
+        if (user.getEmailVerifiedAt() != null) {
+            throw new AppException(ErrorCode.EMAIL_ALREADY_VERIFIED);
+        }
+
+        String otp = otpService.generateAndSave(email, OtpPurpose.EMAIL_VERIFY);
+        emailService.sendOtpEmail(email, otp, OtpPurpose.EMAIL_VERIFY);
+    }
+
+    @Override
+    @Transactional
+    public void verifyEmail(VerifyEmailRequest request) {
+        String email = normalizeEmail(request.email());
+
+        User user = userRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new AppException(ErrorCode.EMAIL_NOT_FOUND));
+
+        if (user.getEmailVerifiedAt() != null) {
+            throw new AppException(ErrorCode.EMAIL_ALREADY_VERIFIED);
+        }
+
+        // Xac thuc OTP
+        otpService.verify(email, request.otp(), OtpPurpose.EMAIL_VERIFY);
+
+        user.setEmailVerifiedAt(LocalDateTime.now());
+        userRepository.save(user);
     }
 }

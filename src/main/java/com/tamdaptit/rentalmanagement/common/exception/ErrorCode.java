@@ -26,6 +26,10 @@ public enum ErrorCode {
     INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "Refresh token không hợp lệ hoặc đã hết hạn"),
     TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "Token đã hết hạn"),
 
+    // ===== OTP =====
+    OTP_INVALID(HttpStatus.BAD_REQUEST, "Mã OTP không đúng hoặc đã hết hạn"),
+    OTP_TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "Gửi OTP quá nhiều lần, vui lòng thử lại sau"),
+
     // ===== USER =====
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "Người dùng không tồn tại"),
     USER_DELETED(HttpStatus.BAD_REQUEST, "Tài khoản người dùng đã bị xóa"),
@@ -35,6 +39,8 @@ public enum ErrorCode {
     PHONE_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "Số điện thoại đã tồn tại"),
     CITIZEN_ID_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "Số CCCD/CMND đã tồn tại"),
     INVALID_REGISTER_ROLE(HttpStatus.BAD_REQUEST, "Không thể đăng ký với vai trò này"),
+    EMAIL_NOT_FOUND(HttpStatus.NOT_FOUND, "Email không tồn tại trong hệ thống"),
+    EMAIL_ALREADY_VERIFIED(HttpStatus.BAD_REQUEST, "Email đã được xác thực trước đó"),
 
     // ===== ROLE & PERMISSION =====
     ROLE_NOT_FOUND(HttpStatus.NOT_FOUND, "Vai trò không tồn tại"),
