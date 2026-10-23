@@ -2,7 +2,7 @@
 # docker-compose.yml - INFRASTRUCTURE ONLY
 # ---------------------------------------------------------------------
 # File nay CHI chay cac CONG NGHE (MySQL, Redis, RabbitMQ, phpMyAdmin,
-# Elasticsearch). Backend KHONG chay trong container - ban chay backend
+# Elasticsearch, MailHog). Backend KHONG chay trong container - ban chay backend
 # o local bang IDE hoac `mvnw spring-boot:run` va no se ket noi toi
 # cac service ben duoi qua localhost.
 #
@@ -74,6 +74,17 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - rental-network
+
+  # ---------- MailHog (SMTP test, xem email tai http://localhost:8025) ----------
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: rental-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP - backend local ket noi qua localhost:1025
+      - "8025:8025"  # Web UI
     networks:
       - rental-network
 

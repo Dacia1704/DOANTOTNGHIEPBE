@@ -147,6 +147,132 @@ Authorization: Bearer <access_token>
 
 ---
 
+### 1.5 Quên mật khẩu — gửi OTP
+
+- Method: POST
+- URL: /api/auth/forgot-password
+- Quyền: Public, không cần access token.
+- Content-Type: application/json
+- Request body:
+
+```json
+{
+  "email": "tenant@gmail.com"
+}
+```
+
+- `email`: bắt buộc, email hợp lệ, tối đa 255 ký tự; được bỏ khoảng trắng hai đầu và chuyển về chữ thường.
+- Nếu email tồn tại, gửi OTP loại `FORGOT_PASSWORD` qua email. API không trả OTP trong response.
+- Response thành công (HTTP 200), kể cả khi email không tồn tại, để tránh tiết lộ tài khoản:
+
+```json
+{
+  "code": 200,
+  "message": "Nếu email tồn tại trong hệ thống, mã OTP đã được gửi"
+}
+```
+
+- Lỗi: 400 nếu request không hợp lệ; 429 nếu gửi lại trong thời gian chờ.
+
+### 1.6 Đặt lại mật khẩu khi quên mật khẩu
+
+- Method: POST
+- URL: /api/auth/reset-password
+- Quyền: Public, không cần access token.
+- Content-Type: application/json
+- Request body:
+
+```json
+{
+  "email": "tenant@gmail.com",
+  "otp": "012345",
+  "newPassword": "NewPassword123",
+  "confirmPassword": "NewPassword123"
+}
+```
+
+- Cả bốn trường đều bắt buộc; `email` phải hợp lệ, `otp` là chuỗi đúng 6 ký tự (giữ số 0 ở đầu).
+- `newPassword`: từ 8 đến 100 ký tự, phải khác mật khẩu hiện tại; `confirmPassword` phải khớp.
+- Dùng OTP nhận từ `/api/auth/forgot-password`; endpoint này tự kiểm tra OTP, không gọi `/api/auth/verify-email` trước đó.
+- Khi OTP được xác thực thành công, mã bị xóa ngay. Nếu bước kiểm tra mật khẩu mới sau đó báo lỗi, cần lấy OTP mới để thử lại.
+- Sau khi đặt lại thành công, tăng `authVersion` để vô hiệu hóa các access token và refresh token cũ; cần đăng nhập lại.
+- Response thành công (HTTP 200):
+
+```json
+{
+  "code": 200,
+  "message": "Đặt lại mật khẩu thành công"
+}
+```
+
+- Lỗi: 400 nếu OTP sai/hết hạn/đã dùng, request không hợp lệ, xác nhận mật khẩu không khớp hoặc mật khẩu mới trùng mật khẩu hiện tại; 404 nếu không tìm thấy email sau khi kiểm tra OTP.
+
+### 1.7 Gửi OTP xác thực email
+
+- Method: POST
+- URL: /api/auth/send-verify-email
+- Quyền: Public, không cần access token.
+- Content-Type: application/json
+- Request body:
+
+```json
+{
+  "email": "tenant@gmail.com"
+}
+```
+
+- `email`: bắt buộc, email hợp lệ, tối đa 255 ký tự; được bỏ khoảng trắng hai đầu và chuyển về chữ thường.
+- Chỉ gửi cho tài khoản đã tồn tại và chưa xác thực email. OTP có loại `EMAIL_VERIFY`, không dùng để đặt lại mật khẩu.
+- Response thành công (HTTP 200):
+
+```json
+{
+  "code": 200,
+  "message": "Mã OTP xác thực email đã được gửi"
+}
+```
+
+- Lỗi: 400 nếu request không hợp lệ hoặc email đã được xác thực; 404 nếu email không tồn tại; 429 nếu gửi lại trong thời gian chờ.
+
+### 1.8 Xác thực email bằng OTP
+
+- Method: POST
+- URL: /api/auth/verify-email
+- Quyền: Public, không cần access token.
+- Content-Type: application/json
+- Request body:
+
+```json
+{
+  "email": "tenant@gmail.com",
+  "otp": "012345"
+}
+```
+
+- `email`: bắt buộc, email hợp lệ; `otp`: bắt buộc, chuỗi đúng 6 ký tự, lấy từ `/api/auth/send-verify-email`.
+- Thành công sẽ cập nhật `emailVerifiedAt` và xóa OTP đã dùng.
+- Response thành công (HTTP 200):
+
+```json
+{
+  "code": 200,
+  "message": "Xác thực email thành công"
+}
+```
+
+- Lỗi: 400 nếu request không hợp lệ, email đã xác thực hoặc OTP sai/hết hạn/đã dùng; 404 nếu email không tồn tại.
+
+### 1.9 Quy tắc OTP và thứ tự gọi API
+
+- Cấu hình hiện tại: OTP gồm 6 chữ số, hết hạn sau 300 giây (5 phút); thời gian chờ gửi lại là 60 giây cho mỗi email và mỗi mục đích.
+- Gửi lại thành công sẽ thay thế OTP cũ của cùng email và mục đích. OTP chỉ dùng một lần; dùng xong vẫn phải chờ hết thời gian chờ nếu muốn gửi lại.
+- **Đổi mật khẩu khi đã đăng nhập:** gọi `PUT /api/users/me/password` với access token và mật khẩu hiện tại; không cần OTP hoặc xác thực email trước đó. Xem mục 4.3.
+- **Quên mật khẩu:** gọi `POST /api/auth/forgot-password` → lấy OTP mới trong email → gọi `POST /api/auth/reset-password`.
+- **Xác thực email:** gọi `POST /api/auth/send-verify-email` → lấy OTP trong email → gọi `POST /api/auth/verify-email`.
+- OTP của hai mục đích được lưu riêng biệt. Xác thực email thành công không cấp quyền đặt lại mật khẩu và không thay thế OTP quên mật khẩu.
+
+---
+
 ## 2. Amenities
 
 ### 2.1 Lấy danh sách tiện ích
@@ -519,6 +645,8 @@ Các API `/me` lấy ID người dùng từ access token.
 
 - Method: PUT
 - URL: /api/users/me/password
+- Yêu cầu đã đăng nhập, dùng access token và mật khẩu hiện tại; không cần OTP hoặc gọi API xác thực email.
+- Nếu quên mật khẩu hiện tại, dùng luồng `/api/auth/forgot-password` → `/api/auth/reset-password` ở mục 1.5–1.6.
 - Content-Type: application/json
 - Request body:
 
@@ -837,7 +965,7 @@ Tất cả endpoint trong nhóm này yêu cầu header `Authorization: Bearer <a
 
 ## 6. Quyền truy cập
 Các API dưới đây cần quyền thích hợp:
-- Public: `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/refresh`.
+- Public: `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/forgot-password`, `POST /api/auth/reset-password`, `POST /api/auth/send-verify-email`, `POST /api/auth/verify-email`.
 - `POST /api/auth/logout`: yêu cầu đăng nhập.
 - `GET /api/amenities`, `GET /api/room-types`, `GET /api/room-types/categories`, `GET /api/amenities/{id}`, `GET /api/room-types/{id}`: yêu cầu `isAuthenticated()`
 - `POST/PUT/DELETE` amenity / room-type: yêu cầu `hasAuthority('AMENITY_CREATE')` hoặc `hasRole('ADMIN')` / `hasAuthority('ROOM_TYPE_CREATE')` hoặc `hasRole('ADMIN')`
@@ -867,12 +995,31 @@ Ví dụ thiếu quyền (HTTP 403):
 }
 ```
 
-Các mã lỗi cần xử lý thêm cho Users và Administrative Units:
+Ví dụ OTP không hợp lệ, đã dùng hoặc hết hạn (HTTP 400):
 
-- 400: request không hợp lệ, trùng email/số điện thoại/CCCD, lỗi đổi mật khẩu.
+```json
+{
+  "code": 400,
+  "message": "Mã OTP không đúng hoặc đã hết hạn"
+}
+```
+
+Ví dụ gửi lại OTP quá sớm (HTTP 429):
+
+```json
+{
+  "code": 429,
+  "message": "Gửi OTP quá nhiều lần, vui lòng thử lại sau"
+}
+```
+
+Các mã lỗi cần xử lý thêm cho Authentication, Users và Administrative Units:
+
+- 400: request không hợp lệ, trùng email/số điện thoại/CCCD, lỗi đổi/đặt lại mật khẩu, email đã xác thực hoặc OTP không hợp lệ/đã dùng/hết hạn.
 - 404: không tìm thấy người dùng, vai trò, tỉnh/thành phố hoặc phường/xã.
 - 409: mã hành chính trùng, dữ liệu đang được tham chiếu hoặc tài khoản ADMIN được bảo vệ.
 - 413: upload vượt giới hạn multipart.
+- 429: gửi OTP quá nhiều lần trong thời gian chờ.
 - 502: upload avatar lên Cloudinary thất bại.
 - 503: Cloudinary chưa được cấu hình.
 - 500: lỗi hệ thống chưa được xử lý cụ thể.
