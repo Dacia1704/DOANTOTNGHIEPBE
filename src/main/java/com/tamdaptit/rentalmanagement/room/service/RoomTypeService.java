@@ -10,6 +10,8 @@ public interface RoomTypeService {
 
     PageResponse<RoomTypeResponse> getAll(int page, int size);
 
+    PageResponse<RoomTypeResponse> filter(String name, String parentId, int page, int size);
+
     RoomTypeResponse getById(String id);
 
     RoomTypeResponse create(RoomTypeRequest request);

@@ -582,7 +582,100 @@ Authorization: Bearer <access_token>
 
 ---
 
-## 4. Users
+## 4. Rooms
+
+Tất cả API ROOM yêu cầu `Authorization: Bearer <access_token>`. Chỉ `LANDLORD` được tạo/cập nhật/xóa amenity, room-type và room; admin không có quyền thao tác quản lý trong các nhóm này. Chủ trọ chỉ có thể sửa/xóa phòng và ảnh do chính mình sở hữu. API đọc danh sách/chi tiết yêu cầu đăng nhập. Các response tuân theo `ApiResponse<T>`.
+
+### 4.1 Lấy danh sách phòng và lọc
+- Method: GET
+- URL: `/api/rooms`
+- Query params: `page` (mặc định 0), `size` (mặc định 10, 1–100), `roomTypeName`, `provinceId`, `wardId`, `rentalStatus` (`AVAILABLE`, `RENTED`, `MAINTENANCE`), `minPrice`, `maxPrice`, `amenityNames` (lặp tham số theo từng tên; phòng cần có đủ tiện ích đã chọn).
+- Trả về `PageResponse<RoomResponse>`; lỗi 400 nếu phân trang/giá không hợp lệ hoặc `minPrice > maxPrice`.
+- Tìm kiếm phòng công khai; `GET /api/amenities` và `GET /api/room-types` cũng công khai để tải lựa chọn bộ lọc.
+- Ví dụ: `/api/rooms?page=0&size=12&provinceId=province-id&minPrice=2500000&maxPrice=4000000&roomTypeName=Studio&amenityNames=Wifi&amenityNames=Máy lạnh`
+
+- Endpoint lọc riêng: `GET /api/rooms/filter` với cùng các tham số trên.
+- Ví dụ: `/api/rooms/filter?page=0&size=12&roomTypeId=type-id&amenityIds=amenity-1`
+
+### 4.2 Lấy danh sách phòng của tôi
+- Method: GET
+- URL: `/api/rooms/mine`
+- Endpoint lọc phòng thuộc chủ trọ đang đăng nhập: `GET /api/rooms/mine/filter` (quyền `LANDLORD`). Nhận cùng bộ tham số dạng chuỗi với `/api/rooms/filter`: `page`, `size`, `roomTypeName`, `provinceId`, `wardId`, `rentalStatus`, `minPrice`, `maxPrice` và `amenityNames` lặp theo từng tiện ích. Backend tự lấy chủ phòng từ tài khoản xác thực; không nhận `ownerId` từ client.
+- Ví dụ: `/api/rooms/mine/filter?page=0&size=12&roomTypeName=Studio&provinceId=province-id&minPrice=2500000&amenityNames=Wifi`
+- Quyền: `LANDLORD`; trả về phân trang các phòng thuộc tài khoản đang đăng nhập.
+- Query params: `page` (mặc định 0), `size` (mặc định 10, 1–100).
+
+Endpoint lọc loại phòng: `GET /api/room-types/filter?name=studio&parentId=parent-id&page=0&size=10`. Endpoint lọc tiện ích: `GET /api/amenities/filter?name=wifi&page=0&size=10`. `name` và `parentId` đều tùy chọn.
+
+### 4.3 Lấy chi tiết phòng
+- Method: GET
+- URL: `/api/rooms/{id}`
+- Response `data` gồm thông tin phòng, loại phòng, tỉnh/phường, tiện ích và ảnh. Lỗi 404 nếu không tìm thấy.
+
+### 4.4 Tạo phòng
+- Method: POST
+- URL: `/api/rooms`
+- Content-Type: `multipart/form-data`. Gửi phần `room` kiểu `application/json` chứa JSON request body bên dưới; gửi thêm một hoặc nhiều file trong field `files` để tải ảnh ngay khi tạo phòng (không bắt buộc, tối đa 10 file). Response `RoomResponse.images` chứa các ảnh đã tải.
+- Quyền: `LANDLORD`; `landlordId` được lấy từ access token.
+- Request body:
+```json
+{
+  "roomTypeId": "type-001",
+  "price": 4500000,
+  "electricityPrice": 3500,
+  "waterPrice": 100000,
+  "serviceFee": 150000,
+  "defaultDeposit": 4500000,
+  "areaM2": 25,
+  "maxOccupants": 2,
+  "provinceId": "province-001",
+  "wardId": "ward-001",
+  "addressLine": "12 Nguyễn Huệ",
+  "latitude": 10.7769,
+  "longitude": 106.7009,
+  "rentalStatus": "AVAILABLE",
+  "amenityIds": ["amenity-001", "amenity-002"]
+}
+```
+- Ví dụ:
+```bash
+curl -X POST "http://localhost:8080/api/rooms" \
+  -H "Authorization: Bearer <access_token>" \
+  -F 'room={"roomTypeId":"type-001","price":4500000,"areaM2":25,"maxOccupants":2,"provinceId":"province-001","wardId":"ward-001","addressLine":"12 Nguyễn Huệ"};type=application/json' \
+  -F "files=@room-1.jpg" -F "files=@room-2.jpg"
+```
+- `roomTypeId`, `provinceId`, `wardId`, `price`, `areaM2`, `maxOccupants`, `addressLine` bắt buộc; giá/diện tích phải lớn hơn 0, số người ở ít nhất 1. Các phí không được âm. Phường phải thuộc tỉnh/thành được chọn. `amenityIds` có thể bỏ qua hoặc gửi danh sách rỗng.
+
+### 4.5 Cập nhật phòng
+- Method: PUT
+- URL: `/api/rooms/{id}`
+- Quyền: chủ phòng (`LANDLORD`). Body có cùng cấu trúc và validation như tạo phòng; `amenityIds` là danh sách tiện ích mới (bỏ qua hoặc `[]` sẽ xóa các tiện ích đang gắn).
+- Lỗi 403 nếu không sở hữu phòng; 404 nếu phòng/loại phòng/địa chỉ/tiện ích không tồn tại.
+
+### 4.6 Xóa phòng
+- Method: DELETE
+- URL: `/api/rooms/{id}`
+- Quyền: chủ phòng (`LANDLORD`). Xóa phòng và toàn bộ ảnh lưu trong thư mục của phòng.
+
+### 4.7 Tải ảnh phòng
+- Method: POST
+- URL: `/api/rooms/{id}/images`
+- Content-Type: `multipart/form-data`; quyền: chủ phòng (`LANDLORD`).
+- Form field `files`: một hoặc nhiều file JPEG/PNG hợp lệ; tối đa 10 ảnh mỗi request. Quy định kích thước/kiểm tra ảnh dùng chung với upload avatar (tối đa 5 MB, tối đa 4096×4096).
+- Response `data` là danh sách ảnh đã tải lên (`id`, `url`, `sortOrder`, `createdAt`). Lỗi 400 nếu ảnh không hợp lệ/vượt số lượng; lỗi 502/503 nếu kho ảnh lỗi/chưa cấu hình.
+- Ví dụ: `curl -X POST "http://localhost:8080/api/rooms/{id}/images" -H "Authorization: Bearer <access_token>" -F "files=@room.jpg"`
+
+### 4.8 Xóa ảnh phòng
+- Method: DELETE
+- URL: `/api/rooms/{id}/images/{imageId}`
+- Quyền: chủ phòng (`LANDLORD`); xóa bản ghi ảnh và ảnh trên kho lưu trữ.
+- Lỗi 403 nếu không sở hữu phòng; 404 nếu phòng hoặc ảnh không tồn tại/ảnh không thuộc phòng.
+
+`RoomResponse` gồm: `id`, `landlordId`, `roomTypeId`, `roomTypeName`, `price`, `electricityPrice`, `waterPrice`, `serviceFee`, `defaultDeposit`, `areaM2`, `maxOccupants`, `provinceId`, `provinceName`, `wardId`, `wardName`, `addressLine`, `latitude`, `longitude`, `rentalStatus`, `amenities`, `images`, `createdAt`, `updatedAt`. Tạo phòng nhận multipart gồm phần JSON `room` và field file `files` tùy chọn; endpoint tải ảnh riêng vẫn dùng được sau khi tạo.
+
+---
+
+## 5. Users
 
 Tất cả endpoint trong nhóm này yêu cầu header `Authorization: Bearer <access_token>`.
 Các API `/me` lấy ID người dùng từ access token.
@@ -812,7 +905,7 @@ curl -X PUT "http://localhost:8080/api/users/me/avatar" \
 
 ---
 
-## 5. Administrative Units (Tỉnh/Thành phố, Phường/Xã)
+## 6. Administrative Units (Tỉnh/Thành phố, Phường/Xã)
 
 Tất cả endpoint trong nhóm này yêu cầu header `Authorization: Bearer <access_token>`, kể cả GET.
 `provinceId` và `id` là ID bản ghi trong hệ thống, khác với mã hành chính `code`.
@@ -963,12 +1056,14 @@ Tất cả endpoint trong nhóm này yêu cầu header `Authorization: Bearer <a
 
 ---
 
-## 6. Quyền truy cập
+## 7. Quyền truy cập
 Các API dưới đây cần quyền thích hợp:
 - Public: `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/forgot-password`, `POST /api/auth/reset-password`, `POST /api/auth/send-verify-email`, `POST /api/auth/verify-email`.
 - `POST /api/auth/logout`: yêu cầu đăng nhập.
 - `GET /api/amenities`, `GET /api/room-types`, `GET /api/room-types/categories`, `GET /api/amenities/{id}`, `GET /api/room-types/{id}`: yêu cầu `isAuthenticated()`
-- `POST/PUT/DELETE` amenity / room-type: yêu cầu `hasAuthority('AMENITY_CREATE')` hoặc `hasRole('ADMIN')` / `hasAuthority('ROOM_TYPE_CREATE')` hoặc `hasRole('ADMIN')`
+- `GET /api/rooms`, `GET /api/rooms/{id}`: yêu cầu `isAuthenticated()`.
+- `GET /api/rooms/mine`, `POST/PUT/DELETE /api/rooms`, và các API ảnh phòng: yêu cầu vai trò `LANDLORD`; thao tác sửa/xóa còn kiểm tra chủ sở hữu phòng. `ADMIN` không được phép dùng các API quản lý ROOM.
+- `POST/PUT/DELETE` amenity và room-type: chỉ yêu cầu vai trò `LANDLORD`; `ADMIN` không được phép thao tác quản lý. Các API GET danh sách/chi tiết vẫn yêu cầu đăng nhập.
 - API hồ sơ cá nhân, mật khẩu, avatar và các URL thay thế: yêu cầu đăng nhập.
 - Danh sách, chi tiết theo ID, tạo, cập nhật và xóa người dùng: vai trò ADMIN.
 - GET provinces/wards: yêu cầu đăng nhập.
@@ -978,7 +1073,7 @@ Các API dưới đây cần quyền thích hợp:
 
 ---
 
-## 7. Error response mẫu
+## 8. Error response mẫu
 
 Các lỗi được xử lý bởi `GlobalExceptionHandler` trả về `ApiResponse`, với HTTP status tương ứng trường `code`. Trường `data` bị bỏ khi không có dữ liệu. Ví dụ lỗi validation (HTTP 400):
 ```json

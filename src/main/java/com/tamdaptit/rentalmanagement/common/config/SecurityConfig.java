@@ -33,6 +33,9 @@ public class SecurityConfig {
             "/api/auth/register",
             "/api/auth/login",
             "/api/auth/refresh",
+            "/api/rooms/filter",
+            "/api/amenities/filter",
+            "/api/room-types/filter",
             // OTP - Quen mat khau
             "/api/auth/forgot-password",
             "/api/auth/reset-password",

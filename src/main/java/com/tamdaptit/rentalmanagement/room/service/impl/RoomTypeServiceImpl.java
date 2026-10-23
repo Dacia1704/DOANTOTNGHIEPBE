@@ -43,6 +43,24 @@ public class RoomTypeServiceImpl implements RoomTypeService {
     }
 
     @Override
+    public PageResponse<RoomTypeResponse> filter(String name, String parentId, int page, int size) {
+        var pageable = pageRequest(page, size);
+        Page<RoomType> result;
+        if (name != null && !name.isBlank() && parentId != null && !parentId.isBlank()) {
+            result = roomTypeRepository.findByNameContainingIgnoreCaseAndParent_Id(name.trim(), parentId, pageable);
+        } else if (name != null && !name.isBlank()) {
+            result = roomTypeRepository.findByNameContainingIgnoreCase(name.trim(), pageable);
+        } else if (parentId != null && !parentId.isBlank()) {
+            result = roomTypeRepository.findByParent_Id(parentId, pageable);
+        } else {
+            result = roomTypeRepository.findAll(pageable);
+        }
+        return PageResponse.<RoomTypeResponse>builder().currentPage(result.getNumber()).pageSize(result.getSize())
+                .totalPages(result.getTotalPages()).totalElements(result.getTotalElements())
+                .data(result.getContent().stream().map(roomTypeMapper::toResponse).toList()).build();
+    }
+
+    @Override
     public RoomTypeResponse getById(String id) {
         return roomTypeMapper.toResponse(findRoomType(id));
     }
@@ -106,9 +124,11 @@ public class RoomTypeServiceImpl implements RoomTypeService {
 
     @Override
     public List<RoomTypeCategoryResponse> getCategoriesWithRooms() {
+        var roomsByType = roomRepository.findAllForCategories().stream()
+                .collect(java.util.stream.Collectors.groupingBy(room -> room.getRoomType().getId()));
         return roomTypeRepository.findAll(Sort.by(Sort.Direction.ASC, "name")).stream()
-                .map(type -> roomTypeMapper.toCategoryResponse(
-                        type, roomRepository.findAllForRoomType(type.getId())))
+                .map(type -> roomTypeMapper.toCategoryResponse(type,
+                        roomsByType.getOrDefault(type.getId(), java.util.List.of())))
                 .toList();
     }
 
