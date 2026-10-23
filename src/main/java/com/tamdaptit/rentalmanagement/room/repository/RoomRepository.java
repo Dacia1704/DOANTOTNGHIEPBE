@@ -30,6 +30,57 @@ public interface RoomRepository extends JpaRepository<Room, String> {
             @Param("status") RoomRentalStatus status, @Param("minPrice") java.math.BigDecimal minPrice,
             @Param("maxPrice") java.math.BigDecimal maxPrice, Pageable pageable);
 
+    @Query("""
+            select r from Room r join fetch r.roomType join fetch r.province join fetch r.ward
+            where (:ownerId is null or r.landlord.id = :ownerId)
+              and (:typeId is null or r.roomType.id = :typeId)
+              and (:provinceId is null or r.province.id = :provinceId)
+              and (:wardId is null or r.ward.id = :wardId)
+              and (:status is null or r.rentalStatus = :status)
+              and (:minPrice is null or r.price >= :minPrice)
+              and (:maxPrice is null or r.price <= :maxPrice)
+              and (select count(distinct ra.amenity.id) from RoomAmenity ra
+                   where ra.room.id = r.id and ra.amenity.id in :amenityIds) = :amenityCount
+            """)
+    Page<Room> searchWithAmenities(@Param("ownerId") String ownerId, @Param("typeId") String typeId,
+            @Param("provinceId") String provinceId, @Param("wardId") String wardId,
+            @Param("status") RoomRentalStatus status, @Param("minPrice") java.math.BigDecimal minPrice,
+            @Param("maxPrice") java.math.BigDecimal maxPrice, @Param("amenityIds") List<String> amenityIds,
+            @Param("amenityCount") long amenityCount, Pageable pageable);
+
+    @Query("""
+            select r from Room r join fetch r.roomType join fetch r.province join fetch r.ward
+            where (:ownerId is null or r.landlord.id = :ownerId)
+              and (:typeName is null or lower(r.roomType.name) = lower(:typeName))
+              and (:provinceId is null or r.province.id = :provinceId)
+              and (:wardId is null or r.ward.id = :wardId)
+              and (:status is null or r.rentalStatus = :status)
+              and (:minPrice is null or r.price >= :minPrice)
+              and (:maxPrice is null or r.price <= :maxPrice)
+              and (select count(distinct lower(ra.amenity.name)) from RoomAmenity ra
+                   where ra.room.id = r.id and lower(ra.amenity.name) in :amenityNames) = :amenityCount
+            """)
+    Page<Room> searchWithAmenityNames(@Param("ownerId") String ownerId, @Param("typeName") String typeName,
+            @Param("provinceId") String provinceId, @Param("wardId") String wardId,
+            @Param("status") RoomRentalStatus status, @Param("minPrice") java.math.BigDecimal minPrice,
+            @Param("maxPrice") java.math.BigDecimal maxPrice, @Param("amenityNames") List<String> amenityNames,
+            @Param("amenityCount") long amenityCount, Pageable pageable);
+
+    @Query("""
+            select r from Room r join fetch r.roomType join fetch r.province join fetch r.ward
+            where (:ownerId is null or r.landlord.id = :ownerId)
+              and (:typeName is null or lower(r.roomType.name) = lower(:typeName))
+              and (:provinceId is null or r.province.id = :provinceId)
+              and (:wardId is null or r.ward.id = :wardId)
+              and (:status is null or r.rentalStatus = :status)
+              and (:minPrice is null or r.price >= :minPrice)
+              and (:maxPrice is null or r.price <= :maxPrice)
+            """)
+    Page<Room> searchByTypeName(@Param("ownerId") String ownerId, @Param("typeName") String typeName,
+            @Param("provinceId") String provinceId, @Param("wardId") String wardId,
+            @Param("status") RoomRentalStatus status, @Param("minPrice") java.math.BigDecimal minPrice,
+            @Param("maxPrice") java.math.BigDecimal maxPrice, Pageable pageable);
+
     @Query("select r from Room r join fetch r.roomType join fetch r.province join fetch r.ward where r.id = :id")
     java.util.Optional<Room> findDetailedById(@Param("id") String id);
 

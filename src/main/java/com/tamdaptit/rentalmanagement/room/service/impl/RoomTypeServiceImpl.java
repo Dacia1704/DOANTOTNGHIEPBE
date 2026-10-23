@@ -43,6 +43,24 @@ public class RoomTypeServiceImpl implements RoomTypeService {
     }
 
     @Override
+    public PageResponse<RoomTypeResponse> filter(String name, String parentId, int page, int size) {
+        var pageable = pageRequest(page, size);
+        Page<RoomType> result;
+        if (name != null && !name.isBlank() && parentId != null && !parentId.isBlank()) {
+            result = roomTypeRepository.findByNameContainingIgnoreCaseAndParent_Id(name.trim(), parentId, pageable);
+        } else if (name != null && !name.isBlank()) {
+            result = roomTypeRepository.findByNameContainingIgnoreCase(name.trim(), pageable);
+        } else if (parentId != null && !parentId.isBlank()) {
+            result = roomTypeRepository.findByParent_Id(parentId, pageable);
+        } else {
+            result = roomTypeRepository.findAll(pageable);
+        }
+        return PageResponse.<RoomTypeResponse>builder().currentPage(result.getNumber()).pageSize(result.getSize())
+                .totalPages(result.getTotalPages()).totalElements(result.getTotalElements())
+                .data(result.getContent().stream().map(roomTypeMapper::toResponse).toList()).build();
+    }
+
+    @Override
     public RoomTypeResponse getById(String id) {
         return roomTypeMapper.toResponse(findRoomType(id));
     }

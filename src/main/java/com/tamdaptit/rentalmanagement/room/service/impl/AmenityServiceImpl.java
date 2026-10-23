@@ -39,6 +39,16 @@ public class AmenityServiceImpl implements AmenityService {
     }
 
     @Override
+    public PageResponse<Amenity> filter(String name, int page, int size) {
+        var pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, 100), Sort.by(Sort.Direction.ASC, "name"));
+        Page<Amenity> result = name == null || name.isBlank()
+                ? amenityRepository.findAll(pageable)
+                : amenityRepository.findByNameContainingIgnoreCase(name.trim(), pageable);
+        return PageResponse.<Amenity>builder().currentPage(result.getNumber()).pageSize(result.getSize())
+                .totalPages(result.getTotalPages()).totalElements(result.getTotalElements()).data(result.getContent()).build();
+    }
+
+    @Override
     public Amenity getById(String id) {
         return findAmenity(id);
     }

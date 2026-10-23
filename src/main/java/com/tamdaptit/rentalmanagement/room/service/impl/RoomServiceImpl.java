@@ -42,13 +42,46 @@ public class RoomServiceImpl implements RoomService {
     private final ImageStorageService storage;
 
     @Override
-    public PageResponse<RoomResponse> search(int page, int size, String typeId, String provinceId, String wardId,
-                                             RoomRentalStatus status, BigDecimal minPrice, BigDecimal maxPrice) {
+    public PageResponse<RoomResponse> search(int page, int size, String typeName, String provinceId, String wardId,
+                                             RoomRentalStatus status, BigDecimal minPrice, BigDecimal maxPrice, List<String> amenityNames) {
+        return searchForOwner(null, page, size, typeName, provinceId, wardId, status, minPrice, maxPrice, amenityNames);
+    }
+
+    @Override
+    public PageResponse<RoomResponse> searchMine(String userId, int page, int size, String typeName, String provinceId,
+            String wardId, RoomRentalStatus status, BigDecimal minPrice, BigDecimal maxPrice, List<String> amenityNames) {
+        return searchForOwner(userId, page, size, typeName, provinceId, wardId, status, minPrice, maxPrice, amenityNames);
+    }
+
+    private PageResponse<RoomResponse> searchForOwner(String ownerId, int page, int size, String typeName,
+            String provinceId, String wardId, RoomRentalStatus status, BigDecimal minPrice, BigDecimal maxPrice,
+            List<String> amenityNames) {
         validatePage(page, size);
         if (minPrice != null && maxPrice != null && minPrice.compareTo(maxPrice) > 0)
             throw new AppException(ErrorCode.INVALID_REQUEST, "minPrice không được lớn hơn maxPrice");
-        var result = rooms.search(null, typeId, provinceId, wardId, status, minPrice, maxPrice,
-                PageRequest.of(page, size, Sort.by("createdAt").descending()));
+        List<String> selectedAmenityNames = amenityNames == null ? List.of() : amenityNames.stream()
+                .filter(name -> name != null && !name.isBlank()).map(String::trim).distinct().toList();
+        var pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        var result = selectedAmenityNames.isEmpty()
+                ? rooms.searchByTypeName(ownerId, typeName, provinceId, wardId, status, minPrice, maxPrice, pageable)
+                : rooms.searchWithAmenityNames(ownerId, typeName, provinceId, wardId, status, minPrice, maxPrice,
+                        selectedAmenityNames.stream().map(String::toLowerCase).toList(), selectedAmenityNames.size(), pageable);
+        return page(result);
+    }
+
+    @Override
+    public PageResponse<RoomResponse> searchByIds(int page, int size, String typeId, String provinceId, String wardId,
+            RoomRentalStatus status, BigDecimal minPrice, BigDecimal maxPrice, List<String> amenityIds) {
+        validatePage(page, size);
+        if (minPrice != null && maxPrice != null && minPrice.compareTo(maxPrice) > 0)
+            throw new AppException(ErrorCode.INVALID_REQUEST, "minPrice không được lớn hơn maxPrice");
+        List<String> selectedIds = amenityIds == null ? List.of() : amenityIds.stream()
+                .filter(id -> id != null && !id.isBlank()).map(String::trim).distinct().toList();
+        var pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        var result = selectedIds.isEmpty()
+                ? rooms.search(null, typeId, provinceId, wardId, status, minPrice, maxPrice, pageable)
+                : rooms.searchWithAmenities(null, typeId, provinceId, wardId, status, minPrice, maxPrice,
+                        selectedIds, selectedIds.size(), pageable);
         return page(result);
     }
 

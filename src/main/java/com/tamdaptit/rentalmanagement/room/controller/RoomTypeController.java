@@ -8,6 +8,8 @@ import com.tamdaptit.rentalmanagement.room.dto.response.RoomTypeResponse;
 import com.tamdaptit.rentalmanagement.room.service.RoomTypeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import java.util.List;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -21,8 +23,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import jakarta.validation.Valid;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/room-types")
@@ -30,16 +30,24 @@ import java.util.List;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Tag(name = "Room types", description = "Quản lý loại phòng và danh mục phòng")
 public class RoomTypeController {
-
     RoomTypeService roomTypeService;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Lấy danh sách loại phòng có phân trang")
     public ApiResponse<PageResponse<RoomTypeResponse>> getAll(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ApiResponse.success("Lấy danh sách loại phòng thành công", roomTypeService.getAll(page, size));
+    }
+
+    @GetMapping("/filter")
+    @Operation(summary = "Lọc loại phòng theo tên và danh mục cha")
+    public ApiResponse<PageResponse<RoomTypeResponse>> filter(
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String parentId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ApiResponse.success("Lọc loại phòng thành công", roomTypeService.filter(name, parentId, page, size));
     }
 
     @GetMapping("/categories")
@@ -57,23 +65,21 @@ public class RoomTypeController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('ROOM_TYPE_CREATE') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Tạo loại phòng")
     public ApiResponse<RoomTypeResponse> create(@RequestBody @Valid RoomTypeRequest request) {
         return ApiResponse.success("Tạo loại phòng thành công", roomTypeService.create(request));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROOM_TYPE_CREATE') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Cập nhật loại phòng")
-    public ApiResponse<RoomTypeResponse> update(
-            @PathVariable String id,
-            @RequestBody @Valid RoomTypeRequest request) {
+    public ApiResponse<RoomTypeResponse> update(@PathVariable String id, @RequestBody @Valid RoomTypeRequest request) {
         return ApiResponse.success("Cập nhật loại phòng thành công", roomTypeService.update(id, request));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROOM_TYPE_CREATE') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Xóa loại phòng")
     public ApiResponse<Void> delete(@PathVariable String id) {
         roomTypeService.delete(id);

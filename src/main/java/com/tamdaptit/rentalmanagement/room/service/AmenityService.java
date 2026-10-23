@@ -8,6 +8,8 @@ public interface AmenityService {
 
     PageResponse<Amenity> getAll(int page, int size);
 
+    PageResponse<Amenity> filter(String name, int page, int size);
+
     Amenity getById(String id);
 
     Amenity create(AmenityRequest request);
