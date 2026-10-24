@@ -102,8 +102,19 @@ public enum ErrorCode {
 
     // ===== SERVICE PACKAGE / BOOST =====
     SERVICE_PACKAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "Gói dịch vụ không tồn tại"),
+    SERVICE_PACKAGE_CODE_EXISTS(HttpStatus.CONFLICT, "Mã gói dịch vụ đã tồn tại"),
+    SERVICE_PACKAGE_PRICE_NOT_FOUND(HttpStatus.NOT_FOUND, "Giá gói dịch vụ không tồn tại"),
+    SERVICE_PACKAGE_PRICE_EXISTS(HttpStatus.CONFLICT, "Gói đã có giá cho thời hạn này"),
+    INVALID_SERVICE_PACKAGE(HttpStatus.BAD_REQUEST, "Cấu hình quyền lợi gói không hợp lệ"),
+    INVALID_PACKAGE_DURATION(HttpStatus.BAD_REQUEST, "Thời hạn gói không được hỗ trợ"),
+    DEFAULT_SERVICE_PACKAGE_PROTECTED(HttpStatus.CONFLICT, "Không được thay đổi cấu hình mặc định hoặc ngừng bán gói Free"),
     BOOST_PACKAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "Gói đẩy tin không tồn tại"),
+    BOOST_PACKAGE_CODE_EXISTS(HttpStatus.CONFLICT, "Mã gói Boost đã tồn tại"),
     SUBSCRIPTION_NOT_FOUND(HttpStatus.NOT_FOUND, "Gói đăng ký không tồn tại"),
+    SUBSCRIPTION_ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "Đơn đăng ký gói không tồn tại"),
+    SUBSCRIPTION_ORDER_CONFLICT(HttpStatus.CONFLICT, "Yêu cầu không phù hợp với gói hiện tại hoặc đã có yêu cầu đổi gói đang chờ"),
+    SUBSCRIPTION_ORDER_NOT_PAID(HttpStatus.CONFLICT, "Đơn chưa có thanh toán thành công hợp lệ"),
+    SUBSCRIPTION_ORDER_NOT_CONFIRMABLE(HttpStatus.CONFLICT, "Đơn không ở trạng thái chờ xác nhận đổi gói"),
     SUBSCRIPTION_EXPIRED(HttpStatus.BAD_REQUEST, "Gói đăng ký đã hết hạn"),
     NO_ACTIVE_SUBSCRIPTION(HttpStatus.BAD_REQUEST, "Bạn chưa có gói dịch vụ nào đang hoạt động"),
     QUOTA_EXCEEDED(HttpStatus.BAD_REQUEST, "Đã vượt quá số lượng tin cho phép của gói"),
@@ -111,6 +122,13 @@ public enum ErrorCode {
 
     // ===== PAYMENT / INVOICE =====
     PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "Giao dịch thanh toán không tồn tại"),
+    VNPAY_NOT_CONFIGURED(HttpStatus.SERVICE_UNAVAILABLE, "Chưa cấu hình VNPay"),
+    VNPAY_QUERY_FAILED(HttpStatus.BAD_GATEWAY, "Không truy vấn được kết quả giao dịch từ VNPay; vui lòng kiểm tra lại sau"),
+    VNPAY_QUERY_INVALID(HttpStatus.BAD_GATEWAY, "Phản hồi truy vấn VNPay không hợp lệ; trạng thái thanh toán được giữ nguyên"),
+    PAYMENT_AMOUNT_INVALID(HttpStatus.BAD_REQUEST, "VNPay chỉ hỗ trợ số tiền VND nguyên dương trong giới hạn cho phép"),
+    PAYMENT_CHECKOUT_UNAVAILABLE(HttpStatus.CONFLICT, "Đơn đã hết hạn, đã thanh toán hoặc không còn chờ thanh toán"),
+    BOOST_ALREADY_ACTIVE(HttpStatus.CONFLICT, "Tin đang có Boost mua riêng còn hiệu lực"),
+    PRIORITY_SLOTS_EXCEEDED(HttpStatus.CONFLICT, "Đã sử dụng hết suất ưu tiên của kỳ hiện tại"),
     PAYMENT_NOT_PENDING(HttpStatus.BAD_REQUEST, "Giao dịch thanh toán không ở trạng thái chờ"),
     PAYMENT_ALREADY_SUCCESS(HttpStatus.BAD_REQUEST, "Giao dịch thanh toán đã thành công"),
     PAYMENT_AMOUNT_NOT_ENOUGH(HttpStatus.BAD_REQUEST, "Số tiền thanh toán không đủ"),

@@ -3,6 +3,7 @@ package com.tamdaptit.rentalmanagement.listing.entity;
 import com.tamdaptit.rentalmanagement.identity.entity.User;
 import com.tamdaptit.rentalmanagement.listing.entity.enums.ListingStatus;
 import com.tamdaptit.rentalmanagement.room.entity.Room;
+import com.tamdaptit.rentalmanagement.subscription.entity.ServiceSubscriptionPeriod;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -55,6 +56,7 @@ public class Listing {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
+    @Builder.Default
     private ListingStatus status = ListingStatus.PENDING;
 
     @Column(name = "rejection_reason", columnDefinition = "TEXT")
@@ -67,13 +69,33 @@ public class Listing {
     @Column(name = "approved_at")
     private LocalDateTime approvedAt;
 
+    @Column(name = "submitted_at")
+    private LocalDateTime submittedAt;
+
+    @Column(name = "pending_expires_at")
+    private LocalDateTime pendingExpiresAt;
+
+    @Column(name = "published_at")
+    private LocalDateTime publishedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "service_subscription_period_id")
+    private ServiceSubscriptionPeriod serviceSubscriptionPeriod;
+
+    @Column(name = "package_priority_level", nullable = false)
+    @Builder.Default
+    private Integer packagePriorityLevel = 0;
+
     @Column(name = "priority_level")
+    @Builder.Default
     private Integer priorityLevel = 0;
 
     @Column(name = "view_count")
+    @Builder.Default
     private Integer viewCount = 0;
 
     @Column(name = "contact_count")
+    @Builder.Default
     private Integer contactCount = 0;
 
     @Column(name = "expires_at")

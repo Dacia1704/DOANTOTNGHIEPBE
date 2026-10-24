@@ -15,7 +15,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -40,24 +39,27 @@ public class ServicePackage {
     private String name;
 
     @Column(name = "max_listings")
+    @Builder.Default
     private Integer maxListings = 0;
 
-    @Column(name = "high_priority_quota")
-    private Integer highPriorityQuota = 0;
+    @Column(name = "high_priority_slots", nullable = false)
+    @Builder.Default
+    private Integer highPrioritySlots = 0;
 
-    @Column(name = "low_priority_quota")
-    private Integer lowPriorityQuota = 0;
+    @Column(name = "low_priority_slots", nullable = false)
+    @Builder.Default
+    private Integer lowPrioritySlots = 0;
 
-    @Column(name = "has_stats")
+    @Column(name = "default_priority_level", nullable = false)
+    @Builder.Default
+    private Integer defaultPriorityLevel = 0;
+
+    @Column(name = "has_stats", nullable = false)
+    @Builder.Default
     private Boolean hasStats = false;
 
-    @Column(nullable = false, precision = 12, scale = 2)
-    private BigDecimal price;
-
-    @Column(name = "billing_cycle_days")
-    private Integer billingCycleDays = 30;
-
-    @Column(name = "is_active")
+    @Column(name = "is_active", nullable = false)
+    @Builder.Default
     private Boolean active = true;
 
     @CreationTimestamp

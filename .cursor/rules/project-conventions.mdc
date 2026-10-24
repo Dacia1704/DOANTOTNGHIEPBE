@@ -1,0 +1,18 @@
+---
+description: Tuân thủ RULE.md và cấu trúc backend hiện có trong toàn dự án
+alwaysApply: true
+---
+
+# Quy tắc dự án
+
+- Đọc và tuân thủ `docs/RULE.md` trước khi lập kế hoạch, viết hoặc sửa code.
+- Nêu rõ giả định, điểm chưa thống nhất và tiêu chí kiểm chứng trước khi triển khai.
+- Giữ cách chia module theo nghiệp vụ trong `com.tamdaptit.rentalmanagement`.
+- Theo mẫu đang có: `controller`, `dto/request`, `dto/response`, `mapper`, `repository`, `service`, `service/impl`, `entity`, `entity/enums` khi cần.
+- Đối chiếu module tương tự trước khi tạo file; chỉ thêm lớp và thư mục cần cho yêu cầu.
+- Dùng lại `ApiResponse`, `PageResponse`, `AppException`, `ErrorCode` và cách phân quyền hiện có.
+- Giữ phong cách DTO record, MapStruct, constructor injection và transaction của code lân cận.
+- Với thay đổi database, đồng bộ migration Flyway, entity và enum; giữ lịch sử migration đã áp dụng.
+- Chỉ sửa phần liên quan trực tiếp; không tự refactor hoặc định dạng lại module khác.
+- Giữ nguyên thay đổi đang có của người dùng và không ghi thông tin bí mật vào tài liệu hay code mới.
+- Kiểm chứng đúng phạm vi thay đổi, cập nhật `docs/api.md` khi thay đổi API, báo rõ phần chưa kiểm chứng.
