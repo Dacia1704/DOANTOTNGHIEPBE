@@ -2,7 +2,7 @@ package com.tamdaptit.rentalmanagement.listing.entity.enums;
 
 public enum ListingStatus {
     PENDING,
-    APPROVED,
+    PUBLISHED,
     REJECTED,
     HIDDEN,
     EXPIRED
