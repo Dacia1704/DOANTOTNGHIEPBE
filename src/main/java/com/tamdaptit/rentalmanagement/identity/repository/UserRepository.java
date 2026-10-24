@@ -8,7 +8,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
+
 
 @Repository
 public interface UserRepository extends JpaRepository<User, String>, JpaSpecificationExecutor<User> {
@@ -60,4 +62,14 @@ public interface UserRepository extends JpaRepository<User, String>, JpaSpecific
             WHERE LOWER(u.email) = LOWER(:email)
             """)
     Optional<User> findByEmailWithRolesAndPermissions(@Param("email") String email);
+    @Query("""
+            SELECT DISTINCT u
+            FROM User u
+            JOIN u.userRoles ur
+            JOIN ur.role r
+            WHERE r.code = com.tamdaptit.rentalmanagement.identity.entity.enums.RoleCode.ADMIN
+              AND u.status = com.tamdaptit.rentalmanagement.identity.entity.enums.UserStatus.ACTIVE
+            ORDER BY u.createdAt ASC
+            """)
+    List<User> findAllAdmins();
 }
