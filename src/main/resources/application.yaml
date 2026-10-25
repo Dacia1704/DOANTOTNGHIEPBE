@@ -8,7 +8,7 @@ server:
 
 spring:
   config:
-    import: "optional:file:.env.local[.properties]"
+    import: "optional:file:.env[.properties]"
 
   application:
     name: rental-management

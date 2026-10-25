@@ -9,7 +9,7 @@ public record ServiceSubscriptionOrderResponse(
         String id, String landlordId, String packageId, String priceOptionId,
         String subscriptionId, String previousSubscriptionId,
         ServiceSubscriptionOrderType type, ServiceSubscriptionOrderStatus status,
-        Integer durationMonths, BigDecimal price, SubscriptionRightsResponse rights,
+        Integer durationMonths, BigDecimal price, Boolean immediateUpgrade, SubscriptionRightsResponse rights,
         LocalDateTime expiresAt, LocalDateTime effectiveAt, LocalDateTime endAt,
         LocalDateTime appliedAt, LocalDateTime confirmedAt, LocalDateTime createdAt) {
 }

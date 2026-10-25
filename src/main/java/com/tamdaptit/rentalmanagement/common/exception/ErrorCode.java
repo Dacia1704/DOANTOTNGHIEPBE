@@ -120,6 +120,9 @@ public enum ErrorCode {
     QUOTA_EXCEEDED(HttpStatus.BAD_REQUEST, "Đã vượt quá số lượng tin cho phép của gói"),
     BOOST_LISTING_NOT_OWNED(HttpStatus.FORBIDDEN, "Bạn không sở hữu tin đăng này"),
 
+    INVALID_BOOST_PACKAGE(HttpStatus.BAD_REQUEST, "Gói Boost phải có ít nhất một suất ưu tiên cao hoặc thấp"),
+    BOOST_SLOTS_EXCEEDED(HttpStatus.CONFLICT, "Gói Boost đã hết suất cho mức ưu tiên được chọn"),
+
     // ===== PAYMENT / INVOICE =====
     PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "Giao dịch thanh toán không tồn tại"),
     VNPAY_NOT_CONFIGURED(HttpStatus.SERVICE_UNAVAILABLE, "Chưa cấu hình VNPay"),

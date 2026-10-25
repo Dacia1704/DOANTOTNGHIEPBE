@@ -35,12 +35,14 @@ import java.util.Optional;
 
 public interface ListingRepository extends JpaRepository<Listing, String> {
     String EFFECTIVE_PRIORITY = """
-            case when exists (select b.id from BoostServicePackageSubscription b
-                where b.listing = l and b.status = 'ACTIVE' and b.startAt <= :time and b.endAt > :time) then 2
+            case when exists (select a.id from BoostAllocation a join a.subscription b
+                where a.listing = l and a.priorityLevel = 2 and b.status = 'ACTIVE' and b.startAt <= :time and b.endAt > :time) then 2
             when exists (select p.id from ServiceSubscriptionPeriod p where p.subscription.landlord = l.room.landlord
                 and p.subscription.status in ('ACTIVE','SCHEDULED') and p.startAt <= :time and p.endAt > :time
                 and p.subscription.startAt <= :time and p.subscription.endAt > :time
                 and l.serviceSubscriptionPeriod = p and l.packagePriorityLevel = 2) then 2
+            when exists (select a.id from BoostAllocation a join a.subscription b
+                where a.listing = l and a.priorityLevel = 1 and b.status = 'ACTIVE' and b.startAt <= :time and b.endAt > :time) then 1
             when exists (select p.id from ServiceSubscriptionPeriod p where p.subscription.landlord = l.room.landlord
                 and p.subscription.status in ('ACTIVE','SCHEDULED') and p.startAt <= :time and p.endAt > :time
                 and p.subscription.startAt <= :time and p.subscription.endAt > :time

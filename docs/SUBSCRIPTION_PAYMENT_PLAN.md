@@ -1,5 +1,7 @@
 # Kế hoạch triển khai gói dịch vụ, Boost và thanh toán
 
+Cập nhật V7/V8: CHANGE nâng gói áp dụng ngay sau thanh toán, phí theo thời gian còn lại và giữ hạn tổng; CHANGE hạ/đổi ngang tự xếp lịch kỳ sau. Không cần admin cho đơn mới. Chi tiết hiện hành ở mục 10.3 của api.md; các mô tả chờ admin bên dưới chỉ còn áp dụng cho đơn cũ.
+
 Trạng thái: đã có code backend MVP cho phần 1–7: danh mục/bảng giá, kỳ quyền lợi, đăng ký/gia hạn/đổi gói, VNPay checkout/Return/IPN, hóa đơn/đối soát, quota/duyệt tin, slot ưu tiên/Boost và tác vụ hết hạn. Vẫn chỉ thêm 3 bảng; V4 bổ sung cột đối soát thanh toán và hạn chờ thanh toán Boost vào bảng hiện có. Migration chỉ chạy trên schema thử nghiệm riêng, chưa áp dụng vào database ứng dụng. Chưa thực hiện giao dịch qua website VNPay hoặc xác nhận VNPay gọi được IPN công khai. Chi tiết API xem mục 8–14 trong `api.md`, cấu hình và kiểm tra sandbox xem `VNPAY_SANDBOX.md`.
 
 Kiểm chứng ngày 24/10/2026: 54 test đã qua, không bỏ qua test nào trong lần chạy có MySQL thử nghiệm (45 API/nghiệp vụ, 7 migration/JPA trên MySQL 8.0.42 và 2 chữ ký). Có kiểm tra giao dịch đồng thời về quota, slot, gia hạn, đổi gói, IPN lặp/thu trùng và đọc snapshot cũ trước khi chờ khóa. Đây là nhóm kiểm thử theo phạm vi thay đổi, không phải kiểm tra toàn bộ ứng dụng/hạ tầng hoặc VNPay trực tiếp.
@@ -25,7 +27,7 @@ Bổ sung theo nhu cầu test localhost: POST `/api/payments/{id}/check` dùng Q
 - Database dùng MySQL và Flyway với `V1__baseline.sql`, `V2__seed_data.sql`; JPA đang đặt `ddl-auto: validate`.
 - Enum phương thức có VNPay/MoMo/chuyển khoản, nhưng MVP đã chọn VNPay Sandbox. Giữ enum đang có, chưa triển khai hai phương thức còn lại.
 - Test hiện có mới kiểm tra Spring context.
-- `.env` và `.env.docker` đang được Git theo dõi. Khi cấu hình VNPay, dùng biến môi trường runtime hoặc file local riêng đã được ignore; không ghi khóa bí mật vào hai file này, source code, log hay tài liệu.
+- Cấu hình VNPay trực tiếp trong `.env` theo thiết lập hiện tại; backend tự đọc file qua spring.config.import, không cần `.env.local`. Biến môi trường runtime có độ ưu tiên cao hơn.
 
 ## 3. Quy tắc nghiệp vụ đã chốt
 

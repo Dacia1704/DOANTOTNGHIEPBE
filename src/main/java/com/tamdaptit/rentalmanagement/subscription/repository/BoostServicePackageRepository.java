@@ -16,7 +16,7 @@ public interface BoostServicePackageRepository extends JpaRepository<BoostServic
     @Query("""
             select p from BoostServicePackage p
             where :includeInactive = true or
-              (p.active = true and p.priorityLevel = 2 and p.durationMonths in (1,3,6))
+              (p.active = true and (p.highPrioritySlots > 0 or p.lowPrioritySlots > 0) and p.durationMonths in (1,3,6))
             """)
     Page<BoostServicePackage> findCatalog(boolean includeInactive, Pageable pageable);
 }

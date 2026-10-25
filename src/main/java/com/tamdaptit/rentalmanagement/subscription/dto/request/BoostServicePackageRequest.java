@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import java.math.BigDecimal;
@@ -18,6 +19,14 @@ public record BoostServicePackageRequest(
         @NotBlank(message = "Tên gói không được để trống")
         @Size(max = 100, message = "Tên gói tối đa 100 ký tự")
         String name,
+
+        @NotNull(message = "Số suất cao không được để trống")
+        @PositiveOrZero(message = "Số suất cao không được âm")
+        Integer highPrioritySlots,
+
+        @NotNull(message = "Số suất thấp không được để trống")
+        @PositiveOrZero(message = "Số suất thấp không được âm")
+        Integer lowPrioritySlots,
 
         @NotNull(message = "Thời hạn không được để trống")
         @Positive(message = "Số tháng phải lớn hơn 0")

@@ -1200,7 +1200,7 @@ Chỉ nhận 1/3/6/12 tháng; mỗi gói có một giá cho mỗi thời hạn. 
 
 ## 9. Danh mục Boost mua riêng
 
-Phân quyền và includeInactive giống nhóm gói dịch vụ. Đây là quản lý danh mục Boost; chưa phải API mua, thanh toán hay kích hoạt Boost cho tin.
+Phân quyền và includeInactive giống nhóm gói dịch vụ. Danh mục Boost quy định số suất cao/thấp, giá và thời hạn; luồng mua và phân bổ được mô tả ở mục 13.
 
 - GET `/api/boost-packages?page=0&size=10&includeInactive=false`: danh sách phân trang, sắp xếp số tháng, code rồi ID.
 - GET `/api/boost-packages/{id}?includeInactive=false`: chi tiết.
@@ -1214,14 +1214,16 @@ Body POST/PUT:
 ```json
 {
   "code": "BOOST_HIGH_3M",
-  "name": "Boost cao 3 tháng",
+  "name": "Boost 3 tháng",
+  "highPrioritySlots": 3,
+  "lowPrioritySlots": 5,
   "durationMonths": 3,
   "price": 150000,
   "active": true
 }
 ```
 
-Code/tên/giá kiểm tra giống gói dịch vụ. Chỉ nhận 1/3/6 tháng. priorityLevel do server đặt bằng 2, không phải trường client được cấu hình. Response có id, code, name, priorityLevel, durationMonths, price, active, createdAt, updatedAt.
+Code/tên/giá kiểm tra giống gói dịch vụ. Chỉ nhận 1/3/6 tháng. highPrioritySlots và lowPrioritySlots là số nguyên không âm, bắt buộc và tổng lớn hơn 0. Response có id, code, name, highPrioritySlots, lowPrioritySlots, durationMonths, price, active, createdAt, updatedAt. Không còn trường priorityLevel trong danh mục Boost.
 
 Boost cũ chưa có durationMonths phải được admin cập nhật thời hạn trước khi bật bán. Sửa danh mục không thay đổi snapshot Boost đã mua.
 
@@ -1249,14 +1251,14 @@ POST `/api/subscriptions/orders`, quyền LANDLORD:
 ```
 
 - `priceOptionId` xác định cả gói và thời hạn 1/3/6/12 tháng; gói và mức giá phải đang bán. Không mua gói Free bằng endpoint này.
-- `type`: PURCHASE (mua mới khi không có gói trả phí còn hạn), RENEW (gia hạn cùng gói), CHANGE (đổi sang gói khác ở kỳ tiếp theo khi đang có gói còn hạn).
+- `type`: PURCHASE (mua mới khi không có gói trả phí còn hạn), RENEW (gia hạn cùng gói), CHANGE (nâng gói áp dụng ngay sau thanh toán; hạ gói hoặc đổi ngang áp dụng từ kỳ sau).
 - RENEW sau khi hết hạn được ghi nhận thành PURCHASE để tạo subscription mới sau thanh toán. Khi còn hạn, RENEW chỉ nhận mức giá của chính gói đang dùng.
 - Server lấy giá, thời hạn và toàn bộ quyền lợi để lưu snapshot. Client không đặt giá, quyền lợi, chủ sở hữu, hạn gói hay trạng thái.
-- Đơn có trạng thái PENDING_PAYMENT, thời hạn chờ thanh toán 15 phút. Tạo đơn chưa tạo quyền sử dụng.
+- Đơn có trạng thái PENDING_PAYMENT, thời hạn chờ thanh toán tối đa 15 phút. Đơn nâng gói không được vượt hạn gói hiện tại. Ngoại lệ: nâng gói có phí chênh lệch bằng 0 được APPLIED ngay lúc tạo đơn, không checkout VNPay.
 - Chỉ có một yêu cầu CHANGE đang mở trong các trạng thái PENDING_PAYMENT, AWAITING_ADMIN_CONFIRMATION hoặc SCHEDULED. Đơn chưa trả tiền quá hạn sẽ EXPIRED và giải phóng yêu cầu đang mở khi chủ trọ thao tác tiếp.
 - Có SCHEDULED thì chặn tạo đơn gia hạn/đăng ký/đổi gói khác. Khoản thanh toán gia hạn của đơn cũ về sau SCHEDULED được giữ để đối soát (REQUIRES_REVIEW), không kéo dài gói hiện tại hoặc dời lịch đã xác nhận.
 
-Dữ liệu đơn trả về: id, landlordId, packageId, priceOptionId, subscriptionId, previousSubscriptionId, type, status, durationMonths, price, rights, expiresAt, effectiveAt, endAt, appliedAt, confirmedAt, createdAt. Những mốc và ID chưa được xác định trả null. `rights` là snapshot gồm packageCode, packageName, maxListings, highPrioritySlots, lowPrioritySlots, defaultPriorityLevel, hasStats.
+Dữ liệu đơn trả về: id, landlordId, packageId, priceOptionId, subscriptionId, previousSubscriptionId, type, status, durationMonths, price, immediateUpgrade, rights, expiresAt, effectiveAt, endAt, appliedAt, confirmedAt, createdAt. Những mốc và ID chưa được xác định trả null. `rights` là snapshot gồm packageCode, packageName, maxListings, highPrioritySlots, lowPrioritySlots, defaultPriorityLevel, hasStats.
 
 ### 10.2. Quyền hiện tại và lịch sử
 
@@ -1277,14 +1279,22 @@ Response current gồm subscriptionId, free, canSubmitListings, subscriptionEnds
 - Các mốc sử dụng giờ Asia/Ho_Chi_Minh, tháng theo lịch. Khoảng hiệu lực là [startAt, endAt), đúng endAt thì kỳ cũ mất quyền.
 - Khi truy cập các API hiện tại/đơn/lịch sử subscription hoặc thực hiện giao dịch, hệ thống đồng bộ hết hạn và kích hoạt SCHEDULED đến hạn trong transaction; không cần chờ cron để lấy quyền mới. Kích hoạt trễ giữ nguyên ngày bắt đầu/kết thúc đã xác nhận.
 
-### 10.3. Admin xác nhận đổi gói
+### 10.3. Nâng gói ngay, hạ gói từ kỳ sau
 
-- GET `/api/subscriptions/orders/awaiting-confirmation?page=0&size=10`: ADMIN xem các đơn đã thanh toán đang chờ xác nhận.
-- POST `/api/subscriptions/orders/{id}/confirm`: ADMIN xác nhận, không cần body.
+Client tiếp tục gửi `type=CHANGE` và `priceOptionId`; server tự phân loại theo snapshot quyền lợi hiện tại, không theo tên/mã gói hoặc chỉ theo giá.
 
-Đơn CHANGE phải có thanh toán SUCCESS hợp lệ và đang AWAITING_ADMIN_CONFIRMATION. Xác nhận trước hạn tạo subscription SCHEDULED bắt đầu tại hạn tổng của gói cũ; xác nhận từ lúc gói cũ hết hạn trở đi tạo ACTIVE bắt đầu tại thời điểm xác nhận. Xác nhận lặp giữ nguyên ngày và không cộng thêm kỳ.
+- `immediateUpgrade=true`: gói đích không giảm bất kỳ quyền nào của các kỳ đã mua còn hạn và tăng ít nhất một quyền hiện tại (giới hạn tin, suất cao, quyền ưu tiên thấp hoặc thống kê). NULL maxListings là không giới hạn; defaultPriorityLevel=1 tương đương ưu tiên thấp cho mọi tin.
+- Nâng gói có hiệu lực ngay sau khi backend xác nhận khoản thanh toán hợp lệ qua IPN/QueryDr, không cần admin. Giữ nguyên ngày hết hạn tổng đã mua, kể cả các kỳ gia hạn trả trước. Subscription cũ chuyển CANCELLED để ngừng cấp quyền; lịch sử đơn/kỳ cũ vẫn giữ nguyên.
+- Phí nâng gói = max(0, giá trị gói đích cho thời gian còn lại - giá trị chưa dùng của các kỳ cũ), làm tròn lên VND nguyên. Giá trị gói đích dùng đơn giá mỗi tháng (giá priceOptionId chia durationMonths), nhân tổng billing_months chưa dùng. Mỗi kỳ quy đổi phần tháng còn lại theo tỷ lệ số giây chưa dùng trên độ dài kỳ gốc; nhờ đó tháng 28/30/31 ngày và kỳ 1/3/6/12 tháng không bị tính lệch. Giá trị cũ dùng entitlement_value lưu tại kỳ, tính cùng tỷ lệ thời gian chưa dùng; không dùng giá danh mục hiện tại. Hai giá trị được làm tròn đến 2 chữ số thập phân trước khi lấy chênh lệch và làm tròn lên VND nguyên.
+- Đơn lưu cố định giá báo trong cửa sổ thanh toán. Nếu gói nguồn hoặc ngày hết hạn đã thay đổi trước checkout, checkout bị chặn; nếu thanh toán đã thu rồi điều kiện thay đổi, đơn REQUIRES_REVIEW. Không tự thu thêm hoặc áp dụng một báo giá lỗi thời.
+- Phí bằng 0: server áp dụng ngay khi tạo đơn và trả APPLIED; frontend không gọi checkout. Giá trị đã trả còn lại được bảo toàn làm cơ sở tính cho lần nâng tiếp theo, không tự hoàn tiền.
+- Nâng gói không reset quota: 10 tin đang chiếm chỗ trong gói 10 tin, nâng lên gói 20 tin thì còn 10 chỗ. Các lựa chọn ưu tiên hiện tại được chuyển sang kỳ mới; nếu mức thấp trở thành mặc định thì giải phóng lựa chọn thấp riêng. Tin/Boost giữ nguyên hạn và publishedAt.
+- `immediateUpgrade=false`: hạ gói, đổi ngang hoặc đổi có giảm một quyền lợi. Sau thanh toán tự tạo SCHEDULED tại hạn tổng của gói hiện tại, không cần admin. Nếu gói cũ đã hết hạn lúc áp dụng thì bắt đầu ngay tại lúc cấp quyền. Thu đủ giá kỳ mới, quyền cũ giữ nguyên đến hạn.
+- RENEW cùng gói vẫn nối thêm kỳ tại endAt tổng mới nhất, không đổi quyền trước khi kỳ mới bắt đầu.
 
-Mua mới/gia hạn được áp dụng bởi service nội bộ sau khi xác minh thanh toán: mua mới tạo subscription/kỳ đầu; gia hạn còn hạn nối thêm kỳ tại endAt tổng mới nhất, giữ snapshot kỳ cũ. Các thao tác cùng chủ trọ khóa chung bản ghi user để tuần tự hóa gia hạn, đổi gói và kích hoạt. Nếu điều kiện đã thay đổi hoặc thanh toán quá hạn, đơn chuyển REQUIRES_REVIEW và không cấp quyền.
+API GET `/api/subscriptions/orders/awaiting-confirmation` và POST `/api/subscriptions/orders/{id}/confirm` giữ lại để xử lý đơn cũ AWAITING_ADMIN_CONFIRMATION từ trước thay đổi này. Đơn đã APPLIED/SCHEDULED được xác nhận lặp mà không tạo thêm kỳ. Đơn CHANGE cũ chưa trả tiền vẫn giữ báo giá cũ, không được tự chuyển thành báo giá nâng gói theo tỷ lệ; nên tạo đơn mới để dùng luồng mới.
+
+Mọi thao tác cùng chủ trọ khóa chung user để tuần tự hóa nâng/gia hạn/đổi gói. Callback lặp không tạo thêm kỳ hoặc hóa đơn.
 
 Luồng VNPay được mô tả ở mục 11. Không có endpoint cho client tự đánh dấu đã thanh toán. Service nội bộ chỉ áp dụng khi có Payment SUCCESS đúng chủ sở hữu, loại và số tiền, không nằm trong nhóm khoản thu cần đối soát. Khoản thu trùng được giữ riêng để không ngăn xử lý giao dịch hợp lệ ban đầu.
 
@@ -1311,7 +1321,7 @@ Response `data` gồm payment và paymentUrl; frontend chuyển người dùng �
 
 - Đơn gói và đăng ký Boost có cửa sổ chờ thanh toán 15 phút; payment không kéo dài cửa sổ này.
 - Gọi lại checkout khi còn payment PENDING hợp lệ trả lại cùng ID/mã tham chiếu. Sau lần thanh toán thất bại có thể tạo lần thử mới nếu đơn còn hạn.
-- Chủ trọ chỉ thanh toán đơn/Boost của mình. Checkout chặn đơn đã thanh toán, hết hạn, không còn phù hợp với gói hiện tại, tin hết hiệu lực hoặc đã có Boost khác đang hoạt động.
+- Chủ trọ chỉ thanh toán đơn/Boost của mình. Checkout chặn đơn đã thanh toán, hết hạn hoặc không còn chờ thanh toán; đơn dịch vụ còn được kiểm tra tính phù hợp với gói hiện tại. Boost được mua độc lập với tin và cho phép nhiều gói cùng hoạt động.
 - Không nhận số tiền, ngày hết hạn, trạng thái hoặc user ID do client tự đặt.
 - Chưa cấu hình khóa VNPay: trả 503; số tiền không hợp lệ: 400; đơn không thể thanh toán: 409; đối tượng không thuộc người dùng: 404.
 
@@ -1329,9 +1339,9 @@ IPN trả JSON trực tiếp theo giao thức VNPay, không bọc ApiResponse:
 
 Mã IPN: 00 đã xử lý, 01 không có tham chiếu, 02 đã xác nhận, 04 sai số tiền, 97 chữ ký/terminal không hợp lệ, 99 dữ liệu không hợp lệ hoặc transaction chưa hoàn tất. Lỗi transaction rollback để VNPay có thể gửi lại.
 
-IPN thành công ghi Payment SUCCESS và hóa đơn đúng một lần, rồi áp dụng quyền trong cùng transaction. CHANGE chỉ sang AWAITING_ADMIN_CONFIRMATION; PURCHASE/RENEW và Boost áp dụng nếu còn đủ điều kiện. Callback lặp không nối thêm kỳ hoặc thêm hóa đơn.
+IPN thành công ghi Payment SUCCESS và hóa đơn đúng một lần, rồi áp dụng quyền trong cùng transaction. CHANGE nâng gói được APPLIED ngay, CHANGE hạ/đổi ngang tự SCHEDULED; PURCHASE/RENEW và Boost áp dụng nếu còn đủ điều kiện. Callback lặp không nối thêm kỳ hoặc thêm hóa đơn.
 
-Khoản thu quá hạn, thu trùng hoặc không còn đủ điều kiện vẫn giữ SUCCESS và hóa đơn, đồng thời đặt requiresReview=true cùng reviewReason; không cấp chồng quyền hoặc tự hoàn tiền. Nếu provider ghi nhận đã trả tiền trong hạn nhưng IPN đến sau khi hệ thống đánh dấu EXPIRED, hệ thống kiểm tra lại điều kiện trước khi áp dụng. Thời gian bắt đầu sử dụng tính tại lúc cấp quyền thực tế; CHANGE vẫn theo thời điểm admin xác nhận/mốc đã xếp lịch.
+Khoản thu quá hạn, thu trùng hoặc không còn đủ điều kiện vẫn giữ SUCCESS và hóa đơn, đồng thời đặt requiresReview=true cùng reviewReason; không cấp chồng quyền hoặc tự hoàn tiền. Nếu provider ghi nhận đã trả tiền trong hạn nhưng IPN đến sau khi hệ thống đánh dấu EXPIRED, hệ thống kiểm tra lại điều kiện trước khi áp dụng. Thời gian bắt đầu sử dụng tính tại lúc cấp quyền thực tế; CHANGE nâng gói giữ hạn gốc, hạ/đổi ngang theo mốc đã xếp lịch.
 
 ### 11.3. Theo dõi kết quả
 
@@ -1406,20 +1416,57 @@ PUT `/api/listings/{id}/priority`, quyền LANDLORD sở hữu:
 
 Lỗi tin đăng: 400 khi sai trạng thái/phòng không sẵn sàng/gói hết quyền/quota đầy, 403 khi sai vai trò hoặc tạo tin cho phòng không thuộc mình, 404 khi không có tin/tin không thuộc chủ trọ, 409 khi hết slot ưu tiên. Các request DTO có validation, không nhận các trường kích hoạt do client đặt.
 
-## 13. Mua Boost cho tin
+## 13. Mua gói suất Boost và phân bổ cho tin
 
-- POST `/api/boost-subscriptions`: LANDLORD tạo đăng ký chờ thanh toán cho tin PUBLISHED còn hạn của mình.
-- GET `/api/boost-subscriptions?page=0&size=10`: LANDLORD xem lịch sử Boost của mình.
+Tất cả API dưới đây yêu cầu LANDLORD có tài khoản ACTIVE và chỉ thao tác dữ liệu của chính mình.
+
+### 13.1. Mua trước, phân bổ sau
+
+- POST `/api/boost-subscriptions`: tạo đơn PENDING_PAYMENT, không cần có tin đăng.
+- GET `/api/boost-subscriptions?page=0&size=10`: lịch sử mua, sắp xếp createdAt/id giảm dần.
+
+Body mua:
 
 ```json
-{"listingId":"uuid-tin","boostPackageId":"uuid-goi-boost"}
+{"boostPackageId":"uuid-goi-boost"}
 ```
 
-Response gồm id, listingId, boostPackageId, packageNameSnapshot, priorityLevelSnapshot, durationMonthsSnapshot, price, status, startAt, endAt, paymentExpiresAt, createdAt. Khi PENDING_PAYMENT, startAt/endAt null. Dùng id này làm targetId của checkout với type=BOOST_PACKAGE.
+Response gồm id, boostPackageId, packageNameSnapshot, highPrioritySlotsSnapshot, lowPrioritySlotsSnapshot, durationMonthsSnapshot, price, status, startAt, endAt, paymentExpiresAt, createdAt. Không còn listingId/priorityLevelSnapshot. Giá, tên, số suất và thời hạn được chốt lúc tạo đơn; sửa/ngừng bán danh mục không đổi đơn đã tạo.
 
-Boost chỉ có mức cao (2), thời hạn 1/3/6 tháng lịch từ lúc kích hoạt sau IPN. Mỗi tin tối đa một Boost ACTIVE; khi hết hạn, bản ghi cũ được chuyển EXPIRED trước khi cấp mới để unique không chặn nhầm. Không tích trữ/chồng/xếp lịch Boost tương lai. Có thể có nhiều đăng ký chưa trả tiền, nhưng chỉ khoản thanh toán đầu còn đủ điều kiện được kích hoạt; các khoản thu không thể cấp quyền được giữ để đối soát.
+Thanh toán trong 15 phút bằng POST `/api/payments/vnpay/checkout`, body `{"type":"BOOST_PACKAGE","targetId":"uuid-don-boost"}`. Sau khi backend xác nhận thanh toán hợp lệ qua IPN hoặc đối soát, gói ACTIVE trong 1/3/6 tháng lịch tính từ lúc kích hoạt. Chưa tin nào được tự nâng ưu tiên. Mỗi chủ trọ được mua và sử dụng nhiều gói đồng thời; mỗi gói giữ hạn riêng. Không yêu cầu gói dịch vụ trả phí còn hạn để mua Boost.
 
-Boost độc lập với gói dịch vụ, có thể mua khi đang dùng Free hoặc gói trả phí đã hết hạn nếu tin vẫn PUBLISHED còn hạn. Boost không kéo dài thời hạn tin; tin hết hạn/ẩn thì không hiển thị ưu tiên. Không có Boost tặng hoặc reset lượt trong MVP.
+### 13.2. Xem số suất và các tin đã gán
+
+GET `/api/boost-subscriptions/active` trả mảng các gói đang hiệu lực. Mỗi phần tử gồm:
+
+- `subscription`: thông tin gói đã mua theo response ở trên.
+- `usedHighPrioritySlots`, `usedLowPrioritySlots`: số suất đang dùng.
+- `remainingHighPrioritySlots`, `remainingLowPrioritySlots`: số suất còn trống.
+- `allocations`: danh sách `{listingId, boostSubscriptionId, level}`.
+
+Tổng quyền khả dụng là tổng số suất của các gói còn hiệu lực. Mỗi phân bổ thuộc một gói cụ thể; không tự chuyển phân bổ sang gói khác khi hết hạn.
+
+### 13.3. Gán, đổi mức hoặc chuyển gói cho một tin
+
+PUT `/api/boost-subscriptions/allocations/{listingId}`:
+
+```json
+{"boostSubscriptionId":"uuid-goi-da-mua","level":2}
+```
+
+- `level` chỉ nhận 1 (thấp) hoặc 2 (cao), bắt buộc. Tin phải thuộc chủ trọ, PUBLISHED và còn hạn.
+- Gói đích phải ACTIVE và còn thời hạn; giới hạn lấy từ snapshot số suất tương ứng.
+- Mỗi tin chỉ giữ một phân bổ Boost. Gọi lại cùng body không tốn thêm suất. Đổi level hoặc boostSubscriptionId thay thế phân bổ cũ trong một transaction; nếu gói đích hết suất, phân bổ cũ được giữ nguyên.
+- Khóa chủ trọ ngăn các request đồng thời vượt suất. Các suất cao/thấp không hoán đổi với nhau và không reset theo lượt sử dụng.
+- Response `{listingId, boostSubscriptionId, level}` là mức Boost được gán, có thể khác mức hiển thị cuối cùng.
+
+DELETE `/api/boost-subscriptions/allocations/{listingId}` bỏ phân bổ và giải phóng suất. Lặp lại với tin thuộc chủ trọ đã không còn phân bổ vẫn thành công. Response theo ApiResponse, data null.
+
+Mức hiển thị cuối cùng = max(mức từ gói dịch vụ, mức Boost đang được gán). Boost không trừ suất gói dịch vụ, không thay đổi publishedAt/expiresAt hoặc số tin được phép đăng. Tin được ẩn sẽ giải phóng suất ngay; tin/gói hết hạn không còn hiệu lực ngay trong truy vấn, và phân bổ được dọn khi đồng bộ hoặc thao tác/xem gói Boost.
+
+Lỗi: 400 khi dữ liệu/mức ưu tiên/trạng thái tin không hợp lệ hoặc gói hết hiệu lực; 401 khi chưa xác thực; 403 khi sai vai trò; 404 khi tin/gói đã mua không thuộc chủ trọ hoặc không tồn tại; 409 `BOOST_SLOTS_EXCEEDED` khi hết suất đúng mức. Cấu hình cả hai số suất bằng 0 trả 400 `INVALID_BOOST_PACKAGE`.
+
+Migration V6 chuyển mỗi Boost cũ thành gói 1 suất cao, 0 suất thấp; giữ giá, trạng thái và thời hạn. Boost cũ ACTIVE còn hạn trên tin PUBLISHED còn hạn được gán lại cho chính tin đó. Các gói cũ không tự kích hoạt lại và Boost không tự gia hạn tin.
 
 ## 14. Đồng bộ hết hạn
 

@@ -17,7 +17,7 @@ import com.tamdaptit.rentalmanagement.listing.service.ListingService;
 import com.tamdaptit.rentalmanagement.room.entity.enums.RoomRentalStatus;
 import com.tamdaptit.rentalmanagement.room.repository.RoomRepository;
 import com.tamdaptit.rentalmanagement.subscription.entity.ServiceSubscriptionPeriod;
-import com.tamdaptit.rentalmanagement.subscription.repository.BoostPurchaseRepository;
+import com.tamdaptit.rentalmanagement.subscription.repository.BoostAllocationRepository;
 import com.tamdaptit.rentalmanagement.subscription.repository.ServiceSubscriptionPeriodRepository;
 import com.tamdaptit.rentalmanagement.subscription.service.ServiceSubscriptionService;
 import lombok.RequiredArgsConstructor;
@@ -44,7 +44,7 @@ public class ListingServiceImpl implements ListingService {
     private final UserRepository userRepository;
     private final ServiceSubscriptionService subscriptions;
     private final ServiceSubscriptionPeriodRepository periods;
-    private final BoostPurchaseRepository boosts;
+    private final BoostAllocationRepository boosts;
     private final ListingMapper mapper;
     private final Clock subscriptionClock;
 
@@ -207,6 +207,7 @@ public class ListingServiceImpl implements ListingService {
         lockOwner(landlordId);
         var listing = findOwned(landlordId, id);
         listing.setStatus(ListingStatus.HIDDEN);
+        boosts.findByListing_Id(id).ifPresent(boosts::delete);
         listing.setPriorityLevel(0);
         clearSelection(listing);
         return response(repository.saveAndFlush(listing));
@@ -315,13 +316,15 @@ public class ListingServiceImpl implements ListingService {
         if (listings.isEmpty()) {
             return List.of();
         }
-        var activeBoosts = new HashSet<>(boosts.findActiveListingIds(listings.stream().map(Listing::getId).toList(), time));
+        var activeBoosts = new HashMap<String, Integer>();
+        boosts.findEffective(listings.stream().map(Listing::getId).toList(), time)
+                .forEach(a -> activeBoosts.merge(a.getListing().getId(), a.getPriorityLevel(), Math::max));
         var currentPeriods = effectivePeriods(listings, time);
         return listings.stream().map(listing -> {
             var period = currentPeriods.get(listing.getRoom().getLandlord().getId());
             int selected = selected(listing, period, time);
-            int priority = !published(listing, time) ? 0 : activeBoosts.contains(listing.getId()) ? 2
-                    : Math.max(selected, period == null ? 0 : period.getDefaultPriorityLevelSnapshot());
+            int priority = !published(listing, time) ? 0 : Math.max(activeBoosts.getOrDefault(listing.getId(), 0),
+                    Math.max(selected, period == null ? 0 : period.getDefaultPriorityLevelSnapshot()));
             return mapper.toResponse(listing, priority, selected);
         }).toList();
     }
@@ -344,6 +347,8 @@ public class ListingServiceImpl implements ListingService {
                 clearSelection(listing);
             }
         }
+        boosts.deleteAll(boosts.findStale(landlordId, time));
+        boosts.flush();
         var effective = responses(listings, time);
         for (int i = 0; i < listings.size(); i++) {
             listings.get(i).setPriorityLevel(effective.get(i).priorityLevel());

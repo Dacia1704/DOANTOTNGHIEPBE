@@ -121,17 +121,22 @@ class SubscriptionSchemaMigrationTest {
                 + ",1,100,'BASIC','Basic',10,0,5,0,0,'2026-12-01')";
     }
 
-    private String boostSql(String id) {
+    private String legacyBoostSql(String id) {
         return "INSERT INTO boost_service_package_subscriptions(id,landlord_id,listing_id,boost_package_id,"
                 + "status,start_at,end_at,price,package_name_snapshot,priority_level_snapshot,duration_months_snapshot) "
                 + "VALUES ('" + id + "','owner','listing','boost','ACTIVE','2026-10-23','2026-11-23',100,'High',2,1)";
     }
 
+    private String boostSql(String id) {
+        return "INSERT INTO boost_service_package_subscriptions(id,landlord_id,boost_package_id,"
+                + "status,start_at,end_at,price,package_name_snapshot,high_priority_slots_snapshot,low_priority_slots_snapshot,duration_months_snapshot) "
+                + "VALUES ('" + id + "','owner','boost','ACTIVE','2026-10-23','2026-11-23',100,'High',1,0,1)";
+    }
     @Test
     void reconciliationMigrationPreservesExistingV3PaymentsAndBoostDates() throws SQLException {
         flyway("3").migrate();
         paidFixture();
-        execute(boostSql("boost-purchase"));
+        execute(legacyBoostSql("boost-purchase"));
         execute("""
                 INSERT INTO payments(id,landlord_id,type,service_subscription_order_id,merchant_order_id,
                 expires_at,amount,payment_method,status,paid_at)
@@ -152,15 +157,46 @@ class SubscriptionSchemaMigrationTest {
                 expires_at,amount,payment_method,status,created_at)
                 VALUES ('payment','owner','SERVICE_PACKAGE','order','merchant-1','2026-11-01',100,'VNPAY','EXPIRED','2026-10-23 10:00:00')
                 """);
-        assertEquals(1, flyway("latest").migrate().migrationsExecuted);
+        assertEquals(1, flyway("5").migrate().migrationsExecuted);
         assertEquals("2026-10-23 10:00:00", scalar("SELECT CAST(vnp_create_date AS CHAR) FROM payments WHERE id='payment'"));
         assertEquals("EXPIRED", scalar("SELECT status FROM payments WHERE id='payment'"));
         assertEquals("0", scalar("SELECT COUNT(*) FROM invoices"));
     }
 
     @Test
+    void slotMigrationPreservesExistingPaidBoostAndItsAssignment() throws SQLException {
+        flyway("5").migrate();
+        paidFixture();
+        execute(legacyBoostSql("old"));
+        execute("UPDATE listings SET published_at=CURRENT_TIMESTAMP, expires_at=CURRENT_TIMESTAMP + INTERVAL 1 MONTH WHERE id='listing'");
+        execute("UPDATE boost_service_package_subscriptions SET start_at=CURRENT_TIMESTAMP, end_at=CURRENT_TIMESTAMP + INTERVAL 3 MONTH WHERE id='old'");
+        String originalEnd = scalar("SELECT CAST(end_at AS CHAR) FROM boost_service_package_subscriptions WHERE id='old'");
+        assertEquals(1, flyway("6").migrate().migrationsExecuted);
+        assertEquals("1:0:100.00", scalar("SELECT CONCAT(high_priority_slots_snapshot,':',low_priority_slots_snapshot,':',price) FROM boost_service_package_subscriptions WHERE id='old'"));
+        assertEquals(originalEnd, scalar("SELECT CAST(end_at AS CHAR) FROM boost_service_package_subscriptions WHERE id='old'"));
+        assertEquals("old:listing:2", scalar("SELECT CONCAT(boost_subscription_id,':',listing_id,':',priority_level) FROM boost_allocations"));
+        assertConstraintRejects("UPDATE boost_service_packages SET high_priority_slots=0,low_priority_slots=0 WHERE id='boost'");
+        assertConstraintRejects("UPDATE boost_allocations SET priority_level=0");
+    }
+
+    @Test
+    void upgradeMigrationBackfillsPaidValueWithoutChangingExistingOrdersAndDates() throws SQLException {
+        flyway("6").migrate();
+        paidFixture();
+        String previousEnd = scalar("SELECT CAST(end_at AS CHAR) FROM service_package_subscriptions WHERE id='subscription'");
+        assertEquals(2, flyway("latest").migrate().migrationsExecuted);
+        assertEquals("-516256725", scalar("SELECT checksum FROM flyway_schema_history WHERE version='7'"));
+        assertEquals("100.00", scalar("SELECT entitlement_value FROM service_subscription_periods WHERE id='period'"));
+        assertEquals("1.000000000000", scalar("SELECT billing_months FROM service_subscription_periods WHERE id='period'"));
+        assertEquals("0", scalar("SELECT immediate_upgrade FROM service_subscription_orders WHERE id='order'"));
+        assertEquals(previousEnd, scalar("SELECT CAST(end_at AS CHAR) FROM service_package_subscriptions WHERE id='subscription'"));
+        assertConstraintRejects("UPDATE service_subscription_periods SET entitlement_value=-1 WHERE id='period'");
+        assertConstraintRejects("UPDATE service_subscription_orders SET immediate_upgrade=TRUE WHERE id='order'");
+    }
+
+    @Test
     void freshSchemaMigratesAndAllJpaMappingsValidate() throws SQLException {
-        assertEquals(5, flyway("latest").migrate().migrationsExecuted);
+        assertEquals(8, flyway("latest").migrate().migrationsExecuted);
         assertEquals("3", scalar("SELECT max_listings FROM service_packages WHERE code='FREE'"));
         assertEquals("0", scalar("SELECT COUNT(*) FROM service_package_prices"));
         assertEquals("0", scalar("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='listing_priority_assignments'"));
@@ -177,6 +213,47 @@ class SubscriptionSchemaMigrationTest {
             factory.destroy();
         }
         assertEquals(0, flyway("latest").migrate().migrationsExecuted);
+    }
+
+    @Test
+    void billingMigrationPreservesExistingV7UpgradeAndBackfillsPendingQuotes() throws SQLException {
+        flyway("7").migrate();
+        paidFixture();
+        execute("UPDATE service_subscription_periods SET entitlement_value=100 WHERE id='period'");
+        execute("UPDATE service_package_subscriptions SET status='CANCELLED' WHERE id='subscription'");
+        execute("INSERT INTO service_package_subscriptions(id,landlord_id,package_id,start_at,end_at) "
+                + "VALUES ('up','owner','package','2026-11-07','2026-11-23')");
+        execute("""
+                INSERT INTO service_subscription_orders(id,landlord_id,package_id,service_package_price_id,
+                subscription_id,previous_subscription_id,type,status,duration_months,price,
+                package_code_snapshot,package_name_snapshot,max_listings_snapshot,high_priority_slots_snapshot,
+                low_priority_slots_snapshot,default_priority_level_snapshot,has_stats_snapshot,expires_at,
+                effective_at,end_at,previous_end_at,applied_at,created_at,immediate_upgrade,upgrade_value)
+                VALUES ('up-order','owner','package','price','up','subscription','CHANGE','APPLIED',1,50,
+                'BASIC','Basic',20,0,5,0,0,'2026-11-07 00:15:00',
+                '2026-11-07','2026-11-23','2026-11-23','2026-11-07','2026-11-07',TRUE,103.23)
+                """);
+        execute("""
+                INSERT INTO service_subscription_periods(id,subscription_id,order_id,period_number,start_at,end_at,
+                package_code_snapshot,package_name_snapshot,max_listings_snapshot,high_priority_slots_snapshot,
+                low_priority_slots_snapshot,default_priority_level_snapshot,has_stats_snapshot,entitlement_value)
+                VALUES ('up-period','up','up-order',1,'2026-11-07','2026-11-23','BASIC','Basic',20,0,5,0,0,103.23)
+                """);
+        execute("""
+                INSERT INTO service_subscription_orders(id,landlord_id,package_id,service_package_price_id,
+                previous_subscription_id,type,duration_months,price,package_code_snapshot,package_name_snapshot,
+                max_listings_snapshot,high_priority_slots_snapshot,low_priority_slots_snapshot,
+                default_priority_level_snapshot,has_stats_snapshot,expires_at,previous_end_at,created_at,
+                immediate_upgrade,upgrade_value)
+                VALUES ('pending-up','owner','package','price','up','CHANGE',1,30,'BASIC','Basic',30,0,5,0,0,
+                '2026-11-15 00:15:00','2026-11-23','2026-11-15',TRUE,80)
+                """);
+        assertEquals(1, flyway("latest").migrate().migrationsExecuted);
+        assertEquals("-516256725", scalar("SELECT checksum FROM flyway_schema_history WHERE version='7'"));
+        assertEquals("0.516129032258", scalar("SELECT billing_months FROM service_subscription_periods WHERE id='up-period'"));
+        assertEquals("0.258064516129", scalar("SELECT upgrade_months FROM service_subscription_orders WHERE id='pending-up'"));
+        assertEquals("103.23", scalar("SELECT entitlement_value FROM service_subscription_periods WHERE id='up-period'"));
+        assertEquals("50.00:APPLIED", scalar("SELECT CONCAT(price,':',status) FROM service_subscription_orders WHERE id='up-order'"));
     }
 
     @Test
@@ -219,9 +296,11 @@ class SubscriptionSchemaMigrationTest {
         execute(orderSql("change-2", "CHANGE"));
 
         execute(boostSql("boost-1"));
-        assertConstraintRejects(boostSql("boost-2"));
-        execute("UPDATE boost_service_package_subscriptions SET status='EXPIRED' WHERE id='boost-1'");
         execute(boostSql("boost-2"));
+        execute("INSERT INTO boost_allocations(id,boost_subscription_id,listing_id,priority_level) VALUES ('a','boost-1','listing',2)");
+        assertConstraintRejects("INSERT INTO boost_allocations(id,boost_subscription_id,listing_id,priority_level) VALUES ('b','boost-2','listing',1)");
+        execute("DELETE FROM boost_allocations WHERE id='a'");
+        execute("INSERT INTO boost_allocations(id,boost_subscription_id,listing_id,priority_level) VALUES ('b','boost-2','listing',1)");
     }
 
     @Test

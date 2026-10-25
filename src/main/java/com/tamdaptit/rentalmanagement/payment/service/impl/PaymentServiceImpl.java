@@ -20,7 +20,6 @@ import com.tamdaptit.rentalmanagement.payment.service.VnPaySigner;
 import com.tamdaptit.rentalmanagement.subscription.entity.enums.BoostSubscriptionStatus;
 import com.tamdaptit.rentalmanagement.subscription.entity.enums.ServiceSubscriptionOrderStatus;
 import com.tamdaptit.rentalmanagement.subscription.entity.enums.ServiceSubscriptionOrderType;
-import com.tamdaptit.rentalmanagement.listing.entity.enums.ListingStatus;
 import com.tamdaptit.rentalmanagement.subscription.repository.BoostPurchaseRepository;
 import com.tamdaptit.rentalmanagement.subscription.repository.ServiceSubscriptionOrderRepository;
 import com.tamdaptit.rentalmanagement.subscription.service.BoostPurchaseService;
@@ -90,6 +89,8 @@ public class PaymentServiceImpl implements PaymentService {
                         && !current.subscriptionId().equals(order.getSubscription().getId()))
                     || (order.getType() == ServiceSubscriptionOrderType.CHANGE && current.subscriptionId() != null
                         && !current.subscriptionId().equals(order.getPreviousSubscription().getId()))
+                    || (Boolean.TRUE.equals(order.getImmediateUpgrade())
+                        && (current.subscriptionId() == null || !current.subscriptionEndsAt().equals(order.getPreviousEndAt())))
                     || !paymentRepository.findByServiceSubscriptionOrder_IdAndStatus(order.getId(), PaymentStatus.SUCCESS).isEmpty()) {
                 throw new AppException(ErrorCode.PAYMENT_CHECKOUT_UNAVAILABLE);
             }
@@ -101,10 +102,6 @@ public class PaymentServiceImpl implements PaymentService {
                     .orElseThrow(() -> new AppException(ErrorCode.SUBSCRIPTION_NOT_FOUND));
             if (boost.getStatus() != BoostSubscriptionStatus.PENDING_PAYMENT
                     || !time.isBefore(boost.getPaymentExpiresAt())
-                    || boost.getListing().getStatus() != ListingStatus.PUBLISHED
-                    || boost.getListing().getExpiresAt() == null || !time.isBefore(boost.getListing().getExpiresAt())
-                    || boostRepository.findByLandlord_IdAndStatus(landlordId, BoostSubscriptionStatus.ACTIVE).stream()
-                        .anyMatch(b -> b.getListing().getId().equals(boost.getListing().getId()) && time.isBefore(b.getEndAt()))
                     || !paymentRepository.findByBoostSubscription_IdAndStatus(boost.getId(), PaymentStatus.SUCCESS).isEmpty()) {
                 throw new AppException(ErrorCode.PAYMENT_CHECKOUT_UNAVAILABLE);
             }

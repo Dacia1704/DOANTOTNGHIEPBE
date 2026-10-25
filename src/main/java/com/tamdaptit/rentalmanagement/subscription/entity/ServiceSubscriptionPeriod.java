@@ -19,6 +19,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.Immutable;
 import org.hibernate.annotations.UuidGenerator;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 @Entity
 @Immutable
@@ -51,6 +52,14 @@ public class ServiceSubscriptionPeriod {
 
     @Column(name = "end_at", nullable = false)
     private LocalDateTime endAt;
+
+    @Column(name = "entitlement_value", nullable = false, precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal entitlementValue = BigDecimal.ZERO;
+
+    @Column(name = "billing_months", nullable = false, precision = 20, scale = 12)
+    @Builder.Default
+    private BigDecimal billingMonths = BigDecimal.ONE;
 
     @Column(name = "package_code_snapshot", nullable = false, length = 50)
     private String packageCodeSnapshot;
