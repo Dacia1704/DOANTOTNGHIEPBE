@@ -309,14 +309,14 @@ class PackageCatalogApiTest {
 
     private static String boostJson(String code, int months) {
         return "{\"code\":\"" + code + "\",\"name\":\"High\",\"durationMonths\":" + months
-                + ",\"price\":100,\"active\":true}";
+                + ",\"highPrioritySlots\":1,\"lowPrioritySlots\":1,\"price\":100,\"active\":true}";
     }
 
     @Test
-    void boostSupportsOnlyHighPriorityAndValidMonthlyTerms() throws Exception {
+    void boostSupportsHighAndLowSlotsAndValidMonthlyTerms() throws Exception {
         String boostId = id(mvc.perform(admin(post("/api/boost-packages")).contentType(APPLICATION_JSON)
                 .content(boostJson("HIGH", 3))).andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.priorityLevel").value(2)).andReturn().getResponse().getContentAsString());
+                .andExpect(jsonPath("$.data.highPrioritySlots").value(1)).andReturn().getResponse().getContentAsString());
         mvc.perform(admin(post("/api/boost-packages")).contentType(APPLICATION_JSON)
                 .content(boostJson("BAD", 12))).andExpect(status().isBadRequest());
         mvc.perform(admin(patch("/api/boost-packages/" + boostId + "/status"))
@@ -481,17 +481,17 @@ class PackageCatalogApiTest {
     }
 
     @Test
-    void changesRequireAdminThenActivateAtOldEndAndBlockRenewals() throws Exception {
+    void nonUpgradesScheduleAutomaticallyAtOldEndAndBlockRenewals() throws Exception {
         createOwners();
         String priceId = createPrice(createPackage("BASIC"), 1);
         var first = paid(priceId, ServiceSubscriptionOrderType.PURCHASE);
         var renewalWaitingForPayment = order(priceId, ServiceSubscriptionOrderType.RENEW);
         String nextPrice = createPrice(createPackage("NEXT"), 3);
         var change = paid(nextPrice, ServiceSubscriptionOrderType.CHANGE);
-        assertEquals(AWAITING_ADMIN_CONFIRMATION, change.status());
+        assertEquals(SCHEDULED, change.status());
         assertEquals(first.subscriptionId(), subscriptions().getCurrent("owner").subscriptionId());
         mvc.perform(admin(get("/api/subscriptions/orders/awaiting-confirmation")))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(1));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(0));
         mvc.perform(admin(post("/api/subscriptions/orders/" + change.id() + "/confirm")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("SCHEDULED"));
         var confirmed = subscriptions().getOrder("owner", change.id());
@@ -519,7 +519,7 @@ class PackageCatalogApiTest {
     }
 
     @Test
-    void adminConfirmationAfterExpiryStartsAtConfirmationAndDelayedActivationKeepsDates() throws Exception {
+    void delayedSynchronizationPreservesAutomaticallyScheduledChangeDates() throws Exception {
         createOwners();
         String priceId = createPrice(createPackage("BASIC"), 1);
         clock.set("2026-10-30T10:00:00");
@@ -528,8 +528,8 @@ class PackageCatalogApiTest {
         clock.set("2026-12-03T10:00:00");
         var confirmed = subscriptions().confirmChange("admin", change.id());
         assertEquals(APPLIED, confirmed.status());
-        assertEquals(LocalDateTime.parse("2026-12-03T10:00:00"), confirmed.effectiveAt());
-        assertEquals(LocalDateTime.parse("2027-01-03T10:00:00"), confirmed.endAt());
+        assertEquals(LocalDateTime.parse("2026-11-30T10:00:00"), confirmed.effectiveAt());
+        assertEquals(LocalDateTime.parse("2026-12-30T10:00:00"), confirmed.endAt());
         assertEquals(confirmed, subscriptions().confirmChange("admin", change.id()));
         var anotherChange = paid(priceId, ServiceSubscriptionOrderType.CHANGE);
         var scheduled = subscriptions().confirmChange("admin", anotherChange.id());
@@ -698,6 +698,7 @@ class PackageCatalogApiTest {
         jdbc().update("UPDATE listings SET service_subscription_period_id=NULL,package_priority_level=0");
         jdbc().update("DELETE FROM service_subscription_periods");
         jdbc().update("DELETE FROM payments");
+        jdbc().update("DELETE FROM boost_allocations");
         jdbc().update("DELETE FROM boost_service_package_subscriptions");
         jdbc().update("DELETE FROM listings");
         jdbc().update("DELETE FROM service_subscription_orders");
@@ -755,6 +756,15 @@ class PackageCatalogApiTest {
 
     private static void sign(MultiValueMap<String, String> parameters) {
         parameters.set("vnp_SecureHash", context.getBean(VnPaySigner.class).sign(parameters.toSingleValueMap()));
+    }
+
+    private static com.tamdaptit.rentalmanagement.subscription.service.BoostAllocationService allocations() {
+        return context.getBean(com.tamdaptit.rentalmanagement.subscription.service.BoostAllocationService.class);
+    }
+
+    private static void assignBoost(String listingId, String boostId, int level) {
+        allocations().assign("owner", listingId,
+                new com.tamdaptit.rentalmanagement.subscription.dto.request.BoostAllocationRequest(boostId, level));
     }
 
     private static String createBoost(int months) throws Exception {
@@ -866,7 +876,7 @@ class PackageCatalogApiTest {
     }
 
     @Test
-    void paidChangeWaitsForAdminAndLateRenewalPaymentGoesToReview() throws Exception {
+    void paidDeferredChangeSchedulesAutomaticallyAndLateRenewalPaymentGoesToReview() throws Exception {
         createOwners();
         String price = createPrice(createPackage("BASIC"), 1);
         paid(price, ServiceSubscriptionOrderType.PURCHASE);
@@ -874,7 +884,7 @@ class PackageCatalogApiTest {
         var renewalPayment = checkout(renewal.id(), PaymentType.SERVICE_PACKAGE);
         var change = order(createPrice(createPackage("NEXT"), 3), ServiceSubscriptionOrderType.CHANGE);
         ipn(callback(checkout(change.id(), PaymentType.SERVICE_PACKAGE), "00"), "00");
-        assertEquals(AWAITING_ADMIN_CONFIRMATION, subscriptions().getOrder("owner", change.id()).status());
+        assertEquals(SCHEDULED, subscriptions().getOrder("owner", change.id()).status());
         var scheduled = subscriptions().confirmChange("admin", change.id());
         ipn(callback(renewalPayment, "00"), "00");
         assertTrue(payments().getById("owner", renewalPayment.payment().id(), false).requiresReview());
@@ -972,8 +982,9 @@ class PackageCatalogApiTest {
         paid(createPrice(createPackage("BASIC"), 1), ServiceSubscriptionOrderType.PURCHASE);
         clock.set("2026-02-20T10:00:00");
         var listing = publishRoom(1);
-        var boost = boosts().create("owner", new BoostPurchaseRequest(listing.id(), createBoost(3)));
+        var boost = boosts().create("owner", new BoostPurchaseRequest(createBoost(3)));
         ipn(callback(checkout(boost.id(), PaymentType.BOOST_PACKAGE), "00"), "00");
+        assignBoost(listing.id(), boost.id(), 2);
         clock.set("2026-03-01T10:00:00");
         assertEquals(2, listings().getPublishedById(listing.id()).priorityLevel());
         assertEquals(listing.expiresAt(), listings().getPublishedById(listing.id()).expiresAt());
@@ -989,16 +1000,18 @@ class PackageCatalogApiTest {
         paid(createPrice(createPackage("BASIC"), 6), ServiceSubscriptionOrderType.PURCHASE);
         var listing = publishRoom(1);
         String boostPackage = createBoost(1);
-        var boost = boosts().create("owner", new BoostPurchaseRequest(listing.id(), boostPackage));
+        var boost = boosts().create("owner", new BoostPurchaseRequest(boostPackage));
         ipn(callback(checkout(boost.id(), PaymentType.BOOST_PACKAGE), "00"), "00");
         clock.set("2026-02-10T10:00:00");
         listings().hide("owner", listing.id()); listings().submit("owner", listing.id()); listings().approve("admin", listing.id());
         listings().setPriority("owner", listing.id(), 1);
+        assignBoost(listing.id(), boost.id(), 2);
         assertEquals(2, listings().getPublishedById(listing.id()).priorityLevel());
         clock.set("2026-02-28T10:00:00");
         assertEquals(1, listings().getPublishedById(listing.id()).priorityLevel());
-        var next = boosts().create("owner", new BoostPurchaseRequest(listing.id(), boostPackage));
+        var next = boosts().create("owner", new BoostPurchaseRequest(boostPackage));
         ipn(callback(checkout(next.id(), PaymentType.BOOST_PACKAGE), "00"), "00");
+        assignBoost(listing.id(), next.id(), 2);
         assertEquals(2, listings().getPublishedById(listing.id()).priorityLevel());
         assertEquals(1, jdbc().queryForObject("SELECT COUNT(*) FROM boost_service_package_subscriptions WHERE status='ACTIVE'", Integer.class));
     }
@@ -1038,11 +1051,11 @@ class PackageCatalogApiTest {
     }
 
     @Test
-    void concurrentBoostPaymentsCollectBothButActivateOnlyOne() throws Exception {
+    void concurrentBoostPaymentsActivateBothIndependentPackages() throws Exception {
         createOwners(); roomFixtures(1);
         var listing = publishRoom(1); String catalog = createBoost(6);
-        var one = boosts().create("owner", new BoostPurchaseRequest(listing.id(), catalog));
-        var two = boosts().create("owner", new BoostPurchaseRequest(listing.id(), catalog));
+        var one = boosts().create("owner", new BoostPurchaseRequest(catalog));
+        var two = boosts().create("owner", new BoostPurchaseRequest(catalog));
         var a = callback(checkout(one.id(), PaymentType.BOOST_PACKAGE), "00");
         var b = callback(checkout(two.id(), PaymentType.BOOST_PACKAGE), "00");
         context.getBean(PlatformTransactionManager.class).commit(transaction); transaction = null;
@@ -1051,10 +1064,10 @@ class PackageCatalogApiTest {
             var second = executor.submit(() -> payments().processIpn(b));
             assertEquals("00", first.get(15, TimeUnit.SECONDS).code());
             assertEquals("00", second.get(15, TimeUnit.SECONDS).code());
-            assertEquals(1, jdbc().queryForObject("SELECT COUNT(*) FROM boost_service_package_subscriptions WHERE status='ACTIVE'", Integer.class));
-            assertEquals(1, jdbc().queryForObject("SELECT COUNT(*) FROM payments WHERE requires_review=TRUE", Integer.class));
+            assertEquals(2, jdbc().queryForObject("SELECT COUNT(*) FROM boost_service_package_subscriptions WHERE status='ACTIVE'", Integer.class));
+            assertEquals(0, jdbc().queryForObject("SELECT COUNT(*) FROM payments WHERE requires_review=TRUE", Integer.class));
             assertEquals(2, jdbc().queryForObject("SELECT COUNT(*) FROM invoices", Integer.class));
-            assertEquals("2026-07-31 10:00:00", jdbc().queryForObject("SELECT CAST(end_at AS CHAR) FROM boost_service_package_subscriptions WHERE status='ACTIVE'", String.class));
+            assertEquals("2026-07-31 10:00:00", jdbc().queryForObject("SELECT CAST(MAX(end_at) AS CHAR) FROM boost_service_package_subscriptions WHERE status='ACTIVE'", String.class));
         } finally { removeCommittedFixtures(); }
     }
 
@@ -1091,18 +1104,18 @@ class PackageCatalogApiTest {
     }
 
     @Test
-    void anotherOwnerCannotCheckoutAnOrderOrBuyBoostForTheListing() throws Exception {
+    void anotherOwnerCannotAllocateBoostAndHiddenListingsCannotBeAssigned() throws Exception {
         createOwners(); roomFixtures(1);
         var order = order(createPrice(createPackage("BASIC"), 1), ServiceSubscriptionOrderType.PURCHASE);
         assertThrows(AppException.class, () -> payments().checkout("other", new PaymentRequest(PaymentType.SERVICE_PACKAGE, order.id()), "127.0.0.1"));
         var listing = publishRoom(1);
-        String catalog = createBoost(1);
-        assertThrows(AppException.class, () -> boosts().create("other", new BoostPurchaseRequest(listing.id(), catalog)));
+        var boost = boosts().create("owner", new BoostPurchaseRequest(createBoost(1)));
+        ipn(callback(checkout(boost.id(), PaymentType.BOOST_PACKAGE), "00"), "00");
+        assertThrows(AppException.class, () -> allocations().assign("other", listing.id(),
+                new com.tamdaptit.rentalmanagement.subscription.dto.request.BoostAllocationRequest(boost.id(), 2)));
         listings().hide("owner", listing.id());
-        assertThrows(AppException.class, () -> boosts().create("owner", new BoostPurchaseRequest(listing.id(), catalog)));
-        assertEquals(0, jdbc().queryForObject("SELECT COUNT(*) FROM payments", Integer.class));
+        assertThrows(AppException.class, () -> assignBoost(listing.id(), boost.id(), 2));
     }
-
     @Test
     void duplicateCollectionDoesNotBlockConfirmingTheLegitimateChangePayment() throws Exception {
         createOwners();
@@ -1118,7 +1131,7 @@ class PackageCatalogApiTest {
     }
 
     @Test
-    void checkoutRejectsKnownInvalidRenewalsAndBoostOverlapsBeforeCollectingMoney() throws Exception {
+    void checkoutRejectsInvalidRenewalsButAllowsMultipleBoostPackages() throws Exception {
         createOwners(); roomFixtures(1);
         String price = createPrice(createPackage("BASIC"), 1);
         paid(price, ServiceSubscriptionOrderType.PURCHASE);
@@ -1127,10 +1140,10 @@ class PackageCatalogApiTest {
         subscriptions().confirmChange("admin", change.id());
         assertThrows(AppException.class, () -> checkout(renewal.id(), PaymentType.SERVICE_PACKAGE));
         var listing = publishRoom(1); String catalog = createBoost(1);
-        var one = boosts().create("owner", new BoostPurchaseRequest(listing.id(), catalog));
-        var two = boosts().create("owner", new BoostPurchaseRequest(listing.id(), catalog));
+        var one = boosts().create("owner", new BoostPurchaseRequest(catalog));
+        var two = boosts().create("owner", new BoostPurchaseRequest(catalog));
         ipn(callback(checkout(one.id(), PaymentType.BOOST_PACKAGE), "00"), "00");
-        assertThrows(AppException.class, () -> checkout(two.id(), PaymentType.BOOST_PACKAGE));
+        ipn(callback(checkout(two.id(), PaymentType.BOOST_PACKAGE), "00"), "00");
     }
 
     @Test
@@ -1323,7 +1336,7 @@ class PackageCatalogApiTest {
             mockQuery(verified);
             mvc.perform(admin(post("/api/payments/" + payment.payment().id() + "/check")))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.data.payment.status").value("SUCCESS"));
-            assertEquals(AWAITING_ADMIN_CONFIRMATION, subscriptions().getOrder("owner", change.id()).status());
+            assertEquals(SCHEDULED, subscriptions().getOrder("owner", change.id()).status());
             assertEquals(SCHEDULED, subscriptions().confirmChange("admin", change.id()).status());
         } finally { removeCommittedFixtures(); }
     }
@@ -1332,7 +1345,7 @@ class PackageCatalogApiTest {
     void queryDrCanRecoverACancelledPendingBoostWithTimelyPayment() throws Exception {
         createOwners(); roomFixtures(1);
         var listing = publishRoom(1);
-        var boost = boosts().create("owner", new BoostPurchaseRequest(listing.id(), createBoost(1)));
+        var boost = boosts().create("owner", new BoostPurchaseRequest(createBoost(1)));
         var payment = checkout(boost.id(), PaymentType.BOOST_PACKAGE);
         var verified = queryResult(payment, "00");
         clock.set("2026-01-31T11:00:00");
@@ -1341,6 +1354,8 @@ class PackageCatalogApiTest {
         try {
             mockQuery(verified);
             context.getBean(PaymentQueryService.class).check("owner", payment.payment().id(), false);
+            assertEquals(0, listings().getPublishedById(listing.id()).priorityLevel());
+            assignBoost(listing.id(), boost.id(), 2);
             assertEquals(2, listings().getPublishedById(listing.id()).priorityLevel());
             assertEquals("ACTIVE", boosts().getHistory("owner", 0, 10).getData().getFirst().status().name());
         } finally { removeCommittedFixtures(); }
@@ -1362,6 +1377,254 @@ class PackageCatalogApiTest {
             assertTrue(subscriptions().getCurrent("owner").free());
             assertEquals(1, jdbc().queryForObject("SELECT COUNT(*) FROM invoices", Integer.class));
         } finally { removeCommittedFixtures(); }
+    }
+
+    @Test
+    void boostPurchasedBeforeListingsCanAllocateBothLevelsAndReleaseSlots() throws Exception {
+        createOwners();
+        String boostId = id(mvc.perform(post("/api/boost-subscriptions").with(user("owner").roles("LANDLORD"))
+                .contentType(APPLICATION_JSON).content("{\"boostPackageId\":\"" + createBoost(1) + "\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.highPrioritySlotsSnapshot").value(1))
+                .andReturn().getResponse().getContentAsString());
+        ipn(callback(checkout(boostId, PaymentType.BOOST_PACKAGE), "00"), "00");
+        roomFixtures(3);
+        var high = publishRoom(1); var low = publishRoom(2); var normal = publishRoom(3);
+        assertEquals(0, listings().getPublishedById(high.id()).priorityLevel());
+        mvc.perform(put("/api/boost-subscriptions/allocations/" + high.id()).with(user("owner").roles("LANDLORD"))
+                .contentType(APPLICATION_JSON).content("{\"boostSubscriptionId\":\"" + boostId + "\",\"level\":2}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.level").value(2));
+        assignBoost(low.id(), boostId, 1);
+        assertEquals(List.of(2, 1, 0), listings().getPublished(0, 10).getData().stream().map(ListingResponse::priorityLevel).toList());
+        mvc.perform(get("/api/boost-subscriptions/active").with(user("owner").roles("LANDLORD")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].remainingHighPrioritySlots").value(0))
+                .andExpect(jsonPath("$.data[0].remainingLowPrioritySlots").value(0));
+        mvc.perform(put("/api/boost-subscriptions/allocations/" + normal.id()).with(user("owner").roles("LANDLORD"))
+                .contentType(APPLICATION_JSON).content("{\"boostSubscriptionId\":\"" + boostId + "\",\"level\":2}"))
+                .andExpect(status().isConflict());
+        mvc.perform(delete("/api/boost-subscriptions/allocations/" + high.id()).with(user("owner").roles("LANDLORD")))
+                .andExpect(status().isOk());
+        assignBoost(normal.id(), boostId, 2);
+        listings().hide("owner", low.id());
+        assertEquals(1, allocations().getActive("owner").getFirst().remainingLowPrioritySlots());
+        assertEquals(0, listings().getPublishedById(high.id()).priorityLevel());
+        assertEquals(high.expiresAt(), listings().getPublishedById(high.id()).expiresAt());
+    }
+
+    @Test
+    void boostAllocationsTransferBetweenPackagesAndUseMaximumOfServiceAndBoost() throws Exception {
+        createOwners(); roomFixtures(2);
+        String pack = id(mvc.perform(admin(post("/api/service-packages")).contentType(APPLICATION_JSON)
+                .content(packageJson("HIGH", "5", 1, 1, 0, false))).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        paid(createPrice(pack, 3), ServiceSubscriptionOrderType.PURCHASE);
+        var high = publishRoom(1); var low = publishRoom(2);
+        listings().setPriority("owner", high.id(), 2);
+        String catalog = createBoost(1);
+        var first = boosts().create("owner", new BoostPurchaseRequest(catalog));
+        var second = boosts().create("owner", new BoostPurchaseRequest(catalog));
+        ipn(callback(checkout(first.id(), PaymentType.BOOST_PACKAGE), "00"), "00");
+        ipn(callback(checkout(second.id(), PaymentType.BOOST_PACKAGE), "00"), "00");
+        assignBoost(high.id(), first.id(), 1);
+        assertEquals(2, listings().getPublishedById(high.id()).priorityLevel());
+        assignBoost(high.id(), second.id(), 2);
+        assignBoost(low.id(), first.id(), 1);
+        assertEquals(2, jdbc().queryForObject("SELECT COUNT(*) FROM boost_allocations", Integer.class));
+        assertEquals(1, allocations().getActive("owner").stream().filter(b -> b.subscription().id().equals(first.id()))
+                .findFirst().orElseThrow().remainingHighPrioritySlots());
+        assignBoost(high.id(), second.id(), 2); // Repeating the same assignment consumes no extra slot.
+        assertEquals(2, jdbc().queryForObject("SELECT COUNT(*) FROM boost_allocations", Integer.class));
+    }
+
+    @Test
+    void onlyTheExpiredBoostLosesItsAllocationsAndSnapshotSurvivesCatalogEdits() throws Exception {
+        createOwners(); roomFixtures(2);
+        var first = boosts().create("owner", new BoostPurchaseRequest(createBoost(1)));
+        var second = boosts().create("owner", new BoostPurchaseRequest(createBoost(3)));
+        ipn(callback(checkout(first.id(), PaymentType.BOOST_PACKAGE), "00"), "00");
+        ipn(callback(checkout(second.id(), PaymentType.BOOST_PACKAGE), "00"), "00");
+        clock.set("2026-02-10T10:00:00");
+        var a = publishRoom(1); var b = publishRoom(2);
+        assignBoost(a.id(), first.id(), 2); assignBoost(b.id(), second.id(), 1);
+        jdbc().update("UPDATE boost_service_packages SET high_priority_slots=9,low_priority_slots=9");
+        assertTrue(allocations().getActive("owner").stream().allMatch(p -> p.subscription().highPrioritySlotsSnapshot() == 1));
+        clock.set("2026-02-28T10:00:00");
+        assertEquals(0, listings().getPublishedById(a.id()).priorityLevel());
+        assertEquals(1, listings().getPublishedById(b.id()).priorityLevel());
+        context.getBean(SubscriptionExpiryJob.class).refreshDueOwners();
+        assertEquals(1, allocations().getActive("owner").size());
+        assertEquals(1, jdbc().queryForObject("SELECT COUNT(*) FROM boost_allocations", Integer.class));
+    }
+
+    @Test
+    void simultaneousBoostAssignmentsCannotExceedThePurchasedHighSlots() throws Exception {
+        createOwners(); roomFixtures(2);
+        var boost = boosts().create("owner", new BoostPurchaseRequest(createBoost(1)));
+        ipn(callback(checkout(boost.id(), PaymentType.BOOST_PACKAGE), "00"), "00");
+        var a = publishRoom(1); var b = publishRoom(2);
+        commitFixtures();
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var one = executor.submit(() -> { try { assignBoost(a.id(), boost.id(), 2); return true; } catch (AppException e) { return false; } });
+            var two = executor.submit(() -> { try { assignBoost(b.id(), boost.id(), 2); return true; } catch (AppException e) { return false; } });
+            assertNotEquals(one.get(15, TimeUnit.SECONDS), two.get(15, TimeUnit.SECONDS));
+            assertEquals(1, jdbc().queryForObject("SELECT COUNT(*) FROM boost_allocations", Integer.class));
+        } finally { removeCommittedFixtures(); }
+    }
+
+    @Test
+    void boostCatalogAndAllocationsRejectInvalidSlotsLevelsAndUnpaidPackages() throws Exception {
+        createOwners(); roomFixtures(1);
+        for (String invalid : List.of(
+                boostJson("EMPTY", 1).replace("\"highPrioritySlots\":1,\"lowPrioritySlots\":1", "\"highPrioritySlots\":0,\"lowPrioritySlots\":0"),
+                boostJson("NEGATIVE", 1).replace("\"highPrioritySlots\":1", "\"highPrioritySlots\":-1"),
+                boostJson("MISSING", 1).replace("\"lowPrioritySlots\":1,", ""))) {
+            mvc.perform(admin(post("/api/boost-packages")).contentType(APPLICATION_JSON).content(invalid))
+                    .andExpect(status().isBadRequest());
+        }
+        var listing = publishRoom(1);
+        var boost = boosts().create("owner", new BoostPurchaseRequest(createBoost(1)));
+        String body = "{\"boostSubscriptionId\":\"" + boost.id() + "\",\"level\":2}";
+        mvc.perform(put("/api/boost-subscriptions/allocations/" + listing.id()).with(user("owner").roles("LANDLORD"))
+                .contentType(APPLICATION_JSON).content(body)).andExpect(status().isBadRequest());
+        mvc.perform(put("/api/boost-subscriptions/allocations/" + listing.id()).with(user("owner").roles("LANDLORD"))
+                .contentType(APPLICATION_JSON).content(body.replace("\"level\":2", "\"level\":0")))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/boost-subscriptions/active").with(user("tenant").roles("TENANT")))
+                .andExpect(status().isForbidden());
+        assertEquals(0, jdbc().queryForObject("SELECT COUNT(*) FROM boost_allocations", Integer.class));
+    }
+
+    private static String tierPrice(String code, String max, int high, int low, int defaultLevel, boolean stats, int amount) throws Exception {
+        String pack = id(mvc.perform(admin(post("/api/service-packages")).contentType(APPLICATION_JSON)
+                .content(packageJson(code, max, high, low, defaultLevel, stats))).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        return id(mvc.perform(admin(post("/api/service-packages/" + pack + "/prices")).contentType(APPLICATION_JSON)
+                .content(priceJson(1, amount))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+    }
+
+    @Test
+    void paidUpgradeImmediatelyRaisesQuotaPreservesPriorityAndKeepsOriginalExpiry() throws Exception {
+        createOwners(); roomFixtures(21);
+        String basic = tierPrice("TEN", "10", 1, 5, 0, false, 100);
+        String better = tierPrice("TWENTY", "20", 2, 5, 0, true, 200);
+        var original = paid(basic, ServiceSubscriptionOrderType.PURCHASE);
+        clock.set("2026-02-14T10:00:00");
+        var listing = publishRoom(1);
+        listings().setPriority("owner", listing.id(), 2);
+        for (int i = 2; i <= 10; i++) submitRoom(i);
+        var upgrade = order(better, ServiceSubscriptionOrderType.CHANGE);
+        assertTrue(upgrade.immediateUpgrade());
+        assertEquals(0, upgrade.price().compareTo(new java.math.BigDecimal("50")));
+        assertEquals(10, subscriptions().getCurrent("owner").rights().maxListings());
+        var payment = checkout(upgrade.id(), PaymentType.SERVICE_PACKAGE);
+        var callback = callback(payment, "00");
+        ipn(callback, "00");
+        var applied = subscriptions().getOrder("owner", upgrade.id());
+        assertEquals(APPLIED, applied.status());
+        assertEquals(original.endAt(), applied.endAt());
+        assertEquals(LocalDateTime.parse("2026-02-14T10:00:00"), applied.effectiveAt());
+        assertEquals(20, subscriptions().getCurrent("owner").rights().maxListings());
+        assertEquals(2, listings().getPublishedById(listing.id()).priorityLevel());
+        assertEquals(listing.expiresAt(), listings().getPublishedById(listing.id()).expiresAt());
+        for (int i = 11; i <= 20; i++) submitRoom(i);
+        mvc.perform(post("/api/listings").with(user("owner").roles("LANDLORD")).contentType(APPLICATION_JSON)
+                .content("{\"roomId\":\"room-21\",\"title\":\"Over limit\"}"))
+                .andExpect(status().isBadRequest());
+        ipn(callback, "02");
+        assertEquals(2, subscriptions().getPeriods("owner", 0, 10).getTotalElements());
+        assertEquals(1, jdbc().queryForObject("SELECT COUNT(*) FROM invoices", Integer.class));
+        var renewal = paid(better, ServiceSubscriptionOrderType.RENEW);
+        assertEquals(applied.endAt(), renewal.effectiveAt());
+    }
+
+    @Test
+    void downgradeSchedulesWithoutAdminAndKeepsHigherRightsUntilExpiry() throws Exception {
+        createOwners();
+        String basic = tierPrice("TEN", "10", 1, 5, 0, false, 100);
+        String better = tierPrice("BUSINESS", "null", 2, 0, 1, true, 200);
+        var original = paid(better, ServiceSubscriptionOrderType.PURCHASE);
+        clock.set("2026-02-14T10:00:00");
+        var downgrade = paid(basic, ServiceSubscriptionOrderType.CHANGE);
+        assertFalse(downgrade.immediateUpgrade());
+        assertEquals(SCHEDULED, downgrade.status());
+        assertEquals(original.endAt(), downgrade.effectiveAt());
+        assertEquals("BUSINESS", subscriptions().getCurrent("owner").rights().packageCode());
+        clock.set(original.endAt().toString());
+        assertEquals("TEN", subscriptions().getCurrent("owner").rights().packageCode());
+        assertEquals(APPLIED, subscriptions().getOrder("owner", downgrade.id()).status());
+    }
+
+    @Test
+    void upgradeQuotesCarryForwardPrepaidRenewalsAndRepeatedUpgradeCredits() throws Exception {
+        createOwners();
+        String basic = tierPrice("TEN", "10", 1, 5, 0, false, 100);
+        String better = tierPrice("TWENTY", "20", 2, 5, 0, true, 200);
+        String best = tierPrice("BUSINESS", "null", 3, 0, 1, true, 300);
+        paid(basic, ServiceSubscriptionOrderType.PURCHASE);
+        var renewal = paid(basic, ServiceSubscriptionOrderType.RENEW);
+        clock.set("2026-02-14T10:00:00");
+        var upgrade = paid(better, ServiceSubscriptionOrderType.CHANGE);
+        assertEquals(0, upgrade.price().compareTo(new java.math.BigDecimal("150")));
+        assertEquals(renewal.endAt(), upgrade.endAt());
+        assertEquals(0, jdbc().queryForObject("SELECT entitlement_value FROM service_subscription_periods WHERE order_id=?",
+                java.math.BigDecimal.class, upgrade.id()).compareTo(new java.math.BigDecimal("300")));
+        var next = paid(best, ServiceSubscriptionOrderType.CHANGE);
+        assertEquals(0, next.price().compareTo(new java.math.BigDecimal("150")));
+        assertEquals(renewal.endAt(), next.endAt());
+        assertEquals("BUSINESS", subscriptions().getCurrent("owner").rights().packageCode());
+    }
+
+    @Test
+    void upgradeWithNoExtraChargeAppliesWithoutVnpayAndRetainsPaidCredit() throws Exception {
+        createOwners();
+        String basic = tierPrice("TEN", "10", 1, 5, 0, false, 100);
+        String better = tierPrice("TWENTY", "20", 2, 5, 0, true, 100);
+        clock.set("2026-01-15T10:00:00");
+        var original = paid(basic, ServiceSubscriptionOrderType.PURCHASE);
+        clock.set("2026-02-01T10:00:00");
+        var upgrade = order(better, ServiceSubscriptionOrderType.CHANGE);
+        assertTrue(upgrade.immediateUpgrade());
+        assertEquals(0, upgrade.price().signum());
+        assertEquals(APPLIED, upgrade.status());
+        assertEquals(original.endAt(), upgrade.endAt());
+        assertEquals(20, subscriptions().getCurrent("owner").rights().maxListings());
+        assertEquals(upgrade, subscriptions().applyPaidOrder("owner", upgrade.id()));
+        assertEquals(1, jdbc().queryForObject("SELECT COUNT(*) FROM payments", Integer.class));
+    }
+
+    @Test
+    void upgradeUsesTheOriginalCalendarPeriodAndSupportsDifferentPriceTerms() throws Exception {
+        createOwners();
+        String basic = tierPrice("TEN", "10", 1, 5, 0, false, 100);
+        String better = tierPrice("TWENTY", "20", 2, 5, 0, true, 200);
+        String pack = jdbc().queryForObject("SELECT package_id FROM service_package_prices WHERE id=?", String.class, better);
+        String threeMonths = id(mvc.perform(admin(post("/api/service-packages/" + pack + "/prices"))
+                .contentType(APPLICATION_JSON).content(priceJson(3, 600))).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        clock.set("2026-01-15T10:00:00");
+        var original = paid(basic, ServiceSubscriptionOrderType.PURCHASE);
+        clock.set("2026-02-01T10:00:00");
+        // 14/31 of the original month remains. (600/3 - 100) * 14/31 rounds up to 46 VND.
+        var upgrade = paid(threeMonths, ServiceSubscriptionOrderType.CHANGE);
+        assertTrue(upgrade.immediateUpgrade());
+        assertEquals(0, upgrade.price().compareTo(new java.math.BigDecimal("46")));
+        assertEquals(original.endAt(), upgrade.endAt());
+    }
+
+    @Test
+    void renewalAppliedAfterUpgradeQuoteMakesTheOldQuoteRequireReview() throws Exception {
+        createOwners();
+        String basic = tierPrice("TEN", "10", 1, 5, 0, false, 100);
+        String better = tierPrice("TWENTY", "20", 2, 5, 0, true, 200);
+        paid(basic, ServiceSubscriptionOrderType.PURCHASE);
+        var renewal = order(basic, ServiceSubscriptionOrderType.RENEW);
+        var upgrade = order(better, ServiceSubscriptionOrderType.CHANGE);
+        var payment = checkout(upgrade.id(), PaymentType.SERVICE_PACKAGE);
+        pay(renewal);
+        subscriptions().applyPaidOrder("owner", renewal.id());
+        ipn(callback(payment, "00"), "00");
+        assertEquals(REQUIRES_REVIEW, subscriptions().getOrder("owner", upgrade.id()).status());
+        assertTrue(payments().getById("owner", payment.payment().id(), false).requiresReview());
+        assertEquals(10, subscriptions().getCurrent("owner").rights().maxListings());
     }
 
     private static class TestClock extends Clock {
@@ -1387,7 +1650,7 @@ class PackageCatalogApiTest {
             ServicePackageServiceImpl.class, BoostServicePackageServiceImpl.class, GlobalExceptionHandler.class,
             ServiceSubscriptionController.class, ServiceSubscriptionServiceImpl.class,
             PaymentController.class, PaymentServiceImpl.class, ListingController.class, ListingServiceImpl.class,
-            BoostPurchaseController.class, BoostPurchaseServiceImpl.class, SubscriptionLifecycleService.class,
+            BoostPurchaseController.class, BoostPurchaseServiceImpl.class, com.tamdaptit.rentalmanagement.subscription.service.BoostAllocationService.class, SubscriptionLifecycleService.class,
             SubscriptionExpiryJob.class, SecurityConfig.class, JwtAuthenticationEntryPoint.class, PaymentQueryServiceImpl.class})
     static class TestConfig {
         @Bean

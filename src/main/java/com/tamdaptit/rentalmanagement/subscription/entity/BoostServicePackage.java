@@ -38,9 +38,13 @@ public class BoostServicePackage {
     @Column(nullable = false, length = 100)
     private String name;
 
-    @Column(name = "priority_level", nullable = false)
+    @Column(name = "high_priority_slots", nullable = false)
     @Builder.Default
-    private Integer priorityLevel = 2;
+    private Integer highPrioritySlots = 0;
+
+    @Column(name = "low_priority_slots", nullable = false)
+    @Builder.Default
+    private Integer lowPrioritySlots = 0;
 
     @Column(name = "duration_months")
     @Builder.Default

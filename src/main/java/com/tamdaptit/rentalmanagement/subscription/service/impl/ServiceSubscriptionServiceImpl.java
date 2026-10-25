@@ -10,6 +10,7 @@ import com.tamdaptit.rentalmanagement.payment.entity.Payment;
 import com.tamdaptit.rentalmanagement.payment.entity.enums.PaymentStatus;
 import com.tamdaptit.rentalmanagement.payment.entity.enums.PaymentType;
 import com.tamdaptit.rentalmanagement.payment.repository.PaymentRepository;
+import com.tamdaptit.rentalmanagement.listing.repository.ListingRepository;
 import com.tamdaptit.rentalmanagement.subscription.dto.request.ServiceSubscriptionOrderRequest;
 import com.tamdaptit.rentalmanagement.subscription.dto.response.*;
 import com.tamdaptit.rentalmanagement.subscription.entity.*;
@@ -27,6 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.function.Function;
 
@@ -43,6 +46,7 @@ public class ServiceSubscriptionServiceImpl implements ServiceSubscriptionServic
     private final ServiceSubscriptionOrderRepository orderRepository;
     private final ServiceSubscriptionPeriodRepository periodRepository;
     private final PaymentRepository paymentRepository;
+    private final ListingRepository listingRepository;
     private final ServiceSubscriptionMapper mapper;
     private final Clock subscriptionClock;
 
@@ -105,7 +109,32 @@ public class ServiceSubscriptionServiceImpl implements ServiceSubscriptionServic
                 .lowPrioritySlotsSnapshot(catalog.getLowPrioritySlots())
                 .defaultPriorityLevelSnapshot(catalog.getDefaultPriorityLevel()).hasStatsSnapshot(catalog.getHasStats())
                 .expiresAt(time.plusMinutes(15)).build();
-        return mapper.toResponse(orderRepository.saveAndFlush(order));
+        if (type == CHANGE) {
+            var periods = periodRepository.findBySubscription_IdOrderByPeriodNumberAsc(active.getId());
+            var currentPeriod = periods.stream().filter(p -> !time.isBefore(p.getStartAt()) && time.isBefore(p.getEndAt()))
+                    .findFirst().orElseThrow(() -> new AppException(ErrorCode.INTERNAL_SERVER_ERROR));
+            if (isUpgrade(currentPeriod, catalog) && periods.stream().filter(p -> p.getEndAt().isAfter(time))
+                    .allMatch(p -> java.util.Arrays.stream(compareRights(p, catalog)).allMatch(c -> c >= 0))) {
+                BigDecimal credit = periods.stream().filter(p -> p.getEndAt().isAfter(time))
+                        .map(p -> remainingPart(p, p.getEntitlementValue(), time)).reduce(BigDecimal.ZERO, BigDecimal::add)
+                        .setScale(2, RoundingMode.HALF_UP);
+                BigDecimal months = periods.stream().filter(p -> p.getEndAt().isAfter(time))
+                        .map(p -> remainingPart(p, p.getBillingMonths(), time)).reduce(BigDecimal.ZERO, BigDecimal::add);
+                BigDecimal targetValue = price.getPrice().multiply(months)
+                        .divide(BigDecimal.valueOf(price.getDurationMonths()), 2, RoundingMode.HALF_UP);
+                order.setImmediateUpgrade(true);
+                order.setPreviousEndAt(active.getEndAt());
+                order.setUpgradeValue(targetValue.max(credit).setScale(2, RoundingMode.HALF_UP));
+                order.setUpgradeMonths(months);
+                order.setPrice(targetValue.subtract(credit).max(BigDecimal.ZERO).setScale(0, RoundingMode.CEILING));
+                if (order.getExpiresAt().isAfter(active.getEndAt())) order.setExpiresAt(active.getEndAt());
+            }
+        }
+        orderRepository.saveAndFlush(order);
+        if (Boolean.TRUE.equals(order.getImmediateUpgrade()) && order.getPrice().signum() == 0) {
+            applyImmediateUpgrade(order, active, time);
+        }
+        return mapper.toResponse(order);
     }
 
     @Override
@@ -140,6 +169,9 @@ public class ServiceSubscriptionServiceImpl implements ServiceSubscriptionServic
         LocalDateTime time = now();
         var subscriptions = synchronize(landlordId, time);
         var order = findOrder(landlordId, orderId);
+        if (order.getStatus() == APPLIED && Boolean.TRUE.equals(order.getImmediateUpgrade()) && order.getPrice().signum() == 0) {
+            return mapper.toResponse(order);
+        }
         requirePaid(order);
         if (order.getStatus() == APPLIED || order.getStatus() == SCHEDULED
                 || order.getStatus() == AWAITING_ADMIN_CONFIRMATION || order.getStatus() == REQUIRES_REVIEW) {
@@ -157,7 +189,16 @@ public class ServiceSubscriptionServiceImpl implements ServiceSubscriptionServic
                     || openOrders(landlordId).stream().anyMatch(o -> o.getType() == CHANGE && !o.getId().equals(orderId))) {
                 return review(order);
             }
-            order.setStatus(AWAITING_ADMIN_CONFIRMATION);
+            if (Boolean.TRUE.equals(order.getImmediateUpgrade())) {
+                if (current == null || !current.getEndAt().equals(order.getPreviousEndAt())
+                        || openOrders(landlordId).stream().anyMatch(o -> o.getStatus() == SCHEDULED)) {
+                    return review(order);
+                }
+                applyImmediateUpgrade(order, current, time);
+            } else {
+                LocalDateTime start = current == null ? time : current.getEndAt();
+                appendPeriod(order, null, start, time, start.isAfter(time));
+            }
         } else {
             if (openOrders(landlordId).stream().anyMatch(o -> o.getStatus() == SCHEDULED)) {
                 return review(order);
@@ -213,7 +254,8 @@ public class ServiceSubscriptionServiceImpl implements ServiceSubscriptionServic
 
     private void appendPeriod(ServiceSubscriptionOrder order, ServicePackageSubscription subscription,
             LocalDateTime start, LocalDateTime time, boolean scheduled) {
-        LocalDateTime end = start.plusMonths(order.getDurationMonths());
+        LocalDateTime end = Boolean.TRUE.equals(order.getImmediateUpgrade())
+                ? order.getPreviousEndAt() : start.plusMonths(order.getDurationMonths());
         int number = 1;
         if (subscription == null) {
             subscription = subscriptionRepository.saveAndFlush(ServicePackageSubscription.builder()
@@ -235,11 +277,60 @@ public class ServiceSubscriptionServiceImpl implements ServiceSubscriptionServic
         orderRepository.saveAndFlush(order);
         periodRepository.saveAndFlush(ServiceSubscriptionPeriod.builder()
                 .subscription(subscription).order(order).periodNumber(number).startAt(start).endAt(end)
+                .entitlementValue(Boolean.TRUE.equals(order.getImmediateUpgrade()) ? order.getUpgradeValue() : order.getPrice())
+                .billingMonths(Boolean.TRUE.equals(order.getImmediateUpgrade()) ? order.getUpgradeMonths() : BigDecimal.valueOf(order.getDurationMonths()))
                 .packageCodeSnapshot(order.getPackageCodeSnapshot()).packageNameSnapshot(order.getPackageNameSnapshot())
                 .maxListingsSnapshot(order.getMaxListingsSnapshot()).highPrioritySlotsSnapshot(order.getHighPrioritySlotsSnapshot())
                 .lowPrioritySlotsSnapshot(order.getLowPrioritySlotsSnapshot())
                 .defaultPriorityLevelSnapshot(order.getDefaultPriorityLevelSnapshot()).hasStatsSnapshot(order.getHasStatsSnapshot())
                 .build());
+    }
+
+    private BigDecimal remainingPart(ServiceSubscriptionPeriod period, BigDecimal value, LocalDateTime time) {
+        LocalDateTime start = time.isAfter(period.getStartAt()) ? time : period.getStartAt();
+        return value.multiply(BigDecimal.valueOf(ChronoUnit.SECONDS.between(start, period.getEndAt())))
+                .divide(BigDecimal.valueOf(ChronoUnit.SECONDS.between(period.getStartAt(), period.getEndAt())),
+                        12, RoundingMode.HALF_UP);
+    }
+
+    // A higher price alone is not an upgrade: none of the purchased rights may decrease.
+    private boolean isUpgrade(ServiceSubscriptionPeriod current, ServicePackage target) {
+        int[] comparison = compareRights(current, target);
+        return java.util.Arrays.stream(comparison).allMatch(c -> c >= 0)
+                && java.util.Arrays.stream(comparison).anyMatch(c -> c > 0);
+    }
+
+    private int[] compareRights(ServiceSubscriptionPeriod current, ServicePackage target) {
+        long oldMax = current.getMaxListingsSnapshot() == null ? Long.MAX_VALUE : current.getMaxListingsSnapshot();
+        long newMax = target.getMaxListings() == null ? Long.MAX_VALUE : target.getMaxListings();
+        long oldLow = current.getDefaultPriorityLevelSnapshot() == 1 ? Long.MAX_VALUE : current.getLowPrioritySlotsSnapshot();
+        long newLow = target.getDefaultPriorityLevel() == 1 ? Long.MAX_VALUE : target.getLowPrioritySlots();
+        int high = Integer.compare(target.getHighPrioritySlots(), current.getHighPrioritySlotsSnapshot());
+        int stats = Boolean.compare(target.getHasStats(), current.getHasStatsSnapshot());
+        return new int[] {Long.compare(newMax, oldMax), Long.compare(newLow, oldLow), high, stats};
+    }
+
+    private void applyImmediateUpgrade(ServiceSubscriptionOrder order, ServicePackageSubscription current, LocalDateTime time) {
+        var oldPeriods = periodRepository.findBySubscription_IdOrderByPeriodNumberAsc(current.getId());
+        var oldPeriod = oldPeriods.stream().filter(p -> !time.isBefore(p.getStartAt()) && time.isBefore(p.getEndAt()))
+                .findFirst().orElseThrow(() -> new AppException(ErrorCode.INTERNAL_SERVER_ERROR));
+        // Keep original periods and financial history. The replaced subscription no longer grants rights.
+        current.setStatus(SubscriptionStatus.CANCELLED);
+        subscriptionRepository.saveAndFlush(current);
+        appendPeriod(order, null, time, time, false);
+        var newPeriod = periodRepository.findBySubscription_IdOrderByPeriodNumberAsc(order.getSubscription().getId()).getFirst();
+        for (var listing : listingRepository.findByRoom_Landlord_Id(order.getLandlord().getId())) {
+            if (listing.getServiceSubscriptionPeriod() != null
+                    && listing.getServiceSubscriptionPeriod().getId().equals(oldPeriod.getId())) {
+                if (listing.getPackagePriorityLevel() == 1 && order.getDefaultPriorityLevelSnapshot() == 1) {
+                    listing.setPackagePriorityLevel(0);
+                    listing.setServiceSubscriptionPeriod(null);
+                } else {
+                    listing.setServiceSubscriptionPeriod(newPeriod);
+                }
+            }
+        }
+        listingRepository.flush();
     }
 
     // Every mutation locks the landlord first. Current reads also reconcile due transitions under this lock.

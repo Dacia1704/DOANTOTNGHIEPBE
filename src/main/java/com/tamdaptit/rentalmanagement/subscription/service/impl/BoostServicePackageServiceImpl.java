@@ -38,7 +38,8 @@ public class BoostServicePackageServiceImpl implements BoostServicePackageServic
     public BoostServicePackageResponse getById(String id, boolean includeInactive) {
         BoostServicePackage entity = find(id);
         if (!includeInactive && (!entity.getActive() || entity.getDurationMonths() == null
-                || !Set.of(1, 3, 6).contains(entity.getDurationMonths()) || entity.getPriorityLevel() != 2)) {
+                || !Set.of(1, 3, 6).contains(entity.getDurationMonths())
+                || (entity.getHighPrioritySlots() == 0 && entity.getLowPrioritySlots() == 0))) {
             throw new AppException(ErrorCode.BOOST_PACKAGE_NOT_FOUND);
         }
         return mapper.toResponse(entity);
@@ -52,6 +53,7 @@ public class BoostServicePackageServiceImpl implements BoostServicePackageServic
             throw new AppException(ErrorCode.BOOST_PACKAGE_CODE_EXISTS);
         }
         validateDuration(request.durationMonths());
+        validateSlots(request.highPrioritySlots(), request.lowPrioritySlots());
         BoostServicePackage entity = mapper.toEntity(request);
         entity.setCode(code);
         entity.setName(request.name().trim());
@@ -67,6 +69,7 @@ public class BoostServicePackageServiceImpl implements BoostServicePackageServic
             throw new AppException(ErrorCode.BOOST_PACKAGE_CODE_EXISTS);
         }
         validateDuration(request.durationMonths());
+        validateSlots(request.highPrioritySlots(), request.lowPrioritySlots());
         mapper.update(request, entity);
         entity.setCode(code);
         entity.setName(request.name().trim());
@@ -79,6 +82,7 @@ public class BoostServicePackageServiceImpl implements BoostServicePackageServic
         BoostServicePackage entity = find(id);
         if (active) {
             validateDuration(entity.getDurationMonths());
+            validateSlots(entity.getHighPrioritySlots(), entity.getLowPrioritySlots());
         }
         entity.setActive(active);
         return mapper.toResponse(repository.saveAndFlush(entity));
@@ -86,6 +90,12 @@ public class BoostServicePackageServiceImpl implements BoostServicePackageServic
 
     private BoostServicePackage find(String id) {
         return repository.findById(id).orElseThrow(() -> new AppException(ErrorCode.BOOST_PACKAGE_NOT_FOUND));
+    }
+
+    private void validateSlots(Integer high, Integer low) {
+        if (high == null || low == null || high < 0 || low < 0 || (long) high + low == 0) {
+            throw new AppException(ErrorCode.INVALID_BOOST_PACKAGE);
+        }
     }
 
     private void validateDuration(Integer duration) {
