@@ -38,16 +38,19 @@ public class BoostServicePackage {
     @Column(nullable = false, length = 100)
     private String name;
 
-    @Column(name = "priority_level")
-    private Integer priorityLevel = 1;
+    @Column(name = "priority_level", nullable = false)
+    @Builder.Default
+    private Integer priorityLevel = 2;
 
-    @Column(name = "duration_days")
-    private Integer durationDays = 1;
+    @Column(name = "duration_months")
+    @Builder.Default
+    private Integer durationMonths = 1;
 
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal price;
 
-    @Column(name = "is_active")
+    @Column(name = "is_active", nullable = false)
+    @Builder.Default
     private Boolean active = true;
 
     @CreationTimestamp

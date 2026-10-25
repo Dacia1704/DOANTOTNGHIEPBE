@@ -41,7 +41,7 @@ public class Invoice {
     private String id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "payment_id", nullable = false)
+    @JoinColumn(name = "payment_id", nullable = false, unique = true)
     private Payment payment;
 
     @Enumerated(EnumType.STRING)

@@ -55,10 +55,8 @@ public class ServicePackageSubscription {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
+    @Builder.Default
     SubscriptionStatus status = SubscriptionStatus.ACTIVE;
-
-    @Column(name = "active_flag")
-    private Boolean activeFlag = true;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

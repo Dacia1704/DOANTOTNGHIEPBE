@@ -33,6 +33,7 @@ build/
 .vscode/
 
 ### Docker secrets ###
+/.env.local
 # .env
 # .env.docker
 # !.env.docker.example
