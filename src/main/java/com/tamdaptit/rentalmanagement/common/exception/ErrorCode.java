@@ -150,6 +150,9 @@ public enum ErrorCode {
     CHAT_CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "Cuộc trò chuyện không tồn tại"),
     CHAT_MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "Tin nhắn không tồn tại"),
     NOT_CONVERSATION_PARTY(HttpStatus.FORBIDDEN, "Bạn không thuộc cuộc trò chuyện này"),
+    CANNOT_CHAT_WITH_SELF(HttpStatus.BAD_REQUEST, "Không thể nhắn tin với chính mình"),
+    CHAT_NOT_ALLOWED(HttpStatus.FORBIDDEN, "Không được phép nhắn tin giữa hai vai trò này"),
+    INVALID_CHAT_MESSAGE(HttpStatus.BAD_REQUEST, "Nội dung tin nhắn không hợp lệ"),
 
     // ===== NOTIFICATION =====
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "Thông báo không tồn tại"),
