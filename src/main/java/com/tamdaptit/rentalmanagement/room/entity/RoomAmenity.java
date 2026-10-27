@@ -17,7 +17,8 @@ import org.hibernate.annotations.UuidGenerator;
 import lombok.experimental.FieldDefaults;
 
 @Entity
-@Table(name = "room_amenities")
+@Table(name = "room_amenities", uniqueConstraints = @jakarta.persistence.UniqueConstraint(
+        name = "uk_room_amenities", columnNames = {"room_id", "amenity_id"}))
 @Getter
 @Setter
 @NoArgsConstructor

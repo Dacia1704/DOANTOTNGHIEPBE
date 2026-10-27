@@ -68,6 +68,10 @@ class SubscriptionSchemaMigrationTest {
     }
 
     private void execute(String sql) throws SQLException {
+        if (sql.startsWith("INSERT INTO listings") && sql.contains("room_id")
+                && "1".equals(scalar("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='listings' AND column_name='property_id'"))) {
+            sql = sql.replace("room_id", "property_id").replace("'room'", "'property'");
+        }
         try (var statement = connection.createStatement()) {
             statement.execute(sql);
         }
@@ -90,8 +94,40 @@ class SubscriptionSchemaMigrationTest {
         execute("INSERT INTO provinces(id,code,name) VALUES ('province','TEST-P','Test')");
         execute("INSERT INTO wards(id,province_id,code,name) VALUES ('ward','province','TEST-W','Test')");
         execute("INSERT INTO room_types(id,name) VALUES ('room-type','Test room')");
-        execute("INSERT INTO rooms(id,landlord_id,room_type_id,price,area_m2,province_id,ward_id,address_line) "
-                + "VALUES ('room','owner','room-type',100,20,'province','ward','Test address')");
+        if ("1".equals(scalar("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='rooms' AND column_name='property_id'"))) {
+            execute("INSERT INTO properties(id,landlord_id,property_type_id,name,rental_mode,province_id,ward_id,address_line) "
+                    + "VALUES ('property','owner','00000000-0000-0000-0000-000000000011','Test','BY_ROOM','province','ward','Test address')");
+            execute("INSERT INTO rooms(id,property_id,room_number,room_type_id,price,area_m2) VALUES ('room','property','A','room-type',100,20)");
+        } else {
+            execute("INSERT INTO rooms(id,landlord_id,room_type_id,price,area_m2,province_id,ward_id,address_line) "
+                    + "VALUES ('room','owner','room-type',100,20,'province','ward','Test address')");
+        }
+    }
+
+    @Test
+    void propertyMigrationPreservesLegacyRoomIdentityAndAddress() throws SQLException {
+        flyway("10").migrate();
+        roomFixture();
+        execute("UPDATE rooms SET latitude=10.12345678,longitude=106.12345678 WHERE id='room'");
+        execute("INSERT INTO listings(id,room_id,title,status) VALUES ('legacy-listing','room','Legacy','HIDDEN')");
+        assertEquals(1, flyway("11").migrate().migrationsExecuted);
+        assertEquals("room:LEGACY", scalar("SELECT CONCAT(property_id,':',room_number) FROM rooms WHERE id='room'"));
+        assertEquals("owner:province:ward:Test address", scalar("SELECT CONCAT(landlord_id,':',province_id,':',ward_id,':',address_line) FROM properties WHERE id='room'"));
+        assertEquals("10.12345678:106.12345678", scalar("SELECT CONCAT(latitude,':',longitude) FROM properties WHERE id='room'"));
+        assertEquals("room", scalar("SELECT room_id FROM listings WHERE id='legacy-listing'"));
+        assertConstraintRejects("INSERT INTO rooms(id,property_id,room_number,room_type_id,price,area_m2) VALUES ('duplicate','room','LEGACY','room-type',100,20)");
+        assertEquals("0", scalar("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='rooms' AND column_name='landlord_id'"));
+    }
+
+    @Test
+    void listingPropertyMigrationKeepsPostIdentityAndItsProperty() throws SQLException {
+        flyway("12").migrate();
+        roomFixture();
+        execute("INSERT INTO listings(id,room_id,title,status) VALUES ('preserved-post','room','Old post','HIDDEN')");
+        assertEquals(1, flyway("13").migrate().migrationsExecuted);
+        assertEquals("property", scalar("SELECT property_id FROM listings WHERE id='preserved-post'"));
+        assertEquals("0", scalar("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='listings' AND column_name='room_id'"));
+        assertEquals("Old post", scalar("SELECT title FROM listings WHERE id='preserved-post'"));
     }
 
     private void paidFixture() throws SQLException {
@@ -184,7 +220,7 @@ class SubscriptionSchemaMigrationTest {
         flyway("6").migrate();
         paidFixture();
         String previousEnd = scalar("SELECT CAST(end_at AS CHAR) FROM service_package_subscriptions WHERE id='subscription'");
-        assertEquals(2, flyway("latest").migrate().migrationsExecuted);
+        assertEquals(2, flyway("8").migrate().migrationsExecuted);
         assertEquals("-516256725", scalar("SELECT checksum FROM flyway_schema_history WHERE version='7'"));
         assertEquals("100.00", scalar("SELECT entitlement_value FROM service_subscription_periods WHERE id='period'"));
         assertEquals("1.000000000000", scalar("SELECT billing_months FROM service_subscription_periods WHERE id='period'"));
@@ -196,7 +232,7 @@ class SubscriptionSchemaMigrationTest {
 
     @Test
     void freshSchemaMigratesAndAllJpaMappingsValidate() throws SQLException {
-        assertEquals(8, flyway("latest").migrate().migrationsExecuted);
+        assertEquals(13, flyway("latest").migrate().migrationsExecuted);
         assertEquals("3", scalar("SELECT max_listings FROM service_packages WHERE code='FREE'"));
         assertEquals("0", scalar("SELECT COUNT(*) FROM service_package_prices"));
         assertEquals("0", scalar("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='listing_priority_assignments'"));
@@ -248,7 +284,7 @@ class SubscriptionSchemaMigrationTest {
                 VALUES ('pending-up','owner','package','price','up','CHANGE',1,30,'BASIC','Basic',30,0,5,0,0,
                 '2026-11-15 00:15:00','2026-11-23','2026-11-15',TRUE,80)
                 """);
-        assertEquals(1, flyway("latest").migrate().migrationsExecuted);
+        assertEquals(1, flyway("8").migrate().migrationsExecuted);
         assertEquals("-516256725", scalar("SELECT checksum FROM flyway_schema_history WHERE version='7'"));
         assertEquals("0.516129032258", scalar("SELECT billing_months FROM service_subscription_periods WHERE id='up-period'"));
         assertEquals("0.258064516129", scalar("SELECT upgrade_months FROM service_subscription_orders WHERE id='pending-up'"));

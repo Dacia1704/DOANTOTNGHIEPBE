@@ -13,14 +13,21 @@ import java.util.List;
 @Repository
 public interface RoomRepository extends JpaRepository<Room, String> {
 
+    List<Room> findByProperty_IdOrderByRoomNumberAsc(String propertyId);
+    boolean existsByProperty_IdAndRoomNumberAndIdNot(String propertyId, String roomNumber, String id);
+    long countByProperty_Id(String propertyId);
+    boolean existsByProperty_IdAndRentalStatus(String propertyId, RoomRentalStatus status);
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"roomType", "property", "property.province", "property.ward"})
+    List<Room> findAllByProperty_IdIn(java.util.Collection<String> propertyIds);
+
     boolean existsByRoomType_Id(String roomTypeId);
 
     @Query("""
-            select r from Room r join fetch r.roomType join fetch r.province join fetch r.ward
-            where (:ownerId is null or r.landlord.id = :ownerId)
+            select r from Room r join fetch r.roomType join fetch r.property p join fetch p.province join fetch p.ward
+            where (:ownerId is null or r.property.landlord.id = :ownerId)
               and (:typeId is null or r.roomType.id = :typeId)
-              and (:provinceId is null or r.province.id = :provinceId)
-              and (:wardId is null or r.ward.id = :wardId)
+              and (:provinceId is null or r.property.province.id = :provinceId)
+              and (:wardId is null or r.property.ward.id = :wardId)
               and (:status is null or r.rentalStatus = :status)
               and (:minPrice is null or r.price >= :minPrice)
               and (:maxPrice is null or r.price <= :maxPrice)
@@ -31,11 +38,11 @@ public interface RoomRepository extends JpaRepository<Room, String> {
             @Param("maxPrice") java.math.BigDecimal maxPrice, Pageable pageable);
 
     @Query("""
-            select r from Room r join fetch r.roomType join fetch r.province join fetch r.ward
-            where (:ownerId is null or r.landlord.id = :ownerId)
+            select r from Room r join fetch r.roomType join fetch r.property p join fetch p.province join fetch p.ward
+            where (:ownerId is null or r.property.landlord.id = :ownerId)
               and (:typeId is null or r.roomType.id = :typeId)
-              and (:provinceId is null or r.province.id = :provinceId)
-              and (:wardId is null or r.ward.id = :wardId)
+              and (:provinceId is null or r.property.province.id = :provinceId)
+              and (:wardId is null or r.property.ward.id = :wardId)
               and (:status is null or r.rentalStatus = :status)
               and (:minPrice is null or r.price >= :minPrice)
               and (:maxPrice is null or r.price <= :maxPrice)
@@ -49,11 +56,11 @@ public interface RoomRepository extends JpaRepository<Room, String> {
             @Param("amenityCount") long amenityCount, Pageable pageable);
 
     @Query("""
-            select r from Room r join fetch r.roomType join fetch r.province join fetch r.ward
-            where (:ownerId is null or r.landlord.id = :ownerId)
+            select r from Room r join fetch r.roomType join fetch r.property p join fetch p.province join fetch p.ward
+            where (:ownerId is null or r.property.landlord.id = :ownerId)
               and (:typeName is null or lower(r.roomType.name) = lower(:typeName))
-              and (:provinceId is null or r.province.id = :provinceId)
-              and (:wardId is null or r.ward.id = :wardId)
+              and (:provinceId is null or r.property.province.id = :provinceId)
+              and (:wardId is null or r.property.ward.id = :wardId)
               and (:status is null or r.rentalStatus = :status)
               and (:minPrice is null or r.price >= :minPrice)
               and (:maxPrice is null or r.price <= :maxPrice)
@@ -67,11 +74,11 @@ public interface RoomRepository extends JpaRepository<Room, String> {
             @Param("amenityCount") long amenityCount, Pageable pageable);
 
     @Query("""
-            select r from Room r join fetch r.roomType join fetch r.province join fetch r.ward
-            where (:ownerId is null or r.landlord.id = :ownerId)
+            select r from Room r join fetch r.roomType join fetch r.property p join fetch p.province join fetch p.ward
+            where (:ownerId is null or r.property.landlord.id = :ownerId)
               and (:typeName is null or lower(r.roomType.name) = lower(:typeName))
-              and (:provinceId is null or r.province.id = :provinceId)
-              and (:wardId is null or r.ward.id = :wardId)
+              and (:provinceId is null or r.property.province.id = :provinceId)
+              and (:wardId is null or r.property.ward.id = :wardId)
               and (:status is null or r.rentalStatus = :status)
               and (:minPrice is null or r.price >= :minPrice)
               and (:maxPrice is null or r.price <= :maxPrice)
@@ -81,18 +88,18 @@ public interface RoomRepository extends JpaRepository<Room, String> {
             @Param("status") RoomRentalStatus status, @Param("minPrice") java.math.BigDecimal minPrice,
             @Param("maxPrice") java.math.BigDecimal maxPrice, Pageable pageable);
 
-    @Query("select r from Room r join fetch r.roomType join fetch r.province join fetch r.ward where r.id = :id")
+    @Query("select r from Room r join fetch r.roomType join fetch r.property p join fetch p.province join fetch p.ward where r.id = :id")
     java.util.Optional<Room> findDetailedById(@Param("id") String id);
 
     @Query("""
             select r from Room r
-            join fetch r.province p
-            join fetch r.ward w
+            join fetch r.property p join fetch p.province
+            join fetch p.ward
             where r.roomType.id = :roomTypeId
             order by r.createdAt desc
             """)
     List<Room> findAllForRoomType(@Param("roomTypeId") String roomTypeId);
 
-    @Query("select r from Room r join fetch r.province join fetch r.ward")
-    List<Room> findAllForCategories();
+    @Query("select r from Room r join fetch r.property p join fetch p.province join fetch p.ward where p.landlord.id = :landlordId")
+    List<Room> findAllForCategories(@Param("landlordId") String landlordId);
 }

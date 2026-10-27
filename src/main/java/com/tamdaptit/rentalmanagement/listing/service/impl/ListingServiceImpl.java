@@ -1,5 +1,9 @@
 package com.tamdaptit.rentalmanagement.listing.service.impl;
 
+import com.tamdaptit.rentalmanagement.room.repository.RoomImageRepository;
+import com.tamdaptit.rentalmanagement.room.repository.RoomAmenityRepository;
+import com.tamdaptit.rentalmanagement.room.mapper.RoomMapper;
+import com.tamdaptit.rentalmanagement.listing.dto.request.ListingSearchRequest;
 import com.tamdaptit.rentalmanagement.common.dto.PageResponse;
 import com.tamdaptit.rentalmanagement.common.exception.AppException;
 import com.tamdaptit.rentalmanagement.common.exception.ErrorCode;
@@ -47,6 +51,13 @@ public class ListingServiceImpl implements ListingService {
     private final BoostAllocationRepository boosts;
     private final ListingMapper mapper;
     private final Clock subscriptionClock;
+    private final RoomMapper roomMapper;
+    private final RoomAmenityRepository roomAmenities;
+    private final RoomImageRepository roomImages;
+    private final com.tamdaptit.rentalmanagement.property.repository.PropertyRepository properties;
+    private final com.tamdaptit.rentalmanagement.property.repository.PropertyAmenityRepository propertyAmenities;
+    private final com.tamdaptit.rentalmanagement.property.repository.PropertyImageRepository propertyImages;
+    private final com.tamdaptit.rentalmanagement.property.mapper.PropertyMapper propertyMapper;
 
     private LocalDateTime now() {
         return LocalDateTime.now(subscriptionClock).truncatedTo(ChronoUnit.SECONDS);
@@ -62,7 +73,7 @@ public class ListingServiceImpl implements ListingService {
     }
 
     private Listing findOwned(String ownerId, String id) {
-        return repository.findByIdAndRoom_Landlord_Id(id, ownerId)
+        return repository.findByIdAndProperty_Landlord_Id(id, ownerId)
                 .orElseThrow(() -> new AppException(ErrorCode.LISTING_NOT_FOUND));
     }
 
@@ -70,12 +81,10 @@ public class ListingServiceImpl implements ListingService {
     @Transactional
     public ListingResponse create(String landlordId, ListingRequest request) {
         lockOwner(landlordId);
-        var room = roomRepository.findById(request.roomId())
-                .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
-        if (!room.getLandlord().getId().equals(landlordId)) {
-            throw new AppException(ErrorCode.NOT_ROOM_OWNER);
-        }
-        var listing = Listing.builder().room(room).title(request.title().trim()).description(request.description())
+        var property = properties.findLockedById(request.propertyId())
+                .orElseThrow(() -> new AppException(ErrorCode.PROPERTY_NOT_FOUND));
+        if (!property.getLandlord().getId().equals(landlordId)) throw new AppException(ErrorCode.NOT_PROPERTY_OWNER);
+        var listing = Listing.builder().property(property).title(request.title().trim()).description(request.description())
                 .slug(UUID.randomUUID().toString()).build();
         submit(listing, landlordId, now());
         return response(repository.saveAndFlush(listing));
@@ -89,15 +98,15 @@ public class ListingServiceImpl implements ListingService {
         String excludeId = listing.getId() == null ? "" : listing.getId();
         var quota = current.rights().maxListings();
         // Locking reads see the latest committed rows even when an admin transaction read before waiting for the owner lock.
-        var live = repository.findByRoom_Landlord_Id(landlordId).stream()
+        var live = repository.findByProperty_Landlord_Id(landlordId).stream()
                 .filter(l -> !l.getId().equals(excludeId) && holdsQuota(l, time)).toList();
         if (quota != null && live.size() + 1 > quota) {
             throw new AppException(ErrorCode.QUOTA_EXCEEDED);
         }
-        if (live.stream().anyMatch(l -> l.getRoom().getId().equals(listing.getRoom().getId()))) {
+        if (live.stream().anyMatch(l -> l.getProperty().getId().equals(listing.getProperty().getId()))) {
             throw new AppException(ErrorCode.ACTIVE_LISTING_EXISTED);
         }
-        if (listing.getRoom().getRentalStatus() != RoomRentalStatus.AVAILABLE) {
+        if (!roomRepository.existsByProperty_IdAndRentalStatus(listing.getProperty().getId(), RoomRentalStatus.AVAILABLE)) {
             throw new AppException(ErrorCode.ROOM_NOT_AVAILABLE);
         }
     }
@@ -177,7 +186,7 @@ public class ListingServiceImpl implements ListingService {
         User admin = admin(adminId);
         var listing = pendingForAdmin(id);
         LocalDateTime time = now();
-        checkQuota(listing, listing.getRoom().getLandlord().getId(), time);
+        checkQuota(listing, listing.getProperty().getLandlord().getId(), time);
         listing.setStatus(ListingStatus.PUBLISHED);
         listing.setApprovedBy(admin);
         listing.setApprovedAt(time);
@@ -237,7 +246,7 @@ public class ListingServiceImpl implements ListingService {
             } else {
                 int limit = level == 2 ? current.rights().highPrioritySlots() : current.rights().lowPrioritySlots();
                 String periodId = current.currentPeriod().id();
-                long used = repository.findByRoom_Landlord_Id(landlordId).stream()
+                long used = repository.findByProperty_Landlord_Id(landlordId).stream()
                         .filter(l -> !l.getId().equals(id) && published(l, time) && l.getServiceSubscriptionPeriod() != null
                                 && l.getServiceSubscriptionPeriod().getId().equals(periodId) && l.getPackagePriorityLevel() == level)
                         .count();
@@ -265,6 +274,34 @@ public class ListingServiceImpl implements ListingService {
     }
 
     @Override
+    public PageResponse<ListingResponse> searchPublished(int page, int size,
+            ListingSearchRequest request) {
+        if (page < 0 || size < 1 || size > 100
+                || (request.minPrice() != null && request.minPrice().signum() < 0)
+                || (request.maxPrice() != null && request.maxPrice().signum() < 0)
+                || (request.minPrice() != null && request.maxPrice() != null
+                    && request.minPrice().compareTo(request.maxPrice()) > 0))
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        var names = request.amenityNames() == null ? List.<String>of() : request.amenityNames().stream()
+                .filter(name -> name != null && !name.isBlank()).map(name -> name.trim().toLowerCase(java.util.Locale.ROOT))
+                .distinct().toList();
+        LocalDateTime time = now();
+        return page(repository.searchPublished(time, blankToNull(request.roomTypeName()),
+                blankToNull(request.provinceId()), blankToNull(request.wardId()), request.rentalStatus(),
+                request.minPrice(), request.maxPrice(), names.isEmpty() ? List.of("") : names, names.size(),
+                PageRequest.of(page, size)), time);
+    }
+
+    private String blankToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }
+
+    @Override
+    public PageResponse<ListingResponse> getAllForAdmin(int page, int size, ListingStatus status) {
+        var pageable = pageable(page, size);
+        LocalDateTime time = now();
+        return page(repository.findForAdmin(status == null ? null : status.name(), time, pageable), time);
+    }
+
+    @Override
     public ListingResponse getPublishedById(String id) {
         var listing = repository.findById(id).orElseThrow(() -> new AppException(ErrorCode.LISTING_NOT_FOUND));
         if (!published(listing, now())) {
@@ -275,7 +312,7 @@ public class ListingServiceImpl implements ListingService {
 
     @Override
     public PageResponse<ListingResponse> getMine(String landlordId, int page, int size) {
-        return page(repository.findByRoom_Landlord_Id(landlordId, pageable(page, size)), now());
+        return page(repository.findByProperty_Landlord_Id(landlordId, pageable(page, size)), now());
     }
 
     @Override
@@ -300,7 +337,7 @@ public class ListingServiceImpl implements ListingService {
 
     private Map<String, ServiceSubscriptionPeriod> effectivePeriods(List<Listing> listings, LocalDateTime time) {
         Map<String, ServiceSubscriptionPeriod> result = new HashMap<>();
-        var owners = listings.stream().map(l -> l.getRoom().getLandlord().getId()).distinct().toList();
+        var owners = listings.stream().map(l -> l.getProperty().getLandlord().getId()).distinct().toList();
         if (!owners.isEmpty()) {
             periods.findEffectivePeriods(owners, time).forEach(p -> result.put(p.getSubscription().getLandlord().getId(), p));
         }
@@ -320,12 +357,32 @@ public class ListingServiceImpl implements ListingService {
         boosts.findEffective(listings.stream().map(Listing::getId).toList(), time)
                 .forEach(a -> activeBoosts.merge(a.getListing().getId(), a.getPriorityLevel(), Math::max));
         var currentPeriods = effectivePeriods(listings, time);
+        var propertyIds = listings.stream().map(l -> l.getProperty().getId()).distinct().toList();
+        var allRooms = roomRepository.findAllByProperty_IdIn(propertyIds);
+        var roomIds = allRooms.stream().map(com.tamdaptit.rentalmanagement.room.entity.Room::getId).toList();
+        var amenitiesByRoom = roomIds.isEmpty() ? Map.<String, List<com.tamdaptit.rentalmanagement.room.entity.RoomAmenity>>of()
+                : roomAmenities.findAllWithAmenityByRoomIds(roomIds).stream()
+                    .collect(java.util.stream.Collectors.groupingBy(a -> a.getRoom().getId()));
+        var imagesByRoom = roomIds.isEmpty() ? Map.<String, List<com.tamdaptit.rentalmanagement.room.entity.RoomImage>>of()
+                : roomImages.findAllByRoomIds(roomIds).stream()
+                    .collect(java.util.stream.Collectors.groupingBy(i -> i.getRoom().getId()));
+        var roomsByProperty = allRooms.stream().collect(java.util.stream.Collectors.groupingBy(r -> r.getProperty().getId()));
+        var sharedAmenities = propertyAmenities.findAllWithAmenityByPropertyIds(propertyIds).stream()
+                .collect(java.util.stream.Collectors.groupingBy(a -> a.getProperty().getId()));
+        var sharedImages = propertyImages.findAllByProperty_IdInOrderBySortOrderAsc(propertyIds).stream()
+                .collect(java.util.stream.Collectors.groupingBy(i -> i.getProperty().getId()));
         return listings.stream().map(listing -> {
-            var period = currentPeriods.get(listing.getRoom().getLandlord().getId());
+            var period = currentPeriods.get(listing.getProperty().getLandlord().getId());
             int selected = selected(listing, period, time);
             int priority = !published(listing, time) ? 0 : Math.max(activeBoosts.getOrDefault(listing.getId(), 0),
                     Math.max(selected, period == null ? 0 : period.getDefaultPriorityLevelSnapshot()));
-            return mapper.toResponse(listing, priority, selected);
+            String propertyId = listing.getProperty().getId();
+            var roomResponses = roomsByProperty.getOrDefault(propertyId, List.of()).stream()
+                    .sorted(java.util.Comparator.comparing(com.tamdaptit.rentalmanagement.room.entity.Room::getRoomNumber))
+                    .map(room -> roomMapper.toResponse(room, amenitiesByRoom.getOrDefault(room.getId(), List.of()),
+                            imagesByRoom.getOrDefault(room.getId(), List.of()))).toList();
+            return mapper.toResponse(listing, priority, selected, propertyMapper.toResponse(listing.getProperty(),
+                    sharedAmenities.getOrDefault(propertyId, List.of()), sharedImages.getOrDefault(propertyId, List.of()), roomResponses));
         }).toList();
     }
 
@@ -335,7 +392,7 @@ public class ListingServiceImpl implements ListingService {
         userRepository.findByIdForUpdate(landlordId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         subscriptions.synchronizeOwner(landlordId);
         LocalDateTime time = now();
-        var listings = repository.findByRoom_Landlord_Id(landlordId);
+        var listings = repository.findByProperty_Landlord_Id(landlordId);
         var currentPeriods = effectivePeriods(listings, time);
         for (var listing : listings) {
             if ((listing.getStatus() == ListingStatus.PENDING && listing.getPendingExpiresAt() != null

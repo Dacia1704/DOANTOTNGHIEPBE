@@ -70,8 +70,10 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, "/api/payments/vnpay/ipn", "/api/payments/vnpay/return").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/listings/mine", "/api/listings/pending").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/listings/mine", "/api/listings/pending", "/api/listings/admin").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/listings", "/api/listings/{id}").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/room-types", "/api/room-types/filter",
+                                "/api/amenities", "/api/amenities/filter", "/api/provinces", "/api/wards").permitAll()
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated()
