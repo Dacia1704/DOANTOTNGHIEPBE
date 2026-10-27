@@ -32,7 +32,8 @@ public class RoomController {
     private final RoomService rooms;
 
     @GetMapping("/filter")
-    public ApiResponse<PageResponse<RoomResponse>> filter(
+    @PreAuthorize("hasRole('LANDLORD')")
+    public ApiResponse<PageResponse<RoomResponse>> filter(Principal principal,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String roomTypeName,
@@ -42,8 +43,8 @@ public class RoomController {
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice,
             @RequestParam(required = false) List<String> amenityNames) {
-        return ApiResponse.success("L\u1ecdc ph\u00f2ng th\u00e0nh c\u00f4ng",
-                rooms.search(page, size, roomTypeName, provinceId, wardId, rentalStatus, minPrice, maxPrice, amenityNames));
+        return ApiResponse.success("Lọc phòng thành công",
+                rooms.searchMine(principal.getName(), page, size, roomTypeName, provinceId, wardId, rentalStatus, minPrice, maxPrice, amenityNames));
     }
 
     @GetMapping("/mine")
@@ -72,9 +73,9 @@ public class RoomController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
-    public ApiResponse<RoomResponse> get(@PathVariable String id) {
-        return ApiResponse.success("Lấy thông tin phòng thành công", rooms.get(id));
+    @PreAuthorize("hasRole('LANDLORD')")
+    public ApiResponse<RoomResponse> get(Principal principal, @PathVariable String id) {
+        return ApiResponse.success("Lấy thông tin phòng thành công", rooms.get(principal.getName(), id));
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

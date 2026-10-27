@@ -93,8 +93,8 @@ public class RoomServiceImpl implements RoomService {
     }
 
     @Override
-    public RoomResponse get(String id) {
-        return responses(List.of(find(id))).get(0);
+    public RoomResponse get(String userId, String id) {
+        return responses(List.of(owned(userId, id))).get(0);
     }
 
     @Override

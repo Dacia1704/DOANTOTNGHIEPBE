@@ -7,21 +7,6 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
-
-@Repository
-public interface ListingRepository extends JpaRepository<Listing, String> {
-
-    /**
-     * Fetch Listing cùng Room và Room.landlord để tránh N+1 khi chat module cần landlord.
-     */
-    @Query("""
-            SELECT l
-            FROM Listing l
-            JOIN FETCH l.room r
-            JOIN FETCH r.landlord
-            WHERE l.id = :id
-            """)
-    Optional<Listing> findByIdWithRoomAndLandlord(@Param("id") String id);
 import com.tamdaptit.rentalmanagement.listing.entity.enums.ListingStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
@@ -32,7 +17,7 @@ import org.springframework.data.jpa.repository.Query;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-
+@Repository
 public interface ListingRepository extends JpaRepository<Listing, String> {
     String EFFECTIVE_PRIORITY = """
             case when exists (select a.id from BoostAllocation a join a.subscription b
@@ -65,7 +50,21 @@ public interface ListingRepository extends JpaRepository<Listing, String> {
     Page<Listing> findPublished(LocalDateTime time, Pageable pageable);
 
     Page<Listing> findByRoom_Landlord_Id(String landlordId, Pageable pageable);
+
     Page<Listing> findByStatusAndPendingExpiresAtGreaterThan(ListingStatus status, LocalDateTime time, Pageable pageable);
 
     @Query("select distinct l.room.landlord.id from Listing l where l.status in ('PENDING','PUBLISHED')")
     List<String> findLiveLandlordIds();
+
+    /**
+     * Fetch Listing cùng Room và Room.landlord để tránh N+1 khi chat module cần landlord.
+     */
+    @Query("""
+            SELECT l
+            FROM Listing l
+            JOIN FETCH l.room r
+            JOIN FETCH r.landlord
+            WHERE l.id = :id
+            """)
+    Optional<Listing> findByIdWithRoomAndLandlord(@Param("id") String id);
+}

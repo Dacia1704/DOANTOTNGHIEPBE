@@ -16,7 +16,7 @@ public interface RoomService {
     PageResponse<RoomResponse> searchByIds(int page, int size, String typeId, String provinceId, String wardId,
             RoomRentalStatus status, BigDecimal minPrice, BigDecimal maxPrice, List<String> amenityIds);
     PageResponse<RoomResponse> mine(String userId, int page, int size);
-    RoomResponse get(String id);
+    RoomResponse get(String userId, String id);
     RoomResponse create(String userId, RoomRequest request, List<MultipartFile> files);
     RoomResponse update(String userId, String id, RoomRequest request);
     void delete(String userId, String id);

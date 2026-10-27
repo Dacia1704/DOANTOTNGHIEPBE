@@ -1,90 +1,307 @@
 -- =============================================================================
--- DỮ LIỆU KHỞI TẠO
---
--- Lưu ý:
--- 1. Không dùng "USE rental_db" — schema do spring.flyway.schemas quyết định.
--- 2. users.auth_version đã nằm trực tiếp trong V1__baseline.sql nên không cần ALTER.
--- 3. Tài khoản admin dưới đây chỉ dùng cho môi trường phát triển.
---    Đổi mật khẩu ngay sau lần đăng nhập đầu tiên.
+-- SEED USERS, RBAC AND ADDRESSES
 -- =============================================================================
 
--- ---------------------------------------------------------------------
--- Vai trò
--- ---------------------------------------------------------------------
 
-INSERT INTO roles (id, code, name, created_at, updated_at)
+-- =============================================================================
+-- 1. ROLES
+-- =============================================================================
+
+INSERT INTO roles (id, code, name)
 VALUES
-    (UUID(), 'ADMIN', 'Administrator', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (UUID(), 'LANDLORD', 'Landlord', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (UUID(), 'TENANT', 'Tenant', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-ON DUPLICATE KEY UPDATE name = roles.name;
+    ('10000000-0000-0000-0000-000000000001', 'ADMIN', 'Quản trị viên'),
+    ('10000000-0000-0000-0000-000000000002', 'LANDLORD', 'Chủ trọ'),
+    ('10000000-0000-0000-0000-000000000003', 'TENANT', 'Người thuê');
 
--- ---------------------------------------------------------------------
--- Quyền: mỗi tài nguyên có 3 quyền READ / WRITE / DELETE
--- ---------------------------------------------------------------------
 
-INSERT INTO permissions (id, code, name, created_at, updated_at)
+-- =============================================================================
+-- 2. PERMISSIONS
+-- =============================================================================
+
+INSERT INTO permissions (id, code, name)
 VALUES
-    (UUID(), 'USER_READ', 'Read users', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (UUID(), 'USER_WRITE', 'Create and update users', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (UUID(), 'USER_DELETE', 'Delete users', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (UUID(), 'PERMISSION_READ', 'Read permissions', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (UUID(), 'PERMISSION_WRITE', 'Create and update permissions', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (UUID(), 'PERMISSION_DELETE', 'Delete permissions', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (UUID(), 'ROOM_READ', 'Read rooms', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (UUID(), 'ROOM_WRITE', 'Create and update rooms', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (UUID(), 'ROOM_DELETE', 'Delete rooms', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-ON DUPLICATE KEY UPDATE name = permissions.name;
+    ('11000000-0000-0000-0000-000000000001', 'USER_READ', 'Xem người dùng'),
+    ('11000000-0000-0000-0000-000000000002', 'USER_MANAGE', 'Quản lý người dùng'),
 
--- ---------------------------------------------------------------------
--- Tài khoản quản trị phát triển
--- Email: admin@rental.local / Mật khẩu: Admin@123456
--- BCrypt cost 10, khớp với PasswordEncoderConfig.
--- Không ghi đè tài khoản đã tồn tại và không tự nâng quyền lên ADMIN.
--- ---------------------------------------------------------------------
+    ('11000000-0000-0000-0000-000000000003', 'ROOM_READ', 'Xem phòng'),
+    ('11000000-0000-0000-0000-000000000004', 'ROOM_CREATE', 'Tạo phòng'),
+    ('11000000-0000-0000-0000-000000000005', 'ROOM_UPDATE', 'Cập nhật phòng'),
+    ('11000000-0000-0000-0000-000000000006', 'ROOM_DELETE', 'Xóa phòng'),
 
-INSERT INTO users (id, email, password, full_name, status, email_verified_at, created_at, updated_at)
+    ('11000000-0000-0000-0000-000000000007', 'LISTING_READ', 'Xem tin đăng'),
+    ('11000000-0000-0000-0000-000000000008', 'LISTING_CREATE', 'Tạo tin đăng'),
+    ('11000000-0000-0000-0000-000000000009', 'LISTING_MANAGE', 'Quản lý tin đăng');
+
+
+-- =============================================================================
+-- 3. ROLE PERMISSIONS
+-- =============================================================================
+
+-- ADMIN
+INSERT INTO role_permissions (role_id, permission_id)
 SELECT
-    '00000000-0000-4000-8000-000000000001',
-    'admin@rental.local',
-    '$2a$10$Wv53grF65.eBa4EM8P8/ne3IXZk3tNFQz9gdQZE9iyBSn1fezYgJy',
-    'System Administrator',
-    'ACTIVE',
-    CURRENT_TIMESTAMP,
-    CURRENT_TIMESTAMP,
-    CURRENT_TIMESTAMP
-WHERE NOT EXISTS (
-    SELECT 1 FROM users WHERE email = 'admin@rental.local'
-);
+    '10000000-0000-0000-0000-000000000001',
+    id
+FROM permissions;
 
-INSERT INTO user_roles (id, user_id, role_id)
-SELECT UUID(), u.id, r.id
-FROM users u
-CROSS JOIN roles r
-WHERE u.id = '00000000-0000-4000-8000-000000000001'
-  AND u.email = 'admin@rental.local'
-  AND r.code = 'ADMIN'
-  AND NOT EXISTS (
-      SELECT 1 FROM user_roles ur
-      WHERE ur.user_id = u.id AND ur.role_id = r.id
-  );
 
--- ---------------------------------------------------------------------
--- Chỉ ADMIN được gán quyền ở đây.
--- Chính sách quyền của LANDLORD và TENANT được cấu hình riêng.
--- ---------------------------------------------------------------------
+-- LANDLORD
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT
+    '10000000-0000-0000-0000-000000000002',
+    id
+FROM permissions
+WHERE code IN (
+               'ROOM_READ',
+               'ROOM_CREATE',
+               'ROOM_UPDATE',
+               'ROOM_DELETE',
+               'LISTING_READ',
+               'LISTING_CREATE'
+    );
 
-INSERT INTO role_permissions (id, role_id, permission_id)
-SELECT UUID(), r.id, p.id
-FROM roles r
-CROSS JOIN permissions p
-WHERE r.code = 'ADMIN'
-  AND p.code IN (
-      'USER_READ', 'USER_WRITE', 'USER_DELETE',
-      'PERMISSION_READ', 'PERMISSION_WRITE', 'PERMISSION_DELETE',
-      'ROOM_READ', 'ROOM_WRITE', 'ROOM_DELETE'
-  )
-  AND NOT EXISTS (
-      SELECT 1 FROM role_permissions rp
-      WHERE rp.role_id = r.id AND rp.permission_id = p.id
-  );
+
+-- TENANT
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT
+    '10000000-0000-0000-0000-000000000003',
+    id
+FROM permissions
+WHERE code IN (
+               'ROOM_READ',
+               'LISTING_READ'
+    );
+
+
+-- =============================================================================
+-- 4. USERS
+-- =============================================================================
+--
+-- Password bên dưới là BCrypt test.
+-- Nếu muốn đăng nhập bằng password cụ thể, nên thay bằng BCrypt hash
+-- được tạo bởi PasswordEncoder của project.
+-- =============================================================================
+
+INSERT INTO users (
+    id,
+    email,
+    phone,
+    password,
+    full_name,
+    status,
+    auth_version
+)
+VALUES
+    (
+        '20000000-0000-0000-0000-000000000001',
+        'admin@gmail.com',
+        '0900000001',
+        '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+        'Quản trị viên',
+        'ACTIVE',
+        0
+    ),
+    (
+        '20000000-0000-0000-0000-000000000002',
+        'landlord1@gmail.com',
+        '0900000002',
+        '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+        'Nguyễn Văn Chủ Trọ',
+        'ACTIVE',
+        0
+    ),
+    (
+        '20000000-0000-0000-0000-000000000003',
+        'landlord2@gmail.com',
+        '0900000003',
+        '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+        'Trần Văn Chủ Trọ',
+        'ACTIVE',
+        0
+    ),
+    (
+        '20000000-0000-0000-0000-000000000004',
+        'tenant1@gmail.com',
+        '0900000004',
+        '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+        'Lê Văn Người Thuê',
+        'ACTIVE',
+        0
+    ),
+    (
+        '20000000-0000-0000-0000-000000000005',
+        'tenant2@gmail.com',
+        '0900000005',
+        '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+        'Phạm Thị Người Thuê',
+        'ACTIVE',
+        0
+    );
+
+
+-- =============================================================================
+-- 5. USER ROLES
+-- =============================================================================
+
+-- ADMIN
+INSERT INTO user_roles (user_id, role_id)
+VALUES (
+           '20000000-0000-0000-0000-000000000001',
+           '10000000-0000-0000-0000-000000000001'
+       );
+
+-- LANDLORD 1
+INSERT INTO user_roles (user_id, role_id)
+VALUES (
+           '20000000-0000-0000-0000-000000000002',
+           '10000000-0000-0000-0000-000000000002'
+       );
+
+-- LANDLORD 2
+INSERT INTO user_roles (user_id, role_id)
+VALUES (
+           '20000000-0000-0000-0000-000000000003',
+           '10000000-0000-0000-0000-000000000002'
+       );
+
+-- TENANT 1
+INSERT INTO user_roles (user_id, role_id)
+VALUES (
+           '20000000-0000-0000-0000-000000000004',
+           '10000000-0000-0000-0000-000000000003'
+       );
+
+-- TENANT 2
+INSERT INTO user_roles (user_id, role_id)
+VALUES (
+           '20000000-0000-0000-0000-000000000005',
+           '10000000-0000-0000-0000-000000000003'
+       );
+
+
+-- =============================================================================
+-- 6. PROVINCES
+-- =============================================================================
+
+INSERT INTO provinces (id, code, name)
+VALUES
+    (
+        '30000000-0000-0000-0000-000000000001',
+        '01',
+        'Thành phố Hà Nội'
+    ),
+    (
+        '30000000-0000-0000-0000-000000000002',
+        '31',
+        'Thành phố Hải Phòng'
+    ),
+    (
+        '30000000-0000-0000-0000-000000000003',
+        '48',
+        'Thành phố Đà Nẵng'
+    ),
+    (
+        '30000000-0000-0000-0000-000000000004',
+        '79',
+        'Thành phố Hồ Chí Minh'
+    ),
+    (
+        '30000000-0000-0000-0000-000000000005',
+        '92',
+        'Thành phố Cần Thơ'
+    );
+
+
+-- =============================================================================
+-- 7. WARDS
+-- =============================================================================
+
+-- Hà Nội
+INSERT INTO wards (id, province_id, code, name)
+VALUES
+    (
+        '31000000-0000-0000-0000-000000000001',
+        '30000000-0000-0000-0000-000000000001',
+        'HN001',
+        'Phường Hoàn Kiếm'
+    ),
+    (
+        '31000000-0000-0000-0000-000000000002',
+        '30000000-0000-0000-0000-000000000001',
+        'HN002',
+        'Phường Ba Đình'
+    ),
+    (
+        '31000000-0000-0000-0000-000000000003',
+        '30000000-0000-0000-0000-000000000001',
+        'HN003',
+        'Phường Cầu Giấy'
+    );
+
+
+-- Hải Phòng
+INSERT INTO wards (id, province_id, code, name)
+VALUES
+    (
+        '31000000-0000-0000-0000-000000000004',
+        '30000000-0000-0000-0000-000000000002',
+        'HP001',
+        'Phường Hồng Bàng'
+    ),
+    (
+        '31000000-0000-0000-0000-000000000005',
+        '30000000-0000-0000-0000-000000000002',
+        'HP002',
+        'Phường Lê Chân'
+    );
+
+
+-- Đà Nẵng
+INSERT INTO wards (id, province_id, code, name)
+VALUES
+    (
+        '31000000-0000-0000-0000-000000000006',
+        '30000000-0000-0000-0000-000000000003',
+        'DN001',
+        'Phường Hải Châu'
+    ),
+    (
+        '31000000-0000-0000-0000-000000000007',
+        '30000000-0000-0000-0000-000000000003',
+        'DN002',
+        'Phường Sơn Trà'
+    );
+
+
+-- TP Hồ Chí Minh
+INSERT INTO wards (id, province_id, code, name)
+VALUES
+    (
+        '31000000-0000-0000-0000-000000000008',
+        '30000000-0000-0000-0000-000000000004',
+        'HCM001',
+        'Phường Sài Gòn'
+    ),
+    (
+        '31000000-0000-0000-0000-000000000009',
+        '30000000-0000-0000-0000-000000000004',
+        'HCM002',
+        'Phường Bến Thành'
+    );
+
+
+-- Cần Thơ
+INSERT INTO wards (id, province_id, code, name)
+VALUES
+    (
+        '31000000-0000-0000-0000-000000000010',
+        '30000000-0000-0000-0000-000000000005',
+        'CT001',
+        'Phường Ninh Kiều'
+    ),
+    (
+        '31000000-0000-0000-0000-000000000011',
+        '30000000-0000-0000-0000-000000000005',
+        'CT002',
+        'Phường Cái Khế'
+    );
