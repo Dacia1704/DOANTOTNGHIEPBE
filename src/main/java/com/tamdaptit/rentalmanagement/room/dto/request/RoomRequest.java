@@ -18,11 +18,9 @@ public record RoomRequest(
         @DecimalMin("0.0") BigDecimal defaultDeposit,
         @NotNull @DecimalMin(value = "0.0", inclusive = false) BigDecimal areaM2,
         @NotNull @DecimalMin("1") Integer maxOccupants,
-        @NotBlank String provinceId,
-        @NotBlank String wardId,
-        @NotBlank @Size(max = 255) String addressLine,
-        BigDecimal latitude,
-        BigDecimal longitude,
+        @NotBlank String propertyId,
+        @NotBlank @Size(max = 30) String roomNumber,
+        @jakarta.validation.constraints.Min(0) Integer floorNumber,
         RoomRentalStatus rentalStatus,
         List<String> amenityIds) {
 }

@@ -57,11 +57,11 @@ public class ChatServiceImpl implements ChatService {
     @Transactional
     public ChatConversationResponse getOrCreateListingConversation(String listingId, String currentUserId) {
         // 1. Load listing với room + landlord
-        Listing listing = listingRepository.findByIdWithRoomAndLandlord(listingId)
+        Listing listing = listingRepository.findByIdWithPropertyAndLandlord(listingId)
                 .orElseThrow(() -> new AppException(ErrorCode.LISTING_NOT_FOUND));
 
         // 2. Xác định landlord từ listing.room
-        User landlord = listing.getRoom().getLandlord();
+        User landlord = listing.getProperty().getLandlord();
 
         // 3. Load current user
         User currentUser = userRepository.findById(currentUserId)

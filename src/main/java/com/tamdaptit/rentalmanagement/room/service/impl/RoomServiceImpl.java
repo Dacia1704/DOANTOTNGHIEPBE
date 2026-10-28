@@ -1,11 +1,10 @@
 package com.tamdaptit.rentalmanagement.room.service.impl;
 
-import com.tamdaptit.rentalmanagement.address.repository.ProvinceRepository;
-import com.tamdaptit.rentalmanagement.address.repository.WardRepository;
 import com.tamdaptit.rentalmanagement.common.dto.PageResponse;
 import com.tamdaptit.rentalmanagement.common.exception.AppException;
 import com.tamdaptit.rentalmanagement.common.exception.ErrorCode;
-import com.tamdaptit.rentalmanagement.identity.repository.UserRepository;
+import com.tamdaptit.rentalmanagement.property.entity.enums.PropertyRentalMode;
+import com.tamdaptit.rentalmanagement.property.repository.PropertyRepository;
 import com.tamdaptit.rentalmanagement.room.dto.request.RoomRequest;
 import com.tamdaptit.rentalmanagement.room.dto.response.RoomResponse;
 import com.tamdaptit.rentalmanagement.room.entity.*;
@@ -36,9 +35,7 @@ public class RoomServiceImpl implements RoomService {
     private final AmenityRepository amenities;
     private final RoomAmenityRepository roomAmenities;
     private final RoomImageRepository images;
-    private final UserRepository users;
-    private final ProvinceRepository provinces;
-    private final WardRepository wards;
+    private final PropertyRepository properties;
     private final ImageStorageService storage;
 
     @Override
@@ -101,7 +98,12 @@ public class RoomServiceImpl implements RoomService {
     @Transactional
     public RoomResponse create(String userId, RoomRequest request, List<MultipartFile> files) {
         Room room = new Room();
-        room.setLandlord(users.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND)));
+        var property = properties.findLockedById(request.propertyId())
+                .orElseThrow(() -> new AppException(ErrorCode.PROPERTY_NOT_FOUND));
+        if (!property.getLandlord().getId().equals(userId)) throw new AppException(ErrorCode.NOT_PROPERTY_OWNER);
+        if (property.getRentalMode() == PropertyRentalMode.WHOLE)
+            throw new AppException(ErrorCode.INVALID_REQUEST, "WHOLE đã có một đơn vị cho thuê");
+        room.setProperty(property);
         apply(room, request);
         rooms.saveAndFlush(room);
         setAmenities(room, request.amenityIds());
@@ -119,6 +121,7 @@ public class RoomServiceImpl implements RoomService {
     @Transactional
     public RoomResponse update(String userId, String id, RoomRequest request) {
         Room room = owned(userId, id);
+        properties.findLockedById(room.getProperty().getId()).orElseThrow();
         apply(room, request);
         setAmenities(room, request.amenityIds());
         return responses(List.of(room)).get(0);
@@ -128,6 +131,9 @@ public class RoomServiceImpl implements RoomService {
     @Transactional
     public void delete(String userId, String id) {
         Room room = owned(userId, id);
+        var property = properties.findLockedById(room.getProperty().getId()).orElseThrow();
+        if (rooms.countByProperty_Id(property.getId()) <= 1)
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Cơ sở phải có ít nhất một đơn vị cho thuê");
         rooms.delete(room);
         storage.deleteByPrefix(StorageFolder.forRoom(id));
     }
@@ -161,24 +167,25 @@ public class RoomServiceImpl implements RoomService {
 
     private Room owned(String userId, String id) {
         Room room = find(id);
-        if (!room.getLandlord().getId().equals(userId)) throw new AppException(ErrorCode.NOT_ROOM_OWNER);
+        if (!room.getProperty().getLandlord().getId().equals(userId)) throw new AppException(ErrorCode.NOT_ROOM_OWNER);
         return room;
     }
 
     private void apply(Room room, RoomRequest request) {
+        if (!room.getProperty().getId().equals(request.propertyId()))
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Không được chuyển phòng sang cơ sở khác");
+        String number = request.roomNumber().trim();
+        if (rooms.existsByProperty_IdAndRoomNumberAndIdNot(request.propertyId(), number,
+                room.getId() == null ? "" : room.getId()))
+            throw new AppException(ErrorCode.DUPLICATE_ROOM_NUMBER);
         roomMapper.updateFromRequest(request, room);
         room.setRoomType(types.findById(request.roomTypeId()).orElseThrow(() -> new AppException(ErrorCode.ROOM_TYPE_NOT_FOUND)));
-        var province = provinces.findById(request.provinceId()).orElseThrow(() -> new AppException(ErrorCode.PROVINCE_NOT_FOUND));
-        var ward = wards.findById(request.wardId()).orElseThrow(() -> new AppException(ErrorCode.WARD_NOT_FOUND));
-        if (!ward.getProvince().getId().equals(province.getId()))
-            throw new AppException(ErrorCode.INVALID_REQUEST, "Phường không thuộc tỉnh/thành đã chọn");
-        room.setProvince(province);
-        room.setWard(ward);
-        room.setAddressLine(request.addressLine().trim());
+        room.setRoomNumber(number);
     }
 
     private void setAmenities(Room room, List<String> ids) {
         roomAmenities.deleteAll(roomAmenities.findAllByRoom_Id(room.getId()));
+        roomAmenities.flush();
         if (ids == null) return;
         ids.stream().distinct().map(id -> amenities.findById(id).orElseThrow(() -> new AppException(ErrorCode.AMENITY_NOT_FOUND)))
                 .forEach(amenity -> roomAmenities.save(RoomAmenity.builder().room(room).amenity(amenity).build()));

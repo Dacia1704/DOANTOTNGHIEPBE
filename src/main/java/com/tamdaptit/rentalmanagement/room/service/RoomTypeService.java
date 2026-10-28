@@ -20,5 +20,5 @@ public interface RoomTypeService {
 
     void delete(String id);
 
-    List<RoomTypeCategoryResponse> getCategoriesWithRooms();
+    List<RoomTypeCategoryResponse> getCategoriesWithRooms(String landlordId);
 }

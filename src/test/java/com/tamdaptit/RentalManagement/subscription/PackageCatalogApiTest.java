@@ -707,6 +707,7 @@ class PackageCatalogApiTest {
         jdbc().update("DELETE FROM service_packages WHERE code <> 'FREE'");
         jdbc().update("DELETE FROM boost_service_packages");
         jdbc().update("DELETE FROM rooms");
+        jdbc().update("DELETE FROM properties");
         jdbc().update("DELETE FROM room_types");
         jdbc().update("DELETE FROM wards");
         jdbc().update("DELETE FROM provinces");
@@ -722,10 +723,12 @@ class PackageCatalogApiTest {
         jdbc().update("INSERT INTO wards(id,province_id,code,name) VALUES ('w-test','p-test','W-TEST','Test')");
         jdbc().update("INSERT INTO room_types(id,name) VALUES ('rt-test','Test room')");
         for (int i = 1; i <= count; i++) {
+            jdbc().update("INSERT INTO properties(id,landlord_id,property_type_id,name,rental_mode,province_id,ward_id,address_line) "
+                    + "VALUES (?,'owner','00000000-0000-0000-0000-000000000011','Test','BY_ROOM','p-test','w-test','Test address')", "room-" + i);
             jdbc().update("""
-                    INSERT INTO rooms(id,landlord_id,room_type_id,price,area_m2,province_id,ward_id,address_line)
-                    VALUES (?,'owner','rt-test',100,20,'p-test','w-test','Test address')
-                    """, "room-" + i);
+                    INSERT INTO rooms(id,property_id,room_number,room_type_id,price,area_m2)
+                    VALUES (?,?,?,'rt-test',100,20)
+                    """, "room-" + i, "room-" + i, "R" + i);
         }
     }
 
@@ -1527,7 +1530,7 @@ class PackageCatalogApiTest {
         assertEquals(listing.expiresAt(), listings().getPublishedById(listing.id()).expiresAt());
         for (int i = 11; i <= 20; i++) submitRoom(i);
         mvc.perform(post("/api/listings").with(user("owner").roles("LANDLORD")).contentType(APPLICATION_JSON)
-                .content("{\"roomId\":\"room-21\",\"title\":\"Over limit\"}"))
+                .content("{\"propertyId\":\"room-21\",\"title\":\"Over limit\"}"))
                 .andExpect(status().isBadRequest());
         ipn(callback, "02");
         assertEquals(2, subscriptions().getPeriods("owner", 0, 10).getTotalElements());
@@ -1627,6 +1630,99 @@ class PackageCatalogApiTest {
         assertEquals(10, subscriptions().getCurrent("owner").rights().maxListings());
     }
 
+    @Test
+    void publicCatalogOnlyShowsPublishedPostsWhileAdminSeesAllPosts() throws Exception {
+        createOwners();
+        roomFixtures(6);
+        var visible = publishRoom(1);
+        var pending = submitRoom(2);
+        var hidden = publishRoom(3);
+        listings().hide("owner", hidden.id());
+        var rejected = submitRoom(4);
+        listings().reject("admin", rejected.id(), "Test rejection");
+        var expired = publishRoom(5);
+        jdbc().update("UPDATE listings SET published_at='2025-12-30 10:00:00',expires_at='2026-01-30 10:00:00' WHERE id=?", expired.id());
+        jdbc().update("UPDATE rooms SET price=3000000,area_m2=25 WHERE id='room-1'");
+        jdbc().update("INSERT INTO room_images(id,room_id,url) VALUES ('public-image','room-1','https://example.test/room.jpg')");
+        jdbc().update("INSERT INTO amenities(id,name) VALUES ('public-wifi','Public test WiFi'),('public-shared','Public shared parking')");
+        jdbc().update("INSERT INTO room_amenities(id,room_id,amenity_id) VALUES ('public-ra','room-1','public-wifi')");
+        jdbc().update("INSERT INTO property_amenities(id,property_id,amenity_id) VALUES ('public-pa','room-1','public-shared')");
+        org.springframework.orm.jpa.EntityManagerFactoryUtils.getTransactionalEntityManager(
+                context.getBean(EntityManagerFactory.class)).clear();
+        mvc.perform(get("/api/listings")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.data[0].id").value(visible.id()))
+                .andExpect(jsonPath("$.data.data[0].property.rooms[0].id").value("room-1"))
+                .andExpect(jsonPath("$.data.data[0].property.rooms[0].images[0].url").value("https://example.test/room.jpg"));
+        mvc.perform(get("/api/listings").param("minPrice", "4000000")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(0));
+        mvc.perform(get("/api/listings").param("amenityNames", "Public test WiFi", "Public shared parking")
+                .param("provinceId", "p-test").param("roomTypeName", "Test room"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(1));
+        mvc.perform(get("/api/listings").param("minPrice", "5").param("maxPrice", "1")).andExpect(status().isBadRequest());
+        for (String id : new String[]{pending.id(), hidden.id(), rejected.id(), expired.id(), "room-6"})
+            mvc.perform(get("/api/listings/" + id)).andExpect(status().isNotFound());
+        mvc.perform(admin(get("/api/listings/admin"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(5));
+        mvc.perform(admin(get("/api/listings/admin").param("status", "PENDING"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(1));
+        mvc.perform(admin(get("/api/listings/admin").param("status", "EXPIRED"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(1));
+        mvc.perform(admin(get("/api/listings/admin").param("status", "PUBLISHED"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(1));
+        mvc.perform(get("/api/listings/admin")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/listings/admin").with(user("owner").roles("LANDLORD"))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/listings/admin").with(user("tenant").roles("TENANT"))).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void onePropertyPostExposesEveryRoomAndFiltersAgainstTheSameRoom() throws Exception {
+        createOwners();
+        roomFixtures(3);
+        jdbc().update("UPDATE rooms SET property_id='room-1',price=5000000 WHERE id='room-2'");
+        jdbc().update("UPDATE rooms SET price=2000000 WHERE id='room-1'");
+        jdbc().update("INSERT INTO room_types(id,name) VALUES ('studio-property-test','Studio property test')");
+        jdbc().update("UPDATE rooms SET room_type_id='studio-property-test' WHERE id='room-2'");
+        var post = publishRoom(1);
+        assertEquals("room-1", post.propertyId());
+        assertEquals(2, post.property().rooms().size());
+        assertEquals(com.tamdaptit.rentalmanagement.common.exception.ErrorCode.ACTIVE_LISTING_EXISTED,
+                assertThrows(AppException.class, () -> listings().create("owner",
+                        new ListingRequest("room-1", "Duplicate property post", ""))).getErrorCode());
+        assertEquals(com.tamdaptit.rentalmanagement.common.exception.ErrorCode.NOT_PROPERTY_OWNER,
+                assertThrows(AppException.class, () -> listings().create("other",
+                        new ListingRequest("room-1", "Not my property", ""))).getErrorCode());
+        mvc.perform(get("/api/listings").param("roomTypeName", "Studio property test").param("minPrice", "4000000"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.data[0].property.rooms.length()").value(2));
+        mvc.perform(get("/api/listings").param("roomTypeName", "Studio property test").param("maxPrice", "3000000"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(0));
+        jdbc().update("UPDATE properties SET rental_mode='WHOLE' WHERE id='room-3'");
+        org.springframework.orm.jpa.EntityManagerFactoryUtils.getTransactionalEntityManager(
+                context.getBean(EntityManagerFactory.class)).clear();
+        var whole = publishRoom(3);
+        assertEquals(1, whole.property().rooms().size());
+        mvc.perform(get("/api/listings")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(2));
+    }
+
+    @Test
+    void migratedDuplicatePropertyPostsKeepHistoryButOnlyOnePublicCard() throws Exception {
+        createOwners();
+        roomFixtures(1);
+        var original = publishRoom(1);
+        jdbc().update("""
+                INSERT INTO listings(id,property_id,title,status,published_at,expires_at)
+                VALUES ('zz-latest-property-post','room-1','Legacy newer post','PUBLISHED',
+                        '2026-01-31 10:00:00','2026-03-01 10:00:00')
+                """);
+        mvc.perform(get("/api/listings")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.data[0].id").value("zz-latest-property-post"));
+        assertEquals(2, listings().getMine("owner", 0, 10).getTotalElements());
+        assertEquals(original.id(), listings().getPublishedById(original.id()).id());
+    }
+
     private static class TestClock extends Clock {
         private volatile Instant instant;
 
@@ -1645,7 +1741,7 @@ class PackageCatalogApiTest {
     @EnableMethodSecurity
     @EnableTransactionManagement
     @EnableJpaRepositories(basePackageClasses = {ServicePackageRepository.class, UserRepository.class,
-            PaymentRepository.class, ListingRepository.class, RoomRepository.class})
+            PaymentRepository.class, ListingRepository.class, RoomRepository.class, com.tamdaptit.rentalmanagement.property.repository.PropertyRepository.class})
     @Import({ServicePackageController.class, BoostServicePackageController.class,
             ServicePackageServiceImpl.class, BoostServicePackageServiceImpl.class, GlobalExceptionHandler.class,
             ServiceSubscriptionController.class, ServiceSubscriptionServiceImpl.class,
@@ -1675,6 +1771,16 @@ class PackageCatalogApiTest {
 
         @Bean
         PaymentMapper paymentMapper() { return Mappers.getMapper(PaymentMapper.class); }
+
+        @Bean
+        com.tamdaptit.rentalmanagement.room.mapper.RoomMapper roomMapper() {
+            return Mappers.getMapper(com.tamdaptit.rentalmanagement.room.mapper.RoomMapper.class);
+        }
+
+        @Bean
+        com.tamdaptit.rentalmanagement.property.mapper.PropertyMapper propertyMapper() {
+            return Mappers.getMapper(com.tamdaptit.rentalmanagement.property.mapper.PropertyMapper.class);
+        }
 
         @Bean
         ListingMapper listingMapper() { return Mappers.getMapper(ListingMapper.class); }

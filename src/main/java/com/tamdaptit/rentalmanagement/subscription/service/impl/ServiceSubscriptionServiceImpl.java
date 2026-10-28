@@ -319,7 +319,7 @@ public class ServiceSubscriptionServiceImpl implements ServiceSubscriptionServic
         subscriptionRepository.saveAndFlush(current);
         appendPeriod(order, null, time, time, false);
         var newPeriod = periodRepository.findBySubscription_IdOrderByPeriodNumberAsc(order.getSubscription().getId()).getFirst();
-        for (var listing : listingRepository.findByRoom_Landlord_Id(order.getLandlord().getId())) {
+        for (var listing : listingRepository.findByProperty_Landlord_Id(order.getLandlord().getId())) {
             if (listing.getServiceSubscriptionPeriod() != null
                     && listing.getServiceSubscriptionPeriod().getId().equals(oldPeriod.getId())) {
                 if (listing.getPackagePriorityLevel() == 1 && order.getDefaultPriorityLevelSnapshot() == 1) {

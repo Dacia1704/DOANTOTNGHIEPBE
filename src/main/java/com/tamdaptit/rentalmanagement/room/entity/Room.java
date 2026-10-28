@@ -1,8 +1,6 @@
 package com.tamdaptit.rentalmanagement.room.entity;
 
-import com.tamdaptit.rentalmanagement.address.entity.Province;
-import com.tamdaptit.rentalmanagement.address.entity.Ward;
-import com.tamdaptit.rentalmanagement.identity.entity.User;
+import com.tamdaptit.rentalmanagement.property.entity.Property;
 import com.tamdaptit.rentalmanagement.room.entity.enums.RoomRentalStatus;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -19,7 +17,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -28,7 +25,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "rooms")
+@Table(name = "rooms", uniqueConstraints = @jakarta.persistence.UniqueConstraint(
+        name = "uk_rooms_property_room_number", columnNames = {"property_id", "room_number"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -43,8 +41,14 @@ public class Room {
     private String id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "landlord_id", nullable = false)
-    private User landlord;
+    @JoinColumn(name = "property_id", nullable = false)
+    private Property property;
+
+    @Column(name = "room_number", nullable = false, length = 30)
+    private String roomNumber;
+
+    @Column(name = "floor_number")
+    private Integer floorNumber;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "room_type_id", nullable = false)
@@ -69,28 +73,13 @@ public class Room {
     private BigDecimal areaM2;
 
     @Column(name = "max_occupants")
+    @Builder.Default
     private Integer maxOccupants = 1;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "province_id", nullable = false)
-    private Province province;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "ward_id", nullable = false)
-    private Ward ward;
-
-    @Column(name = "address_line", nullable = false, length = 255)
-    private String addressLine;
-
-    @Column(precision = 10, scale = 8)
-    private BigDecimal latitude;
-
-    @Column(precision = 11, scale = 8)
-    private BigDecimal longitude;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "rental_status", nullable = false, length = 20)
-    RoomRentalStatus rentalStatus = RoomRentalStatus.AVAILABLE;
+    @Builder.Default
+    private RoomRentalStatus rentalStatus = RoomRentalStatus.AVAILABLE;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

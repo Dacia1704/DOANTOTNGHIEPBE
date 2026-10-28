@@ -627,11 +627,9 @@ Endpoint lọc loại phòng: `GET /api/room-types/filter?name=studio&parentId=p
   "defaultDeposit": 4500000,
   "areaM2": 25,
   "maxOccupants": 2,
-  "provinceId": "province-001",
-  "wardId": "ward-001",
-  "addressLine": "12 Nguyễn Huệ",
-  "latitude": 10.7769,
-  "longitude": 106.7009,
+  "propertyId": "property-001",
+  "roomNumber": "A101",
+  "floorNumber": 1,
   "rentalStatus": "AVAILABLE",
   "amenityIds": ["amenity-001", "amenity-002"]
 }
@@ -640,21 +638,21 @@ Endpoint lọc loại phòng: `GET /api/room-types/filter?name=studio&parentId=p
 ```bash
 curl -X POST "http://localhost:8080/api/rooms" \
   -H "Authorization: Bearer <access_token>" \
-  -F 'room={"roomTypeId":"type-001","price":4500000,"areaM2":25,"maxOccupants":2,"provinceId":"province-001","wardId":"ward-001","addressLine":"12 Nguyễn Huệ"};type=application/json' \
+  -F 'room={"roomTypeId":"type-001","price":4500000,"areaM2":25,"maxOccupants":2,"propertyId":"property-001","roomNumber":"A101","floorNumber":1};type=application/json' \
   -F "files=@room-1.jpg" -F "files=@room-2.jpg"
 ```
-- `roomTypeId`, `provinceId`, `wardId`, `price`, `areaM2`, `maxOccupants`, `addressLine` bắt buộc; giá/diện tích phải lớn hơn 0, số người ở ít nhất 1. Các phí không được âm. Phường phải thuộc tỉnh/thành được chọn. `amenityIds` có thể bỏ qua hoặc gửi danh sách rỗng.
+- `propertyId`, `roomNumber`, `roomTypeId`, `price`, `areaM2`, `maxOccupants` bắt buộc; giá/diện tích phải lớn hơn 0, số người ở ít nhất 1. Các phí không được âm. Property phải thuộc chủ trọ đang đăng nhập và có rentalMode BY_ROOM. `floorNumber` không âm khi được cung cấp. Số phòng duy nhất trong Property. `amenityIds` có thể bỏ qua hoặc gửi danh sách rỗng.
 
 ### 4.5 Cập nhật phòng
 - Method: PUT
 - URL: `/api/rooms/{id}`
 - Quyền: chủ phòng (`LANDLORD`). Body có cùng cấu trúc và validation như tạo phòng; `amenityIds` là danh sách tiện ích mới (bỏ qua hoặc `[]` sẽ xóa các tiện ích đang gắn).
-- Lỗi 403 nếu không sở hữu phòng; 404 nếu phòng/loại phòng/địa chỉ/tiện ích không tồn tại.
+- Không chuyển Room sang Property khác. Lỗi 403 nếu không sở hữu phòng; 404 nếu phòng/loại phòng/tiện ích không tồn tại; 409 nếu số phòng bị trùng.
 
 ### 4.6 Xóa phòng
 - Method: DELETE
 - URL: `/api/rooms/{id}`
-- Quyền: chủ phòng (`LANDLORD`). Xóa phòng và toàn bộ ảnh lưu trong thư mục của phòng.
+- Quyền: chủ phòng (`LANDLORD`). Xóa phòng và toàn bộ ảnh lưu trong thư mục của phòng. Không xóa đơn vị cuối cùng của Property (400), để giữ invariant WHOLE đúng một Room và BY_ROOM ít nhất một Room.
 
 ### 4.7 Tải ảnh phòng
 - Method: POST
@@ -670,7 +668,9 @@ curl -X POST "http://localhost:8080/api/rooms" \
 - Quyền: chủ phòng (`LANDLORD`); xóa bản ghi ảnh và ảnh trên kho lưu trữ.
 - Lỗi 403 nếu không sở hữu phòng; 404 nếu phòng hoặc ảnh không tồn tại/ảnh không thuộc phòng.
 
-`RoomResponse` gồm: `id`, `landlordId`, `roomTypeId`, `roomTypeName`, `price`, `electricityPrice`, `waterPrice`, `serviceFee`, `defaultDeposit`, `areaM2`, `maxOccupants`, `provinceId`, `provinceName`, `wardId`, `wardName`, `addressLine`, `latitude`, `longitude`, `rentalStatus`, `amenities`, `images`, `createdAt`, `updatedAt`. Tạo phòng nhận multipart gồm phần JSON `room` và field file `files` tùy chọn; endpoint tải ảnh riêng vẫn dùng được sau khi tạo.
+`RoomResponse` gồm: `id`, `propertyId`, `roomNumber`, `floorNumber`, `landlordId`, `roomTypeId`, `roomTypeName`, `price`, `electricityPrice`, `waterPrice`, `serviceFee`, `defaultDeposit`, `areaM2`, `maxOccupants`, `provinceId`, `provinceName`, `wardId`, `wardName`, `addressLine`, `latitude`, `longitude`, `rentalStatus`, `amenities`, `images`, `createdAt`, `updatedAt`. Tạo phòng nhận multipart gồm phần JSON `room` và field file `files` tùy chọn; endpoint tải ảnh riêng vẫn dùng được sau khi tạo.
+
+Các trường chủ trọ và địa chỉ trong response được lấy qua `Room.property`; request Room không nhận địa chỉ riêng. Tạo cơ sở và phòng lần đầu dùng `POST /api/properties` (xem [Property API](PROPERTY_API.md)).
 
 ---
 

@@ -62,7 +62,7 @@ public class BoostAllocationService {
         var time = prepare(landlordId);
         if (request.level() == null || request.level() < 1 || request.level() > 2)
             throw new AppException(ErrorCode.INVALID_REQUEST);
-        var listing = listings.findByIdAndRoom_Landlord_Id(listingId, landlordId)
+        var listing = listings.findByIdAndProperty_Landlord_Id(listingId, landlordId)
                 .orElseThrow(() -> new AppException(ErrorCode.LISTING_NOT_FOUND));
         if (listing.getStatus() != ListingStatus.PUBLISHED || listing.getExpiresAt() == null
                 || !time.isBefore(listing.getExpiresAt())) throw new AppException(ErrorCode.INVALID_LISTING_STATUS);
@@ -85,7 +85,7 @@ public class BoostAllocationService {
 
     public void unassign(String landlordId, String listingId) {
         prepare(landlordId);
-        listings.findByIdAndRoom_Landlord_Id(listingId, landlordId)
+        listings.findByIdAndProperty_Landlord_Id(listingId, landlordId)
                 .orElseThrow(() -> new AppException(ErrorCode.LISTING_NOT_FOUND));
         allocations.findByListing_Id(listingId).ifPresent(allocations::delete);
         allocations.flush();
