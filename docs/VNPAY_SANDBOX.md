@@ -17,6 +17,22 @@ Trong cấu hình merchant của VNPay, đăng ký IPN URL là `https://<backend
 
 Khóa VNPay được cấu hình trong `.env`. Thiếu khóa, checkout trả 503; các module khác vẫn khởi động bình thường.
 
+## Nhận IPN khi backend chạy localhost
+
+Trong Merchant Admin, mở **Thông tin tài khoản → website của mình → sửa thông tin IPN**. IPN URL phải là URL HTTPS gọi được từ Internet, kết thúc bằng `/api/payments/vnpay/ipn`; giá trị `#` hoặc `localhost` không nhận được callback từ VNPay. Chọn **GET** và **HMACSHA512**. Return URL của frontend và IPN URL của backend có vai trò khác nhau.
+
+Khi chưa có backend public, có thể dùng [Cloudflare Quick Tunnel](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/). Tunnel trung chuyển dữ liệu callback thanh toán qua Cloudflare; chỉ bật khi người quản lý môi trường cho phép. Proxy đi kèm chỉ cho GET tới endpoint IPN, chặn các API khác và không chuyển tiếp Cookie/Authorization của client. Backend vẫn kiểm tra chữ ký, merchant, số tiền và chống ghi nhận trùng như bình thường.
+
+1. Chạy backend ở cổng 8080 và cài Node.js 22 trở lên.
+2. Tải `cloudflared-windows-amd64.exe` bản **2026.10.6** từ [release chính thức](https://github.com/cloudflare/cloudflared/releases/tag/2026.10.6), lưu thành `target/vnpay-diagnostics/bin/cloudflared.exe`. Script kiểm tra SHA256 `d521b3bf68982165f0d06d76732f22d9a105ef057ff3ae4c0986f3a23190950f` trước khi chạy.
+3. Chạy `./scripts/start-vnpay-ipn.ps1`. Proxy chỉ lắng nghe `127.0.0.1:18080`; tunnel tạo URL HTTPS tạm trên `trycloudflare.com`.
+4. Đăng ký `https://<ten-tunnel>.trycloudflare.com/api/payments/vnpay/ipn` trên Merchant Admin. Mỗi lần tạo tunnel mới phải cập nhật URL nếu nó thay đổi.
+5. Giữ terminal và backend chạy trong lúc thử. Đóng tunnel sẽ làm IPN URL tạm ngừng hoạt động; môi trường triển khai cần URL backend HTTPS ổn định.
+
+Kiểm tra proxy bằng `node --test scripts/vnpay-ipn-proxy.test.mjs`. Request không có chữ ký tới endpoint IPN phải trả `RspCode=97`; gọi các API khác qua proxy phải trả 404. Log nằm trong `target/vnpay-diagnostics/` và không ghi HashSecret hoặc toàn bộ query string callback.
+
+Nếu Return có chữ ký hợp lệ báo `00/00` nhưng payment còn PENDING/EXPIRED, kiểm tra cấu hình và log nhận IPN. QueryDr trả `99 / Unexpected error` là lỗi truy vấn, không phải bằng chứng giao dịch thanh toán đã thất bại. Không thay trạng thái payment bằng cách sửa database hoặc dùng Return để giả làm IPN; cần callback IPN thật hoặc phản hồi QueryDr đã xác minh.
+
 ## Kiểm tra trực tiếp
 
 1. Cấu hình môi trường ứng dụng và database theo dự án; áp dụng Flyway V3/V4/V5 theo hướng dẫn dữ liệu cũ trong `SUBSCRIPTION_SCHEMA.md`. Không reset database để chạy thử thanh toán.
@@ -32,7 +48,7 @@ Khóa VNPay được cấu hình trong `.env`. Thiếu khóa, checkout trả 503
 
 Kiểm thử tự động dùng MySQL riêng, Flyway V1–V5, JPA thật, controller/service/repository thật và SecurityConfig của ứng dụng. Người dùng thử được cung cấp bằng Spring Security test; bộ kiểm thử không thay thế kiểm tra đăng nhập/JWT và toàn bộ hạ tầng ứng dụng.
 
-Callback trong kiểm thử được ký bằng khóa giả của test, gồm đối chiếu HMAC với vector tính độc lập, tham số bị sửa/trùng, sai terminal/số tiền, IPN lặp, thu trùng, thời hạn và giao dịch đồng thời. Chưa thực hiện một giao dịch qua website VNPay hoặc xác nhận VNPay gọi được URL IPN công khai; cần URL backend và cấu hình merchant để kiểm tra bước này.
+Callback trong kiểm thử được ký bằng khóa giả của test, gồm đối chiếu HMAC với vector tính độc lập, tham số bị sửa/trùng, sai terminal/số tiền, IPN lặp, thu trùng, thời hạn và giao dịch đồng thời. Kiểm tra sandbox thực tế ngày 30/10/2026 đã xác nhận giao dịch mua gói 20.000đ qua website VNPay: sau khi lưu IPN HTTPS, backend nhận callback thật và phản hồi `RspCode=00`; payment thành SUCCESS, có đúng một hóa đơn 20.000đ, đơn mua gói chuyển APPLIED và không cần đối soát thủ công. Kết quả này kiểm chứng luồng IPN cho giao dịch mới. Các giao dịch trước khi cấu hình IPN vẫn chưa được xác nhận trong backend; QueryDr sandbox vẫn trả `99 / Unexpected error` ở lần kiểm tra gần nhất.
 
 QueryDr được kiểm tra bằng HTTP server local giả lập VNPay và các ca ghi nhận thanh toán trên MySQL: phản hồi sai không cấp quyền, khôi phục EXPIRED, Boost, CHANGE vẫn chờ admin và IPN đến trong lúc truy vấn không nhân quyền/hóa đơn. Kết quả kiểm thử này không khẳng định giao dịch sandbox cụ thể của người dùng đã được VNPay xác nhận; dùng endpoint check để kiểm tra giao dịch đó. Với payment trước V5, vnp_CreateDate được suy ra từ created_at nên có thể không chính xác nếu URL checkout cũ từng được tạo lại; xem mục 11.4 trong `api.md` nếu provider trả 91.
 
