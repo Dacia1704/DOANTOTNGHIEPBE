@@ -156,6 +156,7 @@ public enum ErrorCode {
     CANNOT_CHAT_WITH_SELF(HttpStatus.BAD_REQUEST, "Không thể nhắn tin với chính mình"),
     CHAT_NOT_ALLOWED(HttpStatus.FORBIDDEN, "Không được phép nhắn tin giữa hai vai trò này"),
     INVALID_CHAT_MESSAGE(HttpStatus.BAD_REQUEST, "Nội dung tin nhắn không hợp lệ"),
+    SUPPORT_ADMIN_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Tài khoản hỗ trợ hiện chưa sẵn sàng. Vui lòng thử lại sau"),
 
     // ===== NOTIFICATION =====
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "Thông báo không tồn tại"),

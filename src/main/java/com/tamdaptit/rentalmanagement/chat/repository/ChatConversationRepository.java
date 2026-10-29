@@ -33,6 +33,7 @@ public interface ChatConversationRepository extends JpaRepository<ChatConversati
             FROM ChatConversation c
             WHERE c.listing.id = :listingId
               AND (SELECT COUNT(p) FROM ChatConversationParticipant p WHERE p.conversation = c AND p.user.id IN (:userIdA, :userIdB)) = 2
+              AND (SELECT COUNT(p) FROM ChatConversationParticipant p WHERE p.conversation = c) = 2
             """)
     Optional<ChatConversation> findListingConversation(
             @Param("listingId") String listingId,

@@ -17,11 +17,11 @@ import com.tamdaptit.rentalmanagement.common.dto.PageResponse;
 import com.tamdaptit.rentalmanagement.common.exception.AppException;
 import com.tamdaptit.rentalmanagement.common.exception.ErrorCode;
 import com.tamdaptit.rentalmanagement.identity.entity.User;
-import com.tamdaptit.rentalmanagement.identity.entity.UserRole;
 import com.tamdaptit.rentalmanagement.identity.entity.enums.RoleCode;
 import com.tamdaptit.rentalmanagement.identity.entity.enums.UserStatus;
 import com.tamdaptit.rentalmanagement.identity.repository.UserRepository;
 import com.tamdaptit.rentalmanagement.listing.entity.Listing;
+import com.tamdaptit.rentalmanagement.listing.entity.enums.ListingStatus;
 import com.tamdaptit.rentalmanagement.listing.repository.ListingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -30,6 +30,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.security.Principal;
 import java.time.LocalDateTime;
@@ -41,6 +43,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ChatServiceImpl implements ChatService {
+    // Stable identity seeded by V2__seed_reference_and_demo_data.sql; never choose an arbitrary admin.
+    static final String SUPPORT_ADMIN_EMAIL = "admin.demo@trotot.example.test";
 
     private final ChatConversationRepository conversationRepository;
     private final ChatConversationParticipantRepository participantRepository;
@@ -56,16 +60,22 @@ public class ChatServiceImpl implements ChatService {
     @Override
     @Transactional
     public ChatConversationResponse getOrCreateListingConversation(String listingId, String currentUserId) {
-        // 1. Load listing với room + landlord
+        // The recipient comes exclusively from the listing's Property, never from the client.
         Listing listing = listingRepository.findByIdWithPropertyAndLandlord(listingId)
                 .orElseThrow(() -> new AppException(ErrorCode.LISTING_NOT_FOUND));
+        if (listing.getStatus() != ListingStatus.PUBLISHED || listing.getExpiresAt() == null
+                || !listing.getExpiresAt().isAfter(LocalDateTime.now())) {
+            throw new AppException(ErrorCode.LISTING_NOT_FOUND);
+        }
 
-        // 2. Xác định landlord từ listing.room
         User landlord = listing.getProperty().getLandlord();
 
         // 3. Load current user
-        User currentUser = userRepository.findById(currentUserId)
+        User currentUser = userRepository.findByIdForUpdate(currentUserId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        if (currentUser.getStatus() != UserStatus.ACTIVE || landlord.getStatus() != UserStatus.ACTIVE) {
+            throw new AppException(ErrorCode.USER_INACTIVE);
+        }
 
         // 4. Không được chat với chính mình
         if (currentUserId.equals(landlord.getId())) {
@@ -99,19 +109,17 @@ public class ChatServiceImpl implements ChatService {
     @Override
     @Transactional
     public ChatConversationResponse getOrCreateSupportConversation(String currentUserId) {
-        User currentUser = userRepository.findById(currentUserId)
+        User currentUser = userRepository.findByIdForUpdate(currentUserId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
         if (currentUser.getStatus() != UserStatus.ACTIVE) {
             throw new AppException(ErrorCode.USER_INACTIVE);
         }
+        if (!isSupportClient(currentUser)) throw new AppException(ErrorCode.CHAT_NOT_ALLOWED);
 
-        // Tìm Admin hỗ trợ trong hệ thống
-        User admin = userRepository.findAllAdmins().stream()
-                .filter(a -> !a.getId().equals(currentUserId))
-                .findFirst()
-                .orElseGet(() -> userRepository.findAllAdmins().stream().findFirst()
-                        .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND)));
+        User admin = userRepository.findByEmailWithRolesAndPermissions(SUPPORT_ADMIN_EMAIL)
+                .filter(user -> user.getStatus() == UserStatus.ACTIVE && isSupportAdmin(user))
+                .orElseThrow(() -> new AppException(ErrorCode.SUPPORT_ADMIN_UNAVAILABLE));
 
         // Tìm direct conversation đã tồn tại giữa current user và admin
         return conversationRepository
@@ -122,9 +130,7 @@ public class ChatServiceImpl implements ChatService {
                     conversation = conversationRepository.save(conversation);
 
                     createParticipant(conversation, currentUser);
-                    if (!currentUser.getId().equals(admin.getId())) {
-                        createParticipant(conversation, admin);
-                    }
+                    createParticipant(conversation, admin);
 
                     return buildConversationResponse(conversation, currentUserId);
                 });
@@ -139,6 +145,7 @@ public class ChatServiceImpl implements ChatService {
     public List<ChatConversationResponse> getMyConversations(String currentUserId) {
         return conversationRepository.findConversationsByUserId(currentUserId)
                 .stream()
+                .filter(c -> isAllowedConversation(c, currentUserId))
                 .map(c -> buildConversationResponse(c, currentUserId))
                 .collect(Collectors.toList());
     }
@@ -194,6 +201,7 @@ public class ChatServiceImpl implements ChatService {
     @Override
     @Transactional
     public void markAsRead(String conversationId, String currentUserId) {
+        ensureParticipant(conversationId, currentUserId);
         ChatConversationParticipant participant = participantRepository
                 .findByConversationIdAndUserId(conversationId, currentUserId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_CONVERSATION_PARTY));
@@ -209,13 +217,16 @@ public class ChatServiceImpl implements ChatService {
     @Override
     @Transactional
     public void sendMessage(ChatMessageRequest request, Principal principal) {
+        if (principal == null) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
         String senderId = principal.getName(); // Principal name = userId
 
         // 1. Validate input
         if (request.getConversationId() == null || request.getConversationId().isBlank()) {
             throw new AppException(ErrorCode.INVALID_CHAT_MESSAGE);
         }
-        if (request.getContent() == null || request.getContent().isBlank()) {
+        if (request.getContent() == null || request.getContent().isBlank() || request.getContent().length() > 4000) {
             throw new AppException(ErrorCode.INVALID_CHAT_MESSAGE);
         }
         if (request.getMessageType() == null) {
@@ -235,6 +246,9 @@ public class ChatServiceImpl implements ChatService {
         // 4. Load sender
         User sender = userRepository.findById(senderId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        if (sender.getStatus() != UserStatus.ACTIVE) {
+            throw new AppException(ErrorCode.USER_INACTIVE);
+        }
 
         // 5. Save message
         LocalDateTime now = LocalDateTime.now();
@@ -244,7 +258,9 @@ public class ChatServiceImpl implements ChatService {
                 .content(request.getContent())
                 .messageType(request.getMessageType())
                 .build();
-        message = messageRepository.save(message);
+        // Hibernate generates @CreationTimestamp at INSERT/flush, not at save().
+        // Build the realtime DTO only after the timestamp and id exist.
+        message = messageRepository.saveAndFlush(message);
 
         // 6. Update lastMessageAt
         conversation.setLastMessageAt(now);
@@ -253,29 +269,24 @@ public class ChatServiceImpl implements ChatService {
         // 7. Build response
         ChatMessageResponse response = toMessageResponse(message);
 
-        // 8. Push tới topic của cuộc trò chuyện (/topic/conversations/{conversationId})
-        messagingTemplate.convertAndSend(
-                "/topic/conversations/" + request.getConversationId(),
-                response
-        );
-
-        // 9. Push tới user queue để update list / notification cho receiver
-        participantRepository.findOtherParticipant(request.getConversationId(), senderId)
-                .ifPresent(otherParticipant -> {
-                    String receiverId = otherParticipant.getUser().getId();
-                    messagingTemplate.convertAndSendToUser(
-                            receiverId,
-                            "/queue/messages",
-                            response
-                    );
-                });
-
-        // 10. Push lại cho sender user queue
-        messagingTemplate.convertAndSendToUser(
-                senderId,
-                "/queue/messages",
-                response
-        );
+        String receiverId = participantRepository.findOtherParticipant(request.getConversationId(), senderId)
+                .map(participant -> participant.getUser().getId()).orElse(null);
+        Runnable deliver = () -> {
+            messagingTemplate.convertAndSend("/topic/conversations/" + response.getConversationId(), response);
+            if (receiverId != null) {
+                messagingTemplate.convertAndSendToUser(receiverId, "/queue/messages", response);
+            }
+            messagingTemplate.convertAndSendToUser(senderId, "/queue/messages", response);
+        };
+        // An echo is a persistence acknowledgement: never publish a transaction that rolls back.
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() { deliver.run(); }
+            });
+        } else {
+            deliver.run();
+        }
     }
 
     // =========================================================================
@@ -332,6 +343,38 @@ public class ChatServiceImpl implements ChatService {
         if (!participantRepository.existsByConversationIdAndUserId(conversationId, userId)) {
             throw new AppException(ErrorCode.NOT_CONVERSATION_PARTY);
         }
+        ChatConversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new AppException(ErrorCode.CHAT_CONVERSATION_NOT_FOUND));
+        if (!isAllowedConversation(conversation, userId)) throw new AppException(ErrorCode.CHAT_NOT_ALLOWED);
+    }
+
+    private boolean isSupportAdmin(User user) {
+        return SUPPORT_ADMIN_EMAIL.equalsIgnoreCase(user.getEmail()) && extractRoles(user).contains(RoleCode.ADMIN);
+    }
+
+    private boolean isSupportClient(User user) {
+        Set<RoleCode> roles = extractRoles(user);
+        return !roles.contains(RoleCode.ADMIN) && (roles.contains(RoleCode.TENANT) || roles.contains(RoleCode.LANDLORD));
+    }
+
+    private boolean isAllowedConversation(ChatConversation conversation, String currentUserId) {
+        List<User> parties = participantRepository.findByConversationId(conversation.getId()).stream()
+                .map(ChatConversationParticipant::getUser).toList();
+        if (parties.size() != 2 || parties.stream().noneMatch(user -> currentUserId.equals(user.getId()))) return false;
+        if (conversation.getListing() != null) {
+            var property = conversation.getListing().getProperty();
+            if (property == null || property.getLandlord() == null
+                    || parties.stream().noneMatch(user -> property.getLandlord().getId().equals(user.getId()))) return false;
+            try {
+                validateChatPermission(parties.get(0), parties.get(1));
+                return true;
+            } catch (AppException exception) {
+                return false;
+            }
+        }
+        if (conversation.getRentalRequest() != null) return false;
+        return (isSupportAdmin(parties.get(0)) && isSupportClient(parties.get(1)))
+                || (isSupportAdmin(parties.get(1)) && isSupportClient(parties.get(0)));
     }
 
     private ChatConversationParticipant createParticipant(ChatConversation conversation, User user) {

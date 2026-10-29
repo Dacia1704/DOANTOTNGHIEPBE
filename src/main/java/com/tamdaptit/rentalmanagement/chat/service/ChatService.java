@@ -18,12 +18,13 @@ public interface ChatService {
     ChatConversationResponse getOrCreateListingConversation(String listingId, String currentUserId);
 
     /**
-     * Tạo hoặc lấy support conversation giữa current user và Admin hệ thống.
+     * Tenant/Landlord tạo hoặc lấy cuộc hỗ trợ với duy nhất tài khoản Admin được seed trong Flyway.
+     * Không nhận receiverId từ client, không tìm một Admin bất kỳ và không tạo cuộc tự chat.
      */
     ChatConversationResponse getOrCreateSupportConversation(String currentUserId);
 
     /**
-     * Lấy danh sách conversations của current user.
+     * Chỉ lấy cuộc trò chuyện của current user thuộc hai luồng: bài đăng hoặc hỗ trợ Admin cố định.
      */
     List<ChatConversationResponse> getMyConversations(String currentUserId);
 
@@ -44,7 +45,7 @@ public interface ChatService {
 
     /**
      * Xử lý gửi tin nhắn qua WebSocket.
-     * Lưu vào DB rồi push realtime tới topic /topic/conversations/{conversationId}.
+     * Lưu/flush vào DB và chỉ push realtime sau khi commit, bao gồm xác nhận về queue của người gửi.
      */
     void sendMessage(ChatMessageRequest request, Principal principal);
 }

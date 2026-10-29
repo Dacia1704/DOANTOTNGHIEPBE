@@ -7,9 +7,11 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.List;
 
 @Repository
 public interface ChatConversationParticipantRepository extends JpaRepository<ChatConversationParticipant, String> {
+    List<ChatConversationParticipant> findByConversationId(String conversationId);
 
     Optional<ChatConversationParticipant> findByConversationIdAndUserId(String conversationId, String userId);
 
