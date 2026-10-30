@@ -1,7 +1,6 @@
 package com.tamdaptit.rentalmanagement.subscription.entity;
 
 import com.tamdaptit.rentalmanagement.identity.entity.User;
-import com.tamdaptit.rentalmanagement.listing.entity.Listing;
 import com.tamdaptit.rentalmanagement.subscription.entity.enums.BoostSubscriptionStatus;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -45,10 +44,6 @@ public class BoostServicePackageSubscription {
     private User landlord;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "listing_id", nullable = false)
-    private Listing listing;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "boost_package_id", nullable = false)
     private BoostServicePackage boostPackage;
 
@@ -66,9 +61,13 @@ public class BoostServicePackageSubscription {
     @Column(name = "package_name_snapshot", nullable = false, length = 100)
     private String packageNameSnapshot;
 
-    @Column(name = "priority_level_snapshot", nullable = false)
+    @Column(name = "high_priority_slots_snapshot", nullable = false)
     @Builder.Default
-    private Integer priorityLevelSnapshot = 2;
+    private Integer highPrioritySlotsSnapshot = 0;
+
+    @Column(name = "low_priority_slots_snapshot", nullable = false)
+    @Builder.Default
+    private Integer lowPrioritySlotsSnapshot = 0;
 
     @Column(name = "duration_months_snapshot", nullable = false)
     private Integer durationMonthsSnapshot;

@@ -72,3 +72,7 @@ Các test MySQL bỏ qua khi chưa đặt URL thử nghiệm; test chữ ký kh�
 API test dùng MockMvc, controller/service/repository thật, SecurityConfig của ứng dụng và người dùng giả lập Spring Security; kiểm tra danh mục, tháng lịch/năm nhuận, snapshot, quyền sở hữu, gia hạn/đổi gói, callback VNPay sai/lặp/thu trùng, hóa đơn, quota/slot/Boost và các giao dịch đồng thời. Callback được ký bằng khóa giả của test trong schema riêng, chưa phải kết quả thanh toán qua website VNPay. Không thay thế nghiệm thu IPN công khai hoặc kiểm tra toàn bộ hạ tầng/JWT thật; xem `VNPAY_SANDBOX.md`.
 
 Lần chạy sau bổ sung QueryDr ngày 24/10/2026: 67 test qua, 0 lỗi/0 bỏ qua (53 API/nghiệp vụ, 8 schema/JPA, 2 chữ ký, 4 HTTP client QueryDr). Migration V1–V5 và JPA validate được kiểm tra bằng MySQL 8.0.42 riêng; không dùng database ứng dụng làm database thử nghiệm. Các ca QueryDr kiểm tra hồi phục EXPIRED, không giữ transaction khi gọi mạng và IPN đến trong lúc chờ không nhân quyền/hóa đơn.
+
+## V7/V8 - Nâng gói ngay và quy đổi kỳ
+
+Migration V7 bổ sung immediate_upgrade, upgrade_value và entitlement_value để nâng gói ngay; giữ nguyên file V7 đã được áp dụng (checksum -516256725). Migration V8 bổ sung upgrade_months và billing_months, quy đổi phần kỳ còn lại và backfill từ các kỳ đã mua, kể cả nâng gói nối tiếp. Không dùng repair để bỏ qua việc thiếu các cột mới. Khi nâng gói, subscription cũ chuyển CANCELLED để ngừng cấp quyền; lịch sử, giá và ngày của các kỳ cũ được giữ nguyên.

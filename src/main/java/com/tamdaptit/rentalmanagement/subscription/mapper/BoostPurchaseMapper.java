@@ -8,7 +8,6 @@ import org.mapstruct.ReportingPolicy;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface BoostPurchaseMapper {
-    @Mapping(target = "listingId", source = "listing.id")
     @Mapping(target = "boostPackageId", source = "boostPackage.id")
     BoostPurchaseResponse toResponse(BoostServicePackageSubscription boost);
 }

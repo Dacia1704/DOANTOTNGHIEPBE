@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public record RoomResponse(
-        String id, String landlordId, String roomTypeId, String roomTypeName,
+        String id, String propertyId, String roomNumber, Integer floorNumber, String landlordId, String roomTypeId, String roomTypeName,
         BigDecimal price, BigDecimal electricityPrice, BigDecimal waterPrice,
         BigDecimal serviceFee, BigDecimal defaultDeposit, BigDecimal areaM2,
         Integer maxOccupants, String provinceId, String provinceName,

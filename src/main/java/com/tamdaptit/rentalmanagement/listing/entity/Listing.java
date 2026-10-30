@@ -2,7 +2,7 @@ package com.tamdaptit.rentalmanagement.listing.entity;
 
 import com.tamdaptit.rentalmanagement.identity.entity.User;
 import com.tamdaptit.rentalmanagement.listing.entity.enums.ListingStatus;
-import com.tamdaptit.rentalmanagement.room.entity.Room;
+import com.tamdaptit.rentalmanagement.property.entity.Property;
 import com.tamdaptit.rentalmanagement.subscription.entity.ServiceSubscriptionPeriod;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -42,8 +42,8 @@ public class Listing {
     private String id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "room_id", nullable = false)
-    private Room room;
+    @JoinColumn(name = "property_id", nullable = false)
+    private Property property;
 
     @Column(nullable = false, length = 255)
     private String title;

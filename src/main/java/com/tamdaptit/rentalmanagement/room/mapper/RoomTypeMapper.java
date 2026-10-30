@@ -18,6 +18,9 @@ public interface RoomTypeMapper {
     @Mapping(target = "parentName", source = "parent.name")
     RoomTypeResponse toResponse(RoomType roomType);
 
+    @Mapping(target = "addressLine", source = "property.addressLine")
+    @Mapping(target = "provinceName", source = "property.province.name")
+    @Mapping(target = "wardName", source = "property.ward.name")
     @Named("roomSummary")
     RoomSummaryResponse toRoomSummary(Room room);
 

@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AmenityServiceImpl implements AmenityService {
 
     private final AmenityRepository amenityRepository;
+    private final com.tamdaptit.rentalmanagement.property.repository.PropertyAmenityRepository propertyAmenities;
     private final RoomAmenityRepository roomAmenityRepository;
 
     @Override
@@ -95,7 +96,7 @@ public class AmenityServiceImpl implements AmenityService {
     @Transactional
     public void delete(String id) {
         Amenity amenity = findAmenity(id);
-        if (roomAmenityRepository.existsByAmenity_Id(id)) {
+        if (roomAmenityRepository.existsByAmenity_Id(id) || propertyAmenities.existsByAmenity_Id(id)) {
             throw new AppException(
                     ErrorCode.AMENITY_IN_USE,
                     String.format(

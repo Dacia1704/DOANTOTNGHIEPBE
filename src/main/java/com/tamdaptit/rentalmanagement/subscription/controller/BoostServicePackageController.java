@@ -24,7 +24,7 @@ import com.tamdaptit.rentalmanagement.subscription.service.BoostServicePackageSe
 @RestController
 @RequestMapping("/api/boost-packages")
 @RequiredArgsConstructor
-@Tag(name = "Boost packages", description = "Danh mục Boost ưu tiên cao mua riêng")
+@Tag(name = "Boost packages", description = "Danh mục gói suất Boost cao và thấp mua riêng")
 public class BoostServicePackageController {
     private final BoostServicePackageService service;
 
@@ -49,7 +49,7 @@ public class BoostServicePackageController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Admin tạo Boost cao 1, 3 hoặc 6 tháng")
+    @Operation(summary = "Admin tạo gói suất Boost 1, 3 hoặc 6 tháng")
     public ApiResponse<BoostServicePackageResponse> create(@RequestBody @Valid BoostServicePackageRequest request) {
         return ApiResponse.success("Tạo gói Boost thành công", service.create(request));
     }

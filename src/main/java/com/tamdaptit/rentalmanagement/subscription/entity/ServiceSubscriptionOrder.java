@@ -74,6 +74,16 @@ public class ServiceSubscriptionOrder {
     @Column(name = "price", nullable = false, precision = 12, scale = 2)
     private BigDecimal price;
 
+    @Column(name = "immediate_upgrade", nullable = false)
+    @Builder.Default
+    private Boolean immediateUpgrade = false;
+
+    @Column(name = "upgrade_value", precision = 12, scale = 2)
+    private BigDecimal upgradeValue;
+
+    @Column(name = "upgrade_months", precision = 20, scale = 12)
+    private BigDecimal upgradeMonths;
+
     @Column(name = "package_code_snapshot", nullable = false, length = 50)
     private String packageCodeSnapshot;
 

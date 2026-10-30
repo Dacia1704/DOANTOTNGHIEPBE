@@ -17,13 +17,17 @@ import java.util.List;
         nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
 public interface RoomMapper {
 
-    @Mapping(target = "landlordId", source = "room.landlord.id")
+    @Mapping(target = "landlordId", source = "room.property.landlord.id")
     @Mapping(target = "roomTypeId", source = "room.roomType.id")
     @Mapping(target = "roomTypeName", source = "room.roomType.name")
-    @Mapping(target = "provinceId", source = "room.province.id")
-    @Mapping(target = "provinceName", source = "room.province.name")
-    @Mapping(target = "wardId", source = "room.ward.id")
-    @Mapping(target = "wardName", source = "room.ward.name")
+    @Mapping(target = "provinceId", source = "room.property.province.id")
+    @Mapping(target = "provinceName", source = "room.property.province.name")
+    @Mapping(target = "wardId", source = "room.property.ward.id")
+    @Mapping(target = "wardName", source = "room.property.ward.name")
+    @Mapping(target = "addressLine", source = "room.property.addressLine")
+    @Mapping(target = "latitude", source = "room.property.latitude")
+    @Mapping(target = "longitude", source = "room.property.longitude")
+    @Mapping(target = "propertyId", source = "room.property.id")
     @Mapping(target = "amenities", source = "roomAmenityList")
     @Mapping(target = "images", source = "roomImageList")
     RoomResponse toResponse(Room room, List<RoomAmenity> roomAmenityList, List<RoomImage> roomImageList);
@@ -35,11 +39,9 @@ public interface RoomMapper {
 
     RoomResponse.RoomImageResponse toImageResponse(RoomImage image);
 
+    @Mapping(target = "property", ignore = true)
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "landlord", ignore = true)
     @Mapping(target = "roomType", ignore = true)
-    @Mapping(target = "province", ignore = true)
-    @Mapping(target = "ward", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     void updateFromRequest(RoomRequest request, @MappingTarget Room room);

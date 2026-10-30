@@ -1,0 +1,80 @@
+USE rental_db;
+SET NAMES utf8mb4;
+START TRANSACTION;
+
+-- ==================================================
+-- 1. BA GÓI DỊCH VỤ
+-- max_listings = NULL: không giới hạn.
+-- default_priority_level = 1: mọi tin được ưu tiên thấp.
+-- ==================================================
+
+INSERT INTO service_packages (
+    code, name, max_listings,
+    high_priority_slots, low_priority_slots,
+    default_priority_level, has_stats, is_active
+)
+VALUES
+    ('PACKAGE_1', 'Gói 1', 10,
+     2, 5, 0, FALSE, TRUE),
+
+    ('PACKAGE_2', 'Gói 2', 20,
+     5, 10, 0, TRUE, TRUE),
+
+    ('PACKAGE_3_BUSINESS', 'Gói 3 - Business', NULL,
+     10, 0, 1, TRUE, TRUE);
+
+-- Giá sử dụng 1 tháng, đơn vị VND.
+INSERT INTO service_package_prices (
+    package_id, duration_months, price, is_active
+)
+SELECT
+    id,
+    1,
+    CASE code
+        WHEN 'PACKAGE_1' THEN 5000
+        WHEN 'PACKAGE_2' THEN 10000
+        WHEN 'PACKAGE_3_BUSINESS' THEN 20000
+    END,
+    TRUE
+FROM service_packages
+WHERE code IN ('PACKAGE_1', 'PACKAGE_2', 'PACKAGE_3_BUSINESS');
+
+-- ==================================================
+-- 2. BA GÓI BOOST
+-- Số suất là số tin được giữ ưu tiên đồng thời.
+-- Thanh toán trước, sau đó chọn tin để phân bổ.
+-- ==================================================
+
+INSERT INTO boost_service_packages (
+    code, name,
+    high_priority_slots, low_priority_slots,
+    duration_months, price, is_active
+)
+VALUES
+    ('BOOST_1M', 'Boost 1 tháng',
+     1, 3, 1, 3000, TRUE),
+
+    ('BOOST_3M', 'Boost 3 tháng',
+     3, 5, 3, 15000, TRUE),
+
+    ('BOOST_6M', 'Boost 6 tháng',
+     5, 10, 6, 40000, TRUE);
+
+COMMIT;
+
+-- Kiểm tra dữ liệu vừa tạo.
+SELECT
+    p.code, p.name, p.max_listings,
+    p.high_priority_slots, p.low_priority_slots,
+    p.default_priority_level, p.has_stats,
+    r.duration_months, r.price
+FROM service_packages p
+JOIN service_package_prices r ON r.package_id = p.id
+ORDER BY r.price;
+
+SELECT
+    code, name,
+    high_priority_slots, low_priority_slots,
+    duration_months, price
+FROM boost_service_packages
+ORDER BY duration_months;

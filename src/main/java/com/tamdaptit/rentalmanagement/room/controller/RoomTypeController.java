@@ -1,5 +1,6 @@
 package com.tamdaptit.rentalmanagement.room.controller;
 
+import java.security.Principal;
 import com.tamdaptit.rentalmanagement.common.dto.ApiResponse;
 import com.tamdaptit.rentalmanagement.common.dto.PageResponse;
 import com.tamdaptit.rentalmanagement.room.dto.request.RoomTypeRequest;
@@ -51,10 +52,10 @@ public class RoomTypeController {
     }
 
     @GetMapping("/categories")
-    @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "Lấy danh mục loại phòng kèm danh sách phòng")
-    public ApiResponse<List<RoomTypeCategoryResponse>> getCategoriesWithRooms() {
-        return ApiResponse.success("Lấy danh mục phòng thành công", roomTypeService.getCategoriesWithRooms());
+    @PreAuthorize("hasRole('LANDLORD')")
+    @Operation(summary = "Lấy danh mục loại phòng kèm các phòng của chủ trọ")
+    public ApiResponse<List<RoomTypeCategoryResponse>> getCategoriesWithRooms(Principal principal) {
+        return ApiResponse.success("Lấy danh mục phòng thành công", roomTypeService.getCategoriesWithRooms(principal.getName()));
     }
 
     @GetMapping("/{id}")

@@ -1,5 +1,6 @@
 package com.tamdaptit.rentalmanagement.listing.controller;
 
+import com.tamdaptit.rentalmanagement.listing.entity.enums.ListingStatus;
 import com.tamdaptit.rentalmanagement.common.dto.ApiResponse;
 import com.tamdaptit.rentalmanagement.common.dto.PageResponse;
 import com.tamdaptit.rentalmanagement.listing.dto.request.*;
@@ -19,8 +20,8 @@ public class ListingController {
 
     @GetMapping
     public ApiResponse<PageResponse<ListingResponse>> published(@RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        return ApiResponse.success(service.getPublished(page, size));
+            @RequestParam(defaultValue = "10") int size, @ModelAttribute ListingSearchRequest request) {
+        return ApiResponse.success(service.searchPublished(page, size, request));
     }
 
     @GetMapping("/{id}")
@@ -33,6 +34,14 @@ public class ListingController {
     public ApiResponse<PageResponse<ListingResponse>> mine(Principal principal,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
         return ApiResponse.success(service.getMine(principal.getName(), page, size));
+    }
+
+    @GetMapping("/admin")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<PageResponse<ListingResponse>> admin(
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) ListingStatus status) {
+        return ApiResponse.success(service.getAllForAdmin(page, size, status));
     }
 
     @GetMapping("/pending")

@@ -6,9 +6,6 @@ import com.tamdaptit.rentalmanagement.common.exception.ErrorCode;
 import com.tamdaptit.rentalmanagement.identity.entity.User;
 import com.tamdaptit.rentalmanagement.identity.entity.enums.UserStatus;
 import com.tamdaptit.rentalmanagement.identity.repository.UserRepository;
-import com.tamdaptit.rentalmanagement.listing.entity.Listing;
-import com.tamdaptit.rentalmanagement.listing.entity.enums.ListingStatus;
-import com.tamdaptit.rentalmanagement.listing.repository.ListingRepository;
 import com.tamdaptit.rentalmanagement.listing.service.ListingService;
 import com.tamdaptit.rentalmanagement.payment.entity.enums.PaymentStatus;
 import com.tamdaptit.rentalmanagement.payment.repository.PaymentRepository;
@@ -28,14 +25,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class BoostPurchaseServiceImpl implements BoostPurchaseService {
     private final UserRepository users;
-    private final ListingRepository listings;
     private final ListingService listingService;
     private final BoostPurchaseRepository repository;
     private final BoostServicePackageRepository packages;
@@ -51,17 +46,6 @@ public class BoostPurchaseServiceImpl implements BoostPurchaseService {
         return users.findByIdForUpdate(landlordId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
     }
 
-    private boolean validListing(Listing listing, LocalDateTime time) {
-        return listing.getStatus() == ListingStatus.PUBLISHED && listing.getExpiresAt() != null && time.isBefore(listing.getExpiresAt());
-    }
-
-    private List<BoostServicePackageSubscription> active(String landlordId, LocalDateTime time) {
-        var active = repository.findByLandlord_IdAndStatus(landlordId, BoostSubscriptionStatus.ACTIVE);
-        active.stream().filter(b -> !time.isBefore(b.getEndAt())).forEach(b -> b.setStatus(BoostSubscriptionStatus.EXPIRED));
-        repository.flush();
-        return active.stream().filter(b -> b.getStatus() == BoostSubscriptionStatus.ACTIVE).toList();
-    }
-
     @Override
     @Transactional
     public BoostPurchaseResponse create(String landlordId, BoostPurchaseRequest request) {
@@ -69,23 +53,18 @@ public class BoostPurchaseServiceImpl implements BoostPurchaseService {
         if (owner.getStatus() != UserStatus.ACTIVE) {
             throw new AppException(ErrorCode.USER_INACTIVE);
         }
-        var listing = listings.findByIdAndRoom_Landlord_Id(request.listingId(), landlordId)
-                .orElseThrow(() -> new AppException(ErrorCode.LISTING_NOT_FOUND));
         LocalDateTime time = now();
-        if (!validListing(listing, time)) {
-            throw new AppException(ErrorCode.INVALID_LISTING_STATUS);
-        }
-        if (active(landlordId, time).stream().anyMatch(b -> b.getListing().getId().equals(listing.getId()))) {
-            throw new AppException(ErrorCode.BOOST_ALREADY_ACTIVE);
-        }
         var catalog = packages.findById(request.boostPackageId())
                 .orElseThrow(() -> new AppException(ErrorCode.BOOST_PACKAGE_NOT_FOUND));
-        if (!Boolean.TRUE.equals(catalog.getActive()) || catalog.getDurationMonths() == null) {
+        if (!Boolean.TRUE.equals(catalog.getActive()) || catalog.getDurationMonths() == null
+                || !java.util.Set.of(1, 3, 6).contains(catalog.getDurationMonths())
+                || (catalog.getHighPrioritySlots() == 0 && catalog.getLowPrioritySlots() == 0)) {
             throw new AppException(ErrorCode.BOOST_PACKAGE_NOT_FOUND);
         }
         return mapper.toResponse(repository.saveAndFlush(BoostServicePackageSubscription.builder()
-                .landlord(owner).listing(listing).boostPackage(catalog).price(catalog.getPrice())
-                .packageNameSnapshot(catalog.getName()).priorityLevelSnapshot(2)
+                .landlord(owner).boostPackage(catalog).price(catalog.getPrice())
+                .packageNameSnapshot(catalog.getName()).highPrioritySlotsSnapshot(catalog.getHighPrioritySlots())
+                .lowPrioritySlotsSnapshot(catalog.getLowPrioritySlots())
                 .durationMonthsSnapshot(catalog.getDurationMonths()).paymentExpiresAt(time.plusMinutes(15)).build()));
     }
 
@@ -106,9 +85,7 @@ public class BoostPurchaseServiceImpl implements BoostPurchaseService {
             return true;
         }
         LocalDateTime time = now();
-        var listing = listings.findByIdAndRoom_Landlord_Id(boost.getListing().getId(), landlordId).orElseThrow();
-        boolean overlaps = active(landlordId, time).stream().anyMatch(b -> b.getListing().getId().equals(listing.getId()));
-        if (owner.getStatus() != UserStatus.ACTIVE || !validListing(listing, time) || overlaps
+        if (owner.getStatus() != UserStatus.ACTIVE
                 || !paid.getFirst().getPaidAt().isBefore(boost.getPaymentExpiresAt())
                 || !paid.getFirst().getPaidAt().isBefore(paid.getFirst().getExpiresAt())) {
             boost.setStatus(BoostSubscriptionStatus.CANCELLED);

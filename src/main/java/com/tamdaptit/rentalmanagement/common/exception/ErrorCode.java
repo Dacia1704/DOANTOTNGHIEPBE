@@ -75,7 +75,7 @@ public enum ErrorCode {
     LISTING_ALREADY_APPROVED(HttpStatus.BAD_REQUEST, "Tin đăng đã được duyệt"),
     LISTING_NOT_PENDING(HttpStatus.BAD_REQUEST, "Tin đăng không ở trạng thái chờ duyệt"),
     INVALID_LISTING_STATUS(HttpStatus.BAD_REQUEST, "Trạng thái tin đăng không hợp lệ"),
-    ACTIVE_LISTING_EXISTED(HttpStatus.BAD_REQUEST, "Phòng đã có tin đăng đang hoạt động"),
+    ACTIVE_LISTING_EXISTED(HttpStatus.BAD_REQUEST, "Cơ sở đã có tin đăng đang hoạt động"),
 
     // ===== TENANT PROFILE =====
     TENANT_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "Hồ sơ nhu cầu thuê không tồn tại"),
@@ -120,6 +120,9 @@ public enum ErrorCode {
     QUOTA_EXCEEDED(HttpStatus.BAD_REQUEST, "Đã vượt quá số lượng tin cho phép của gói"),
     BOOST_LISTING_NOT_OWNED(HttpStatus.FORBIDDEN, "Bạn không sở hữu tin đăng này"),
 
+    INVALID_BOOST_PACKAGE(HttpStatus.BAD_REQUEST, "Gói Boost phải có ít nhất một suất ưu tiên cao hoặc thấp"),
+    BOOST_SLOTS_EXCEEDED(HttpStatus.CONFLICT, "Gói Boost đã hết suất cho mức ưu tiên được chọn"),
+
     // ===== PAYMENT / INVOICE =====
     PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "Giao dịch thanh toán không tồn tại"),
     VNPAY_NOT_CONFIGURED(HttpStatus.SERVICE_UNAVAILABLE, "Chưa cấu hình VNPay"),
@@ -150,6 +153,10 @@ public enum ErrorCode {
     CHAT_CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "Cuộc trò chuyện không tồn tại"),
     CHAT_MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "Tin nhắn không tồn tại"),
     NOT_CONVERSATION_PARTY(HttpStatus.FORBIDDEN, "Bạn không thuộc cuộc trò chuyện này"),
+    CANNOT_CHAT_WITH_SELF(HttpStatus.BAD_REQUEST, "Không thể nhắn tin với chính mình"),
+    CHAT_NOT_ALLOWED(HttpStatus.FORBIDDEN, "Không được phép nhắn tin giữa hai vai trò này"),
+    INVALID_CHAT_MESSAGE(HttpStatus.BAD_REQUEST, "Nội dung tin nhắn không hợp lệ"),
+    SUPPORT_ADMIN_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Tài khoản hỗ trợ hiện chưa sẵn sàng. Vui lòng thử lại sau"),
 
     // ===== NOTIFICATION =====
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "Thông báo không tồn tại"),
@@ -164,6 +171,13 @@ public enum ErrorCode {
     FILE_UPLOAD_FAILED(HttpStatus.BAD_REQUEST, "Không thể tải lên file"),
     FILE_EMPTY(HttpStatus.BAD_REQUEST, "File không được để trống"),
     INVALID_FILE_TYPE(HttpStatus.BAD_REQUEST, "Loại file không được hỗ trợ"),
+
+    PROPERTY_NOT_FOUND(HttpStatus.NOT_FOUND, "Cơ sở cho thuê không tồn tại"),
+    NOT_PROPERTY_OWNER(HttpStatus.FORBIDDEN, "Bạn không phải chủ cơ sở cho thuê"),
+    PROPERTY_TYPE_NOT_FOUND(HttpStatus.NOT_FOUND, "Loại bất động sản không tồn tại"),
+    PROPERTY_TYPE_ALREADY_EXISTS(HttpStatus.CONFLICT, "Tên loại bất động sản đã tồn tại"),
+    PROPERTY_TYPE_IN_USE(HttpStatus.CONFLICT, "Loại bất động sản đang được sử dụng"),
+    DUPLICATE_ROOM_NUMBER(HttpStatus.CONFLICT, "Số phòng bị trùng trong cùng cơ sở"),
 
     // ===== COMMON =====
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, "Yêu cầu không hợp lệ"),
