@@ -13,6 +13,11 @@ import java.util.List;
 @Repository
 public interface RoomRepository extends JpaRepository<Room, String> {
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.QueryHints(@jakarta.persistence.QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))
+    @Query("select r from Room r where r.id = :roomId")
+    java.util.Optional<Room> findByIdForUpdate(@Param("roomId") String roomId);
+
     List<Room> findByProperty_IdOrderByRoomNumberAsc(String propertyId);
     boolean existsByProperty_IdAndRoomNumberAndIdNot(String propertyId, String roomNumber, String id);
     long countByProperty_Id(String propertyId);

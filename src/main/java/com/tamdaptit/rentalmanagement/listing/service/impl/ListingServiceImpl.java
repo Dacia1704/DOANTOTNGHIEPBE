@@ -52,6 +52,7 @@ public class ListingServiceImpl implements ListingService {
     private final ListingMapper mapper;
     private final Clock subscriptionClock;
     private final RoomMapper roomMapper;
+    private final com.tamdaptit.rentalmanagement.rental.service.RentalAvailabilityService booking;
     private final RoomAmenityRepository roomAmenities;
     private final RoomImageRepository roomImages;
     private final com.tamdaptit.rentalmanagement.property.repository.PropertyRepository properties;
@@ -359,6 +360,7 @@ public class ListingServiceImpl implements ListingService {
         var currentPeriods = effectivePeriods(listings, time);
         var propertyIds = listings.stream().map(l -> l.getProperty().getId()).distinct().toList();
         var allRooms = roomRepository.findAllByProperty_IdIn(propertyIds);
+        booking.enrich(allRooms);
         var roomIds = allRooms.stream().map(com.tamdaptit.rentalmanagement.room.entity.Room::getId).toList();
         var amenitiesByRoom = roomIds.isEmpty() ? Map.<String, List<com.tamdaptit.rentalmanagement.room.entity.RoomAmenity>>of()
                 : roomAmenities.findAllWithAmenityByRoomIds(roomIds).stream()

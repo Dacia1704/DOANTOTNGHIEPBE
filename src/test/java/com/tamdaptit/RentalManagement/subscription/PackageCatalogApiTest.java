@@ -1741,13 +1741,13 @@ class PackageCatalogApiTest {
     @EnableMethodSecurity
     @EnableTransactionManagement
     @EnableJpaRepositories(basePackageClasses = {ServicePackageRepository.class, UserRepository.class,
-            PaymentRepository.class, ListingRepository.class, RoomRepository.class, com.tamdaptit.rentalmanagement.property.repository.PropertyRepository.class})
+            com.tamdaptit.rentalmanagement.rental.repository.RentalAgreementRepository.class, PaymentRepository.class, ListingRepository.class, RoomRepository.class, com.tamdaptit.rentalmanagement.property.repository.PropertyRepository.class})
     @Import({ServicePackageController.class, BoostServicePackageController.class,
             ServicePackageServiceImpl.class, BoostServicePackageServiceImpl.class, GlobalExceptionHandler.class,
             ServiceSubscriptionController.class, ServiceSubscriptionServiceImpl.class,
             PaymentController.class, PaymentServiceImpl.class, ListingController.class, ListingServiceImpl.class,
             BoostPurchaseController.class, BoostPurchaseServiceImpl.class, com.tamdaptit.rentalmanagement.subscription.service.BoostAllocationService.class, SubscriptionLifecycleService.class,
-            SubscriptionExpiryJob.class, SecurityConfig.class, JwtAuthenticationEntryPoint.class, PaymentQueryServiceImpl.class})
+            com.tamdaptit.rentalmanagement.rental.service.RentalAvailabilityService.class, SubscriptionExpiryJob.class, SecurityConfig.class, JwtAuthenticationEntryPoint.class, PaymentQueryServiceImpl.class})
     static class TestConfig {
         @Bean
         ObjectMapper objectMapper() { return new ObjectMapper(); }

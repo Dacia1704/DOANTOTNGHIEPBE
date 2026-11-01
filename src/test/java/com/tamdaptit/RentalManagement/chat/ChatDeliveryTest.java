@@ -1,4 +1,4 @@
-package com.tamdaptit.RentalManagement.chat;
+package com.tamdaptit.rentalmanagement.chat;
 
 import com.tamdaptit.rentalmanagement.chat.dto.request.ChatMessageRequest;
 import com.tamdaptit.rentalmanagement.chat.dto.response.ChatMessageResponse;

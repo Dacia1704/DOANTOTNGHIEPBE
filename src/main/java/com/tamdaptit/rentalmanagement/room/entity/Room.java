@@ -35,6 +35,10 @@ import java.time.LocalDateTime;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class Room {
 
+    @jakarta.persistence.Transient
+    private String bookingAvailability;
+    public String getBookingAvailability() { return bookingAvailability == null ? rentalStatus.name() : bookingAvailability; }
+
     @Id
     @UuidGenerator
     @Column(length = 36)

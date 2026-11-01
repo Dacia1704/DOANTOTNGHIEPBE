@@ -40,6 +40,7 @@ public class PropertyServiceImpl implements PropertyService {
     private final WardRepository wards;
     private final PropertyMapper propertyMapper;
     private final RoomMapper roomMapper;
+    private final com.tamdaptit.rentalmanagement.rental.service.RentalAvailabilityService booking;
 
     @Override
     @Transactional
@@ -128,6 +129,7 @@ public class PropertyServiceImpl implements PropertyService {
 
     private PropertyResponse response(Property property) {
         var units = rooms.findByProperty_IdOrderByRoomNumberAsc(property.getId());
+        booking.enrich(units);
         var ids = units.stream().map(Room::getId).toList();
         var amenitiesByRoom = ids.isEmpty() ? Map.<String, List<RoomAmenity>>of()
                 : roomAmenities.findAllWithAmenityByRoomIds(ids).stream().collect(Collectors.groupingBy(a -> a.getRoom().getId()));

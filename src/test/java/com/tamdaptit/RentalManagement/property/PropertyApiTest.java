@@ -232,11 +232,11 @@ class PropertyApiTest {
 
     @Configuration(proxyBeanMethods = false)
     @EnableWebMvc @EnableWebSecurity @EnableMethodSecurity @EnableTransactionManagement
-    @EnableJpaRepositories(basePackageClasses = {PropertyRepository.class, RoomRepository.class, ProvinceRepository.class, UserRepository.class})
+    @EnableJpaRepositories(basePackageClasses = {PropertyRepository.class, RoomRepository.class, com.tamdaptit.rentalmanagement.rental.repository.RentalAgreementRepository.class, ProvinceRepository.class, UserRepository.class})
     @Import({com.tamdaptit.rentalmanagement.room.controller.RoomTypeController.class,
             com.tamdaptit.rentalmanagement.room.service.impl.RoomTypeServiceImpl.class,
             PropertyController.class, PropertyTypeController.class, PropertyServiceImpl.class,
-            PropertyTypeServiceImpl.class, RoomController.class, RoomServiceImpl.class, GlobalExceptionHandler.class})
+            PropertyTypeServiceImpl.class, RoomController.class, RoomServiceImpl.class, com.tamdaptit.rentalmanagement.rental.service.RentalAvailabilityService.class, GlobalExceptionHandler.class})
     static class Config {
         @Bean SecurityFilterChain security(HttpSecurity http) throws Exception {
             return http.csrf(c -> c.disable()).authorizeHttpRequests(a -> a.anyRequest().authenticated()).build();

@@ -18,6 +18,12 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(org.springframework.dao.PessimisticLockingFailureException.class)
+    public ResponseEntity<ApiResponse<Object>> handleRoomBusy(Exception ex) {
+        return ResponseEntity.status(409).body(ApiResponse.builder().code(409)
+                .errorCode("ROOM_BUSY").message(ErrorCode.ROOM_BUSY.getMessage()).build());
+    }
+
     @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiResponse<Object>> handleUploadTooLarge(Exception ex) {
         return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(ApiResponse.builder()
@@ -41,6 +47,7 @@ public class GlobalExceptionHandler {
                 ApiResponse.builder()
                         .code(errorCode.getCode().value())
                         .message(ex.getMessage())
+                        .errorCode(errorCode.name())
                         .build();
 
         return ResponseEntity.status(errorCode.getCode()).body(response);
@@ -66,6 +73,7 @@ public class GlobalExceptionHandler {
                 ApiResponse.builder()
                         .code(HttpStatus.BAD_REQUEST.value())
                         .message(errorMessage)
+                        .errorCode("VALIDATION_ERROR")
                         .build();
 
         return ResponseEntity.badRequest().body(response);
@@ -117,7 +125,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Object>> handleDataIntegrityViolation(
             DataIntegrityViolationException ex) {
 
-        log.warn("Data integrity violation", ex);
+        // SQL exception text can contain personal data. Do not log bound values.
+        String constraint = ex.getMostSpecificCause().getMessage();
+        if (constraint != null && (constraint.contains("uk_rr_open_room_tenant")
+                || constraint.contains("uk_rag_occupied_room") || constraint.contains("uk_rag_request"))) {
+            String code = constraint.contains("uk_rr_open_room_tenant") ? "REQUEST_ALREADY_PENDING" : "ROOM_UNAVAILABLE";
+            return ResponseEntity.status(409).body(ApiResponse.builder().code(409).errorCode(code)
+                    .message("Phòng hoặc yêu cầu đã được xử lý, vui lòng tải lại").build());
+        }
+        log.warn("Data integrity constraint rejected a write");
 
         ApiResponse<Object> response =
                 ApiResponse.builder()

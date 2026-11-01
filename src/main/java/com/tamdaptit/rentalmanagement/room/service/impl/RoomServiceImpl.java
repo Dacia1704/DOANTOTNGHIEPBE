@@ -37,6 +37,8 @@ public class RoomServiceImpl implements RoomService {
     private final RoomImageRepository images;
     private final PropertyRepository properties;
     private final ImageStorageService storage;
+    private final com.tamdaptit.rentalmanagement.rental.service.RentalAvailabilityService booking;
+    private final com.tamdaptit.rentalmanagement.rental.repository.RentalAgreementRepository agreements;
 
     @Override
     public PageResponse<RoomResponse> search(int page, int size, String typeName, String provinceId, String wardId,
@@ -120,7 +122,11 @@ public class RoomServiceImpl implements RoomService {
     @Override
     @Transactional
     public RoomResponse update(String userId, String id, RoomRequest request) {
-        Room room = owned(userId, id);
+        Room room = rooms.findByIdForUpdate(id).orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
+        if (!room.getProperty().getLandlord().getId().equals(userId)) throw new AppException(ErrorCode.NOT_ROOM_OWNER);
+        if (request.rentalStatus() != null && request.rentalStatus() != room.getRentalStatus()
+                && agreements.existsByRoom_IdAndStatusIn(id, agreements.OCCUPIED))
+            throw new AppException(ErrorCode.ROOM_UNAVAILABLE, "Hãy xử lý hợp đồng và bàn giao trước khi đổi trạng thái phòng");
         properties.findLockedById(room.getProperty().getId()).orElseThrow();
         apply(room, request);
         setAmenities(room, request.amenityIds());
@@ -130,12 +136,17 @@ public class RoomServiceImpl implements RoomService {
     @Override
     @Transactional
     public void delete(String userId, String id) {
-        Room room = owned(userId, id);
+        Room room = rooms.findByIdForUpdate(id).orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
+        if (!room.getProperty().getLandlord().getId().equals(userId)) throw new AppException(ErrorCode.NOT_ROOM_OWNER);
+        if (agreements.existsByRoom_IdAndStatusIn(id, agreements.OCCUPIED)) throw new AppException(ErrorCode.ROOM_UNAVAILABLE);
         var property = properties.findLockedById(room.getProperty().getId()).orElseThrow();
         if (rooms.countByProperty_Id(property.getId()) <= 1)
             throw new AppException(ErrorCode.INVALID_REQUEST, "Cơ sở phải có ít nhất một đơn vị cho thuê");
         rooms.delete(room);
-        storage.deleteByPrefix(StorageFolder.forRoom(id));
+        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                new org.springframework.transaction.support.TransactionSynchronization() {
+                    @Override public void afterCommit() { storage.deleteByPrefix(StorageFolder.forRoom(id)); }
+                });
     }
 
     @Override
@@ -198,6 +209,7 @@ public class RoomServiceImpl implements RoomService {
 
     private List<RoomResponse> responses(List<Room> roomList) {
         if (roomList.isEmpty()) return List.of();
+        booking.enrich(roomList);
         var ids = roomList.stream().map(Room::getId).toList();
         var amenitiesByRoom = roomAmenities.findAllWithAmenityByRoomIds(ids).stream().collect(
                 java.util.stream.Collectors.groupingBy(a -> a.getRoom().getId()));
