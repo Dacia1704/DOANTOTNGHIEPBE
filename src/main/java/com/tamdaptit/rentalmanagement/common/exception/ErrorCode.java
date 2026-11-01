@@ -6,6 +6,15 @@ import org.springframework.http.HttpStatus;
 
 @Getter
 public enum ErrorCode {
+    ROOM_UNAVAILABLE(HttpStatus.CONFLICT, "Phòng vừa được người khác giữ/thuê hoặc đang bảo trì"),
+    ROOM_BUSY(HttpStatus.CONFLICT, "Phòng đang được xử lý, vui lòng thử lại"),
+    REQUEST_ALREADY_PENDING(HttpStatus.CONFLICT, "Bạn đã gửi yêu cầu khác đang chờ cho phòng này"),
+    REQUEST_NOT_PENDING(HttpStatus.CONFLICT, "Yêu cầu không còn chờ xử lý"),
+    CONTRACT_PDF_NOT_READY(HttpStatus.CONFLICT, "Hợp đồng PDF chưa sẵn sàng"),
+    CONTRACT_CHANGED(HttpStatus.CONFLICT, "Phiên bản hợp đồng đã thay đổi, vui lòng tải lại"),
+    CONTRACT_CONFIRMATION_EXPIRED(HttpStatus.CONFLICT, "Đã hết hạn xác nhận hợp đồng"),
+    INVALID_AGREEMENT_STATUS(HttpStatus.CONFLICT, "Trạng thái hợp đồng không phù hợp"),
+    PDF_GENERATION_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "Chưa thể tạo hoặc tải hợp đồng PDF"),
     CURRENT_PASSWORD_INCORRECT(HttpStatus.BAD_REQUEST, "Mật khẩu hiện tại không đúng"),
     PASSWORD_CONFIRMATION_MISMATCH(HttpStatus.BAD_REQUEST, "Xác nhận mật khẩu mới không khớp"),
     PASSWORD_UNCHANGED(HttpStatus.BAD_REQUEST, "Mật khẩu mới phải khác mật khẩu hiện tại"),
@@ -89,7 +98,7 @@ public enum ErrorCode {
     RENTAL_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "Yêu cầu thuê không tồn tại"),
     RENTAL_REQUEST_ALREADY_PENDING(HttpStatus.BAD_REQUEST, "Đã có yêu cầu thuê đang chờ xử lý"),
     RENTAL_REQUEST_NOT_PENDING(HttpStatus.BAD_REQUEST, "Yêu cầu thuê không ở trạng thái chờ"),
-    RENTAL_REQUEST_EXPIRED(HttpStatus.BAD_REQUEST, "Yêu cầu thuê đã hết hạn"),
+    RENTAL_REQUEST_EXPIRED(HttpStatus.CONFLICT, "Yêu cầu thuê đã hết hạn"),
     CANNOT_REQUEST_OWN_LISTING(HttpStatus.BAD_REQUEST, "Không thể gửi yêu cầu thuê phòng của chính mình"),
 
     // ===== RENTAL AGREEMENT =====

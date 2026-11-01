@@ -39,6 +39,26 @@ import java.time.LocalDateTime;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class RentalRequest {
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "room_id")
+    private com.tamdaptit.rentalmanagement.room.entity.Room room;
+    @Column(name = "tenant_full_name", length = 100)
+    private String tenantFullName;
+    @Column(name = "tenant_phone", length = 20)
+    private String tenantPhone;
+    @Column(name = "tenant_email", length = 255)
+    private String tenantEmail;
+    @Column(name = "tenant_citizen_id", length = 20)
+    private String tenantCitizenId;
+    @Column(name = "tenant_permanent_address", length = 500)
+    private String tenantPermanentAddress;
+    @Column(name = "occupant_count")
+    private Integer occupantCount;
+    @Column(name = "duration_months")
+    private Integer durationMonths;
+    @Column(name = "resolution_reason", length = 500)
+    private String resolutionReason;
+
     @Id
     @UuidGenerator
     @Column(length = 36)
@@ -64,6 +84,7 @@ public class RentalRequest {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
+    @Builder.Default
     RentalRequestStatus status = RentalRequestStatus.PENDING;
 
     @Column(name = "responded_at")

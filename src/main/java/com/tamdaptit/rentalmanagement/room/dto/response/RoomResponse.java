@@ -11,7 +11,7 @@ public record RoomResponse(
         BigDecimal serviceFee, BigDecimal defaultDeposit, BigDecimal areaM2,
         Integer maxOccupants, String provinceId, String provinceName,
         String wardId, String wardName, String addressLine, BigDecimal latitude,
-        BigDecimal longitude, RoomRentalStatus rentalStatus,
+        BigDecimal longitude, RoomRentalStatus rentalStatus, String bookingAvailability,
         List<AmenityResponse> amenities, List<RoomImageResponse> images,
         LocalDateTime createdAt, LocalDateTime updatedAt) {
     public record AmenityResponse(String id, String name, String icon) {}

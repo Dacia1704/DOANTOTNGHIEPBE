@@ -18,6 +18,8 @@ public class ApiResponse<T> {
 
     private String message;
 
+    private String errorCode;
+
     private T data;
 
     public static <T> ApiResponse<T> success(T data) {

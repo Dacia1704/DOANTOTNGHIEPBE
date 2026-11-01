@@ -40,6 +40,32 @@ import java.time.LocalDateTime;
 @Builder
 public class RentalAgreement {
 
+    @Column(name = "confirmation_expires_at")
+    private LocalDateTime confirmationExpiresAt;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pdf_status", nullable = false)
+    @Builder.Default
+    private com.tamdaptit.rentalmanagement.rental.entity.enums.ContractPdfStatus pdfStatus = com.tamdaptit.rentalmanagement.rental.entity.enums.ContractPdfStatus.PENDING;
+    @Column(name = "pdf_error", length = 500)
+    private String pdfError;
+    @Column(name = "pdf_generated_at")
+    private LocalDateTime pdfGeneratedAt;
+    @Column(name = "pdf_sha256", length = 64)
+    private String pdfSha256;
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @Column(name = "contract_snapshot", columnDefinition = "json")
+    private String contractSnapshot;
+    @Column(name = "pdf_attempt_count", nullable = false)
+    private int pdfAttemptCount;
+    @Column(name = "pdf_next_retry_at")
+    private LocalDateTime pdfNextRetryAt;
+    @Column(name = "pdf_lease_until")
+    private LocalDateTime pdfLeaseUntil;
+    @Column(name = "pdf_claim_token", length = 36)
+    private String pdfClaimToken;
+    @Column(name = "cancel_reason", length = 500)
+    private String cancelReason;
+
     @Id
     @UuidGenerator
     @Column(length = 36)
@@ -80,6 +106,7 @@ public class RentalAgreement {
     private BigDecimal serviceFee;
 
     @Column(name = "payment_cycle_months")
+    @Builder.Default
     private Integer paymentCycleMonths = 1;
 
     @Column(name = "start_date", nullable = false)
@@ -99,6 +126,7 @@ public class RentalAgreement {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
+    @Builder.Default
     private RentalAgreementStatus status = RentalAgreementStatus.DRAFT;
 
     @Enumerated(EnumType.STRING)
