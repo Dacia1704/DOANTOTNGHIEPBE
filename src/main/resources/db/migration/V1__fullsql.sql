@@ -1,14 +1,6 @@
--- V14: FULL SCHEMA FOR A NEW / EMPTY MYSQL 8.0.16+ DATABASE.
--- Consolidates the final state of V12 + V13 and all current JPA entities.
--- Standalone build: select/create your empty database before executing this file.
--- Do not place this file in classpath:db/migration or run it after V1-V13.
--- Do not execute V13 again: listings already references properties here.
--- No DROP/TRUNCATE, no application/sample users, rooms, listings or payment data.
--- All 44 tables are created first; all 85 foreign keys are added afterwards.
--- Changes from V12 + V13: UNIQUE listings.slug; remove four unused legacy_* columns.
--- Retain generated uniqueness guards, business checks, delete rules and query indexes.
--- SQL-only guards need not be mapped as writable JPA fields.
--- See docs/FULL_SCHEMA_V14.md for verification and Flyway startup instructions.
+-- V1: Complete current schema for a fresh MySQL 8.0.16+ database.
+-- Includes identity, property/room, listing, billing, chat, rental workflow and tenant AI profiles.
+-- Schema only: all catalogs and demo rows are in V2. Foreign keys/checks stay enabled.
 
 -- amenities
 CREATE TABLE `amenities` (
@@ -867,8 +859,183 @@ ALTER TABLE `user_roles` ADD CONSTRAINT `fk_ur_role` FOREIGN KEY (`role_id`) REF
 ALTER TABLE `user_roles` ADD CONSTRAINT `fk_ur_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 ALTER TABLE `wards` ADD CONSTRAINT `fk_wards_province` FOREIGN KEY (`province_id`) REFERENCES `provinces` (`id`) ON DELETE CASCADE;
 
--- Minimal system catalog required by the subscription flow; no demo data.
-INSERT INTO service_packages
-    (id, code, name, max_listings, high_priority_slots, low_priority_slots,
-     default_priority_level, has_stats, is_active)
-VALUES (UUID(), 'FREE', 'Free', 3, 0, 0, 0, FALSE, TRUE);
+
+-- Rental booking, PDF processing and outbox persistence.
+ALTER TABLE rental_requests
+  ADD room_id VARCHAR(36) NULL,
+  ADD tenant_full_name VARCHAR(100) NULL,
+  ADD tenant_phone VARCHAR(20) NULL,
+  ADD tenant_email VARCHAR(255) NULL,
+  ADD tenant_citizen_id VARCHAR(20) NULL,
+  ADD tenant_permanent_address VARCHAR(500) NULL,
+  ADD occupant_count INT NULL,
+  ADD duration_months INT NULL,
+  ADD resolution_reason VARCHAR(500) NULL,
+  ADD open_request_key VARCHAR(73) GENERATED ALWAYS AS
+    (CASE WHEN status='PENDING' AND room_id IS NOT NULL THEN CONCAT(tenant_id,':',room_id) ELSE NULL END) VIRTUAL,
+  ADD CONSTRAINT fk_rr_room FOREIGN KEY(room_id) REFERENCES rooms(id) ON DELETE RESTRICT,
+  ADD UNIQUE KEY uk_rr_open_room_tenant(open_request_key),
+  ADD INDEX idx_rr_room_status_created(room_id,status,created_at),
+  ADD INDEX idx_rr_expiry(status,expires_at),
+  ADD CONSTRAINT chk_rr_duration CHECK(duration_months IS NULL OR duration_months BETWEEN 1 AND 36),
+  ADD CONSTRAINT chk_rr_occupants CHECK(occupant_count IS NULL OR occupant_count > 0);
+
+ALTER TABLE rental_agreements
+  ADD confirmation_expires_at DATETIME NULL,
+  ADD pdf_status ENUM('PENDING','PROCESSING','READY','FAILED') NOT NULL DEFAULT 'PENDING',
+  ADD pdf_error VARCHAR(500) NULL,
+  ADD pdf_generated_at DATETIME NULL,
+  ADD pdf_sha256 CHAR(64) NULL,
+  ADD contract_snapshot JSON NULL,
+  ADD pdf_attempt_count INT NOT NULL DEFAULT 0,
+  ADD pdf_next_retry_at DATETIME NULL,
+  ADD pdf_lease_until DATETIME NULL,
+  ADD pdf_claim_token VARCHAR(36) NULL,
+  ADD cancel_reason VARCHAR(500) NULL,
+  ADD occupied_room_id VARCHAR(36) GENERATED ALWAYS AS
+    (CASE WHEN status IN ('DRAFT','PENDING_CONFIRMATION','ACTIVE') THEN room_id ELSE NULL END) STORED,
+  ADD UNIQUE KEY uk_rag_occupied_room(occupied_room_id),
+  ADD UNIQUE KEY uk_rag_request(rental_request_id),
+  ADD INDEX idx_rag_confirmation(status,confirmation_expires_at),
+  ADD INDEX idx_rag_room_status(room_id,status),
+  ADD INDEX idx_rag_pdf_job(pdf_status,pdf_next_retry_at,pdf_lease_until);
+
+-- Durable audit + notification outbox: never contains request bodies, identity documents or tokens.
+CREATE TABLE rental_events (
+  id VARCHAR(36) PRIMARY KEY,
+  actor_id VARCHAR(36) NULL,
+  recipient_id VARCHAR(36) NOT NULL,
+  reference_id VARCHAR(36) NOT NULL,
+  reference_type VARCHAR(50) NOT NULL,
+  transition VARCHAR(80) NOT NULL,
+  pdf_sha256 CHAR(64) NULL,
+  created_at DATETIME NOT NULL,
+  delivered_at DATETIME NULL,
+  INDEX idx_rental_event_delivery(delivered_at,created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Upload intent is durable before HTTP starts, allowing orphan cleanup after a process crash.
+CREATE TABLE rental_pdf_assets (
+  public_id VARCHAR(255) PRIMARY KEY,
+  agreement_id VARCHAR(36) NOT NULL,
+  created_at DATETIME NOT NULL,
+  last_cleanup_at DATETIME NULL,
+  INDEX idx_rental_pdf_asset_created(created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Tenant preferences and search history used by AI recommendations.
+ALTER TABLE tenant_profiles
+    ADD COLUMN tenant_type ENUM('STUDENT','WORKER','FAMILY','OTHER') NULL AFTER user_id,
+    ADD COLUMN occupants INT NULL,
+    ADD COLUMN move_in_date DATE NULL,
+    ADD COLUMN anchor_label VARCHAR(255) NULL,
+    ADD COLUMN anchor_latitude DECIMAL(10, 8) NULL,
+    ADD COLUMN anchor_longitude DECIMAL(11, 8) NULL,
+    ADD COLUMN max_distance_km DECIMAL(5, 2) NULL,
+    ADD COLUMN price_tolerance_pct TINYINT NOT NULL DEFAULT 20,
+    ADD COLUMN top_priority ENUM('PRICE','LOCATION','AREA','AMENITIES') NULL,
+    ADD COLUMN note VARCHAR(500) NULL,
+    ADD COLUMN allow_personalization BOOLEAN NOT NULL DEFAULT TRUE;
+
+-- Cac rang buoc CHECK dat tren cot KHONG co FK nen khong vuong gioi han
+-- cua MySQL ve CHECK + ON DELETE.
+ALTER TABLE tenant_profiles
+    ADD CONSTRAINT chk_tp_price
+        CHECK (price_min IS NULL OR price_max IS NULL OR price_min <= price_max),
+    ADD CONSTRAINT chk_tp_area
+        CHECK (area_min IS NULL OR area_max IS NULL OR area_min <= area_max),
+    ADD CONSTRAINT chk_tp_occupants
+        CHECK (occupants IS NULL OR occupants >= 1),
+    ADD CONSTRAINT chk_tp_tolerance
+        CHECK (price_tolerance_pct BETWEEN 0 AND 50),
+    ADD CONSTRAINT chk_tp_anchor
+        CHECK ((anchor_latitude IS NULL) = (anchor_longitude IS NULL));
+
+-- ---------------------------------------------------------------------
+-- 2. TIEN ICH UU TIEN
+-- ---------------------------------------------------------------------
+-- Dieu kien nhu "cho nuoi thu cung" hoac "chung chu" duoc tao thanh mot
+-- dong trong bang amenities thay vi them cot vao rooms/tenant_profiles.
+-- is_required = TRUE: phong thieu tien ich nay bi loai khi goi y.
+-- is_required = FALSE: chi cong diem neu co.
+
+CREATE TABLE tenant_profile_amenities (
+    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+
+    tenant_profile_id VARCHAR(36) NOT NULL,
+    amenity_id VARCHAR(36) NOT NULL,
+
+    is_required BOOLEAN NOT NULL DEFAULT FALSE,
+
+    CONSTRAINT uk_tpa UNIQUE (tenant_profile_id, amenity_id),
+
+    CONSTRAINT fk_tpa_profile
+        FOREIGN KEY (tenant_profile_id)
+        REFERENCES tenant_profiles(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_tpa_amenity
+        FOREIGN KEY (amenity_id)
+        REFERENCES amenities(id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ---------------------------------------------------------------------
+-- 3. NHIEU PHUONG MONG MUON (TUY CHON)
+-- ---------------------------------------------------------------------
+-- desired_ward_id giu nguyen lam "phuong chinh". Bang nay luu them cac
+-- phuong khong ma tenant mong muon.
+
+CREATE TABLE tenant_profile_wards (
+    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+
+    tenant_profile_id VARCHAR(36) NOT NULL,
+    ward_id VARCHAR(36) NOT NULL,
+
+    CONSTRAINT uk_tpw UNIQUE (tenant_profile_id, ward_id),
+
+    CONSTRAINT fk_tpw_profile
+        FOREIGN KEY (tenant_profile_id)
+        REFERENCES tenant_profiles(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_tpw_ward
+        FOREIGN KEY (ward_id)
+        REFERENCES wards(id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ---------------------------------------------------------------------
+-- 4. LICH SU TIM KIEM
+-- ---------------------------------------------------------------------
+-- Spring ghi bang nay moi lan tenant tim kiem. Khi chatbot tim phong, AI
+-- service KHONG ghi vao day (khong co quyen) ma ghi vao ai_messages.filters_json
+-- trong schema rental_ai.
+
+CREATE TABLE listing_search_history (
+    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+
+    user_id VARCHAR(36) NOT NULL,
+
+    source ENUM('SEARCH_PAGE','MAP','CHATBOT') NOT NULL DEFAULT 'SEARCH_PAGE',
+
+    keyword VARCHAR(255),
+    province_id VARCHAR(36),
+    ward_id VARCHAR(36),
+    price_min DECIMAL(12, 2),
+    price_max DECIMAL(12, 2),
+    area_min DECIMAL(8, 2),
+    area_max DECIMAL(8, 2),
+    room_type_id VARCHAR(36),
+
+    result_count INT,
+
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_lsh_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+
+    INDEX IX_lsh_user_created (user_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

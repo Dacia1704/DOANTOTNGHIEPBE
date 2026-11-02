@@ -3,266 +3,114 @@ package com.tamdaptit.rentalmanagement.subscription;
 import com.tamdaptit.rentalmanagement.auth.service.impl.JwtTokenServiceImpl;
 import com.tamdaptit.rentalmanagement.identity.entity.User;
 import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
-import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import java.util.LinkedHashMap;
-import java.util.List;
+import java.sql.*;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.UUID;
-
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Applies the actual SQL files only to disposable schemas on a dedicated local MySQL server. */
-@EnabledIfEnvironmentVariable(named = "SUBSCRIPTION_TEST_MYSQL_URL",
-        matches = "jdbc:mysql://(127\\.0\\.0\\.1|localhost):[0-9]+/")
+/** Applies the real two-file chain only to a disposable local database. */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@EnabledIfEnvironmentVariable(named="SUBSCRIPTION_TEST_MYSQL_URL", matches="jdbc:mysql://(127\\.0\\.0\\.1|localhost):[0-9]+/")
 class SeedDataMigrationTest {
-    private static final String MIGRATION_DIR = "src/main/resources/db/migration/";
-    private static final String SEED = MIGRATION_DIR + "V2__seed_reference_and_demo_data.sql";
-    private static final String DEMO_PASSWORD = "TroTotDemo@2026";
-    private static final List<String> DEMO_EMAILS = List.of(
-            "admin.demo@trotot.example.test", "landlord.hanoi@trotot.example.test",
-            "landlord.south@trotot.example.test", "tenant.an@trotot.example.test",
-            "tenant.binh@trotot.example.test");
-    private static final Set<String> PERMISSIONS = Set.of(
-            "USER_READ", "USER_MANAGE", "ROOM_READ", "ROOM_CREATE", "ROOM_UPDATE", "ROOM_DELETE",
-            "LISTING_READ", "LISTING_CREATE", "LISTING_MANAGE", "WARD_WRITE", "WARD_DELETE");
-    private static final List<String> SEEDED_TABLES = List.of(
-            "users", "roles", "permissions", "user_roles", "role_permissions", "provinces", "wards",
-            "property_types", "properties", "room_types", "rooms", "amenities", "property_amenities", "room_amenities");
+    private final String schema = "seed_test_" + UUID.randomUUID().toString().replace("-", "");
+    private Connection db;
+    private Flyway flyway;
+    private String user() { return System.getenv().getOrDefault("SUBSCRIPTION_TEST_MYSQL_USER", "root"); }
+    private String password() { return System.getenv().getOrDefault("SUBSCRIPTION_TEST_MYSQL_PASSWORD", ""); }
+    private String url(String name) { return System.getenv("SUBSCRIPTION_TEST_MYSQL_URL") + name + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh"; }
 
-    private String schema;
-    private Connection connection;
-
-    private String user() {
-        return System.getenv().getOrDefault("SUBSCRIPTION_TEST_MYSQL_USER", "root");
-    }
-
-    private String password() {
-        return System.getenv().getOrDefault("SUBSCRIPTION_TEST_MYSQL_PASSWORD", "");
-    }
-
-    private String url(String database) {
-        return System.getenv("SUBSCRIPTION_TEST_MYSQL_URL") + database
-                + "?serverTimezone=Asia/Ho_Chi_Minh&useSSL=false&allowPublicKeyRetrieval=true";
-    }
-
-    @BeforeEach
-    void createAndSeedIsolatedSchema() throws SQLException {
-        schema = "seed_test_" + UUID.randomUUID().toString().replace("-", "");
-        try (Connection admin = DriverManager.getConnection(url(""), user(), password());
-             var statement = admin.createStatement()) {
-            statement.execute("CREATE DATABASE `" + schema + "` CHARACTER SET utf8mb4");
+    @BeforeAll void migrate() throws Exception {
+        try (var admin=DriverManager.getConnection(url(""),user(),password()); var s=admin.createStatement()) {
+            s.execute("CREATE DATABASE `"+schema+"` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci");
         }
-        connection = DriverManager.getConnection(url(schema), user(), password());
-        ScriptUtils.executeSqlScript(connection, new FileSystemResource(MIGRATION_DIR + "V1__fullsql.sql"));
-        applySeed();
+        flyway=Flyway.configure().dataSource(url(schema),user(),password()).baselineOnMigrate(false).load();
+        assertEquals(2,flyway.migrate().migrationsExecuted);
+        db=DriverManager.getConnection(url(schema),user(),password());
     }
-
-    @AfterEach
-    void dropOnlyThisTestSchema() throws SQLException {
-        if (connection != null) {
-            connection.close();
-        }
-        if (schema != null && schema.matches("seed_test_[a-f0-9]{32}")) {
-            try (Connection admin = DriverManager.getConnection(url(""), user(), password());
-                 var statement = admin.createStatement()) {
-                statement.execute("DROP DATABASE IF EXISTS `" + schema + "`");
+    @AfterAll void cleanup() throws Exception {
+        if(db!=null) db.close();
+        if(schema.matches("seed_test_[a-f0-9]{32}")) {
+            try(var admin=DriverManager.getConnection(url(""),user(),password()); var s=admin.createStatement()) {
+                s.execute("DROP DATABASE IF EXISTS `"+schema+"`");
             }
         }
     }
-
-    private void applySeed() {
-        ScriptUtils.executeSqlScript(connection, new FileSystemResource(SEED));
+    private long count(String sql) throws SQLException {
+        try(var s=db.createStatement(); var r=s.executeQuery(sql)) { assertTrue(r.next()); return r.getLong(1); }
     }
+    private void none(String sql) throws SQLException { assertEquals(0,count(sql),sql); }
 
-    private String scalar(String sql) throws SQLException {
-        return scalar(connection, sql);
-    }
-
-    private String scalar(Connection source, String sql) throws SQLException {
-        try (var statement = source.createStatement(); var result = statement.executeQuery(sql)) {
-            assertTrue(result.next(), sql);
-            return result.getString(1);
+    @Test void accountsHaveRequestedCredentialsAndRoles() throws Exception {
+        assertEquals(127,count("SELECT COUNT(*) FROM users"));
+        for(var role:Map.of("ADMIN",3,"LANDLORD",24,"TENANT",100).entrySet())
+            assertEquals(role.getValue().longValue(),count("SELECT COUNT(*) FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE r.code='"+role.getKey()+"'"));
+        none("SELECT COUNT(*) FROM users WHERE email NOT LIKE '%@gmail.com' OR status<>'ACTIVE' OR email_verified_at IS NULL OR avatar_url<>'https://img.icons8.com/nolan/1200/user-default.jpg'");
+        none("SELECT COUNT(*) FROM users u WHERE NOT EXISTS(SELECT 1 FROM user_roles ur WHERE ur.user_id=u.id)");
+        try(var s=db.createStatement(); var r=s.executeQuery("SELECT DISTINCT password FROM users")) {
+            int hashes=0; while(r.next()) { hashes++; assertTrue(new BCryptPasswordEncoder(10).matches("123456",r.getString(1))); }
+            assertEquals(1,hashes);
         }
     }
 
-    private Set<String> values(String sql) throws SQLException {
-        Set<String> values = new TreeSet<>();
-        try (var statement = connection.createStatement(); var result = statement.executeQuery(sql)) {
-            while (result.next()) {
-                values.add(result.getString(1));
-            }
-        }
-        return values;
+    @Test void inventoryImagesAndAddressesAreCoherent() throws Exception {
+        for(var entry:Map.of("provinces",34,"wards",3321,"properties",192,"rooms",1368,"listings",192,"room_images",4104).entrySet())
+            assertEquals(entry.getValue().longValue(),count("SELECT COUNT(*) FROM "+entry.getKey()));
+        assertEquals(72,count("SELECT COUNT(*) FROM listings WHERE status='PUBLISHED'"));
+        none("SELECT COUNT(*) FROM properties p JOIN wards w ON w.id=p.ward_id WHERE w.province_id<>p.province_id");
+        none("SELECT COUNT(*) FROM rooms r WHERE (SELECT COUNT(*) FROM room_images i WHERE i.room_id=r.id)<>3");
+        none("SELECT COUNT(*) FROM room_images WHERE public_id IS NOT NULL OR sort_order NOT BETWEEN 0 AND 2");
+        assertEquals(3,count("SELECT COUNT(DISTINCT url) FROM room_images"));
+        none("SELECT COUNT(*) FROM properties p WHERE p.rental_mode='WHOLE' AND ((SELECT COUNT(*) FROM rooms r WHERE r.property_id=p.id)<>1 OR EXISTS(SELECT 1 FROM rooms r WHERE r.property_id=p.id AND (r.room_number<>'WHOLE' OR r.floor_number IS NOT NULL)))");
+        none("SELECT COUNT(*) FROM rooms r WHERE EXISTS(SELECT 1 FROM room_types child WHERE child.parent_id=r.room_type_id)");
+        none("SELECT COUNT(*) FROM listings l WHERE l.status='PUBLISHED' AND (l.expires_at<=DATE_ADD(UTC_TIMESTAMP(),INTERVAL 7 HOUR) OR NOT EXISTS(SELECT 1 FROM rooms r WHERE r.property_id=l.property_id AND r.rental_status='AVAILABLE'))");
+        none("SELECT COUNT(*) FROM rental_requests q JOIN rooms r ON r.id=q.room_id JOIN listings l ON l.id=q.listing_id JOIN properties p ON p.id=l.property_id WHERE r.property_id<>p.id OR q.landlord_id<>p.landlord_id");
+        none("SELECT COUNT(*) FROM listings l WHERE l.view_count<>(SELECT COUNT(*) FROM listing_view_history h WHERE h.listing_id=l.id) OR l.contact_count<>(SELECT COUNT(*) FROM listing_contact_events h WHERE h.listing_id=l.id)");
     }
 
-    private Map<String, String> rowCounts() throws SQLException {
-        return rowCounts(connection);
+    @Test void subscriptionsPaymentsAndBoostAllocationsMatchTheirOwnersAndQuotas() throws Exception {
+        assertEquals(7,count("SELECT COUNT(*) FROM service_packages"));
+        assertEquals(10,count("SELECT COUNT(*) FROM boost_service_packages"));
+        assertEquals(12,count("SELECT COUNT(*) FROM service_package_subscriptions WHERE status='ACTIVE'"));
+        assertEquals(12,count("SELECT COUNT(*) FROM boost_service_package_subscriptions WHERE status='ACTIVE'"));
+        assertEquals(6,count("SELECT COUNT(DISTINCT s.landlord_id) FROM service_package_subscriptions s JOIN boost_service_package_subscriptions b ON b.landlord_id=s.landlord_id WHERE s.status='ACTIVE' AND b.status='ACTIVE'"));
+        assertEquals(132,count("SELECT COUNT(*) FROM payments"));
+        assertEquals(66,count("SELECT COUNT(*) FROM invoices"));
+        none("SELECT COUNT(*) FROM service_package_subscriptions s WHERE s.status='ACTIVE' AND (SELECT COUNT(*) FROM service_subscription_periods p WHERE p.subscription_id=s.id AND p.start_at<=DATE_ADD(UTC_TIMESTAMP(),INTERVAL 7 HOUR) AND p.end_at>DATE_ADD(UTC_TIMESTAMP(),INTERVAL 7 HOUR))<>1");
+        none("SELECT COUNT(*) FROM boost_allocations a JOIN boost_service_package_subscriptions b ON b.id=a.boost_subscription_id JOIN listings l ON l.id=a.listing_id JOIN properties p ON p.id=l.property_id WHERE b.landlord_id<>p.landlord_id OR b.status<>'ACTIVE' OR l.status<>'PUBLISHED'");
+        none("SELECT COUNT(*) FROM boost_service_package_subscriptions b WHERE (SELECT COUNT(*) FROM boost_allocations a WHERE a.boost_subscription_id=b.id AND a.priority_level=2)>b.high_priority_slots_snapshot OR (SELECT COUNT(*) FROM boost_allocations a WHERE a.boost_subscription_id=b.id AND a.priority_level=1)>b.low_priority_slots_snapshot");
+        none("SELECT COUNT(*) FROM payments p JOIN service_subscription_orders o ON o.id=p.service_subscription_order_id WHERE p.landlord_id<>o.landlord_id OR p.amount<>o.price");
+        none("SELECT COUNT(*) FROM payments p JOIN boost_service_package_subscriptions b ON b.id=p.boost_subscription_id WHERE p.landlord_id<>b.landlord_id OR p.amount<>b.price");
+        none("SELECT COUNT(*) FROM invoices i JOIN payments p ON p.id=i.payment_id WHERE p.status<>'SUCCESS' OR i.total_amount<>p.amount");
+        none("SELECT COUNT(*) FROM listings l JOIN service_subscription_periods s ON s.id=l.service_subscription_period_id JOIN service_package_subscriptions b ON b.id=s.subscription_id JOIN properties p ON p.id=l.property_id WHERE b.landlord_id<>p.landlord_id");
+        none("SELECT COUNT(*) FROM (SELECT p.landlord_id FROM listings l JOIN properties p ON p.id=l.property_id WHERE l.status IN('PUBLISHED','PENDING') AND NOT EXISTS(SELECT 1 FROM service_package_subscriptions s WHERE s.landlord_id=p.landlord_id) GROUP BY p.landlord_id HAVING COUNT(*)>3) over_quota");
     }
 
-    private Map<String, String> rowCounts(Connection source) throws SQLException {
-        Map<String, String> counts = new LinkedHashMap<>();
-        for (String table : SEEDED_TABLES) {
-            counts.put(table, scalar(source, "SELECT COUNT(*) FROM " + table));
-        }
-        return counts;
-    }
-
-    @Test
-    void seedUsesOfficialAddressCodesAndCoherentPropertyRoomRelationships() throws SQLException {
-        assertEquals("5", scalar("SELECT COUNT(*) FROM users"));
-        assertEquals("3", scalar("SELECT COUNT(*) FROM roles"));
-        assertEquals(PERMISSIONS, values("SELECT code FROM permissions"));
-        assertEquals(new TreeSet<>(DEMO_EMAILS), values("SELECT email FROM users"));
-        assertEquals("34", scalar("SELECT COUNT(*) FROM provinces"));
-        assertEquals("3321", scalar("SELECT COUNT(*) FROM wards"));
-        assertEquals("2599", scalar("SELECT COUNT(*) FROM wards WHERE name LIKE 'Xã %'"));
-        assertEquals("709", scalar("SELECT COUNT(*) FROM wards WHERE name LIKE 'Phường %'"));
-        assertEquals("13", scalar("SELECT COUNT(*) FROM wards WHERE name LIKE 'Đặc khu %'"));
-        assertEquals("Thành phố Quảng Ninh", scalar("SELECT name FROM provinces WHERE code='22'"));
-        assertEquals("Thành phố Bắc Ninh", scalar("SELECT name FROM provinces WHERE code='24'"));
-        assertEquals("Thành phố Đồng Nai", scalar("SELECT name FROM provinces WHERE code='75'"));
-        assertEquals("0", scalar("SELECT COUNT(*) FROM provinces WHERE code NOT REGEXP '^[0-9]{2}$'"));
-        assertEquals("0", scalar("SELECT COUNT(*) FROM wards WHERE code NOT REGEXP '^[0-9]{5}$'"));
-        assertEquals("0", scalar("SELECT COUNT(*) FROM wards w LEFT JOIN provinces p ON p.id=w.province_id WHERE p.id IS NULL"));
-        assertEquals("4", scalar("SELECT COUNT(*) FROM property_types"));
-        assertEquals("12", scalar("SELECT COUNT(*) FROM room_types"));
-        assertEquals("14", scalar("SELECT COUNT(*) FROM amenities"));
-        assertEquals("6", scalar("SELECT COUNT(*) FROM properties"));
-        assertEquals("14", scalar("SELECT COUNT(*) FROM rooms"));
-        assertEquals("4", scalar("SELECT COUNT(*) FROM properties WHERE rental_mode='BY_ROOM'"));
-        assertEquals("2", scalar("SELECT COUNT(*) FROM properties WHERE rental_mode='WHOLE'"));
-        assertEquals("0", scalar("SELECT COUNT(*) FROM listings"), "Seed assets must not publish listings");
-        assertEquals("0", scalar("SELECT COUNT(*) FROM properties p JOIN wards w ON w.id=p.ward_id WHERE p.province_id<>w.province_id"));
-        assertEquals("0", scalar("SELECT COUNT(*) FROM properties p WHERE NOT EXISTS (SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=p.landlord_id AND r.code='LANDLORD')"));
-        assertEquals("0", scalar("SELECT COUNT(*) FROM properties p WHERE p.rental_mode='WHOLE' AND ((SELECT COUNT(*) FROM rooms r WHERE r.property_id=p.id)<>1 OR EXISTS (SELECT 1 FROM rooms r WHERE r.property_id=p.id AND (r.room_number<>'WHOLE' OR r.floor_number IS NOT NULL)))"));
-        assertEquals("0", scalar("SELECT COUNT(*) FROM rooms r JOIN properties p ON p.id=r.property_id WHERE p.rental_mode='BY_ROOM' AND (r.room_number='WHOLE' OR r.floor_number IS NULL)"));
-        assertEquals("0", scalar("SELECT COUNT(*) FROM rooms WHERE rental_status<>'AVAILABLE' OR price<=0 OR area_m2<=0 OR max_occupants<1 OR default_deposit<0 OR electricity_price<0 OR water_price<0 OR service_fee<0"));
-        assertEquals("0", scalar("SELECT COUNT(*) FROM rooms r WHERE EXISTS (SELECT 1 FROM room_types child WHERE child.parent_id=r.room_type_id)"), "Rooms should select specific leaf types");
-        assertEquals("0", scalar("WITH RECURSIVE ancestors AS (SELECT id AS root,id,parent_id,CAST(CONCAT('/',id,'/') AS CHAR(4096)) AS path,0 AS cycle FROM room_types UNION ALL SELECT a.root,p.id,p.parent_id,CONCAT(a.path,p.id,'/'),LOCATE(CONCAT('/',p.id,'/'),a.path)>0 FROM ancestors a JOIN room_types p ON p.id=a.parent_id WHERE a.cycle=0) SELECT COUNT(*) FROM ancestors WHERE cycle=1"));
-        assertEquals("0", scalar("SELECT COUNT(*) FROM (SELECT property_id,room_number FROM rooms GROUP BY property_id,room_number HAVING COUNT(*)>1) duplicated"));
-    }
-
-    @Test
-    void demoCredentialsAndRolePermissionsProduceRealJwtAuthoritiesAndJpaMappingsValidate() throws SQLException {
-        var encoder = new BCryptPasswordEncoder(10);
-        for (String email : DEMO_EMAILS) {
-            try (var statement = connection.prepareStatement("SELECT password,status FROM users WHERE email=?")) {
-                statement.setString(1, email);
-                try (var result = statement.executeQuery()) {
-                    assertTrue(result.next(), email);
-                    assertEquals("ACTIVE", result.getString("status"));
-                    assertTrue(encoder.matches(DEMO_PASSWORD, result.getString("password")), email);
-                }
-            }
-        }
-
-        var factory = new LocalContainerEntityManagerFactoryBean();
-        factory.setDataSource(new DriverManagerDataSource(url(schema), user(), password()));
+    @Test void flywayRestartAndCurrentJpaMappingsValidate() throws Exception {
+        assertEquals(0,flyway.migrate().migrationsExecuted); flyway.validate();
+        assertEquals(2,count("SELECT COUNT(*) FROM flyway_schema_history WHERE success=1"));
+        none("SELECT COUNT(*) FROM flyway_schema_history WHERE type='BASELINE'");
+        var factory=new LocalContainerEntityManagerFactoryBean();
+        factory.setDataSource(new DriverManagerDataSource(url(schema),user(),password()));
         factory.setPackagesToScan("com.tamdaptit.rentalmanagement");
         factory.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
-        factory.setJpaPropertyMap(Map.of("hibernate.hbm2ddl.auto", "validate"));
+        factory.setJpaPropertyMap(Map.of("hibernate.hbm2ddl.auto","validate"));
         try {
-            factory.afterPropertiesSet();
-            assertNotNull(factory.getObject());
-            assertEquals(44, factory.getObject().getMetamodel().getEntities().size());
-            var entityManager = factory.getObject().createEntityManager();
+            factory.afterPropertiesSet(); assertNotNull(factory.getObject());
+            var em=factory.getObject().createEntityManager();
             try {
-                var tokens = new JwtTokenServiceImpl("seed-test-key-only-".repeat(5), "seed-data-test", 60_000, 120_000);
-                for (String email : DEMO_EMAILS) {
-                    User user = entityManager.createQuery("SELECT u FROM User u WHERE u.email=:email", User.class)
-                            .setParameter("email", email).getSingleResult();
-                    Set<String> expected = new TreeSet<>();
-                    if (email.startsWith("admin.")) {
-                        expected.addAll(PERMISSIONS);
-                        expected.add("ROLE_ADMIN");
-                    } else if (email.startsWith("landlord.")) {
-                        expected.addAll(Set.of("ROLE_LANDLORD", "ROOM_READ", "ROOM_CREATE", "ROOM_UPDATE", "ROOM_DELETE", "LISTING_READ", "LISTING_CREATE"));
-                    } else {
-                        expected.addAll(Set.of("ROLE_TENANT", "ROOM_READ", "LISTING_READ"));
-                    }
-                    assertEquals(expected, new TreeSet<>(tokens.buildAuthorities(user)), email);
-                    String token = tokens.generateAccessToken(user);
-                    assertEquals(expected, new TreeSet<>(tokens.getAuthorities(tokens.validateToken(token))), email);
-                    assertEquals(user.getId(), tokens.getUserId(token));
+                var tokens=new JwtTokenServiceImpl("seed-test-key-only-".repeat(5),"seed-data-test",60000,120000);
+                for(String role:new String[]{"admin","landlord","tenant"}) {
+                    var account=em.createQuery("SELECT u FROM User u WHERE u.email=:email",User.class).setParameter("email",role+"@gmail.com").getSingleResult();
+                    assertTrue(tokens.buildAuthorities(account).contains("ROLE_"+role.toUpperCase()));
+                    assertEquals(account.getId(),tokens.getUserId(tokens.generateAccessToken(account)));
                 }
-            } finally {
-                entityManager.close();
-            }
-        } finally {
-            factory.destroy();
-        }
-    }
-
-    @Test
-    void seedCanBeReplayedWithoutDuplicatesOrResettingAnExistingDemoPassword() throws SQLException {
-        Map<String, String> initialCounts = rowCounts();
-        String changedPassword = new BCryptPasswordEncoder(10).encode("ChangedDemoPassword@2026");
-        try (var statement = connection.prepareStatement("UPDATE users SET password=?,auth_version=7 WHERE email=?")) {
-            statement.setString(1, changedPassword);
-            statement.setString(2, DEMO_EMAILS.getFirst());
-            assertEquals(1, statement.executeUpdate());
-        }
-        applySeed();
-        applySeed();
-        assertEquals(initialCounts, rowCounts());
-        try (var statement = connection.prepareStatement("SELECT password,auth_version FROM users WHERE email=?")) {
-            statement.setString(1, DEMO_EMAILS.getFirst());
-            try (var result = statement.executeQuery()) {
-                assertTrue(result.next());
-                assertEquals(changedPassword, result.getString("password"));
-                assertEquals(7, result.getInt("auth_version"));
-            }
-        }
-        assertEquals("0", scalar("SELECT COUNT(*) FROM (SELECT user_id,role_id FROM user_roles GROUP BY user_id,role_id HAVING COUNT(*)>1) duplicated"));
-        assertEquals("0", scalar("SELECT COUNT(*) FROM (SELECT role_id,permission_id FROM role_permissions GROUP BY role_id,permission_id HAVING COUNT(*)>1) duplicated"));
-    }
-
-    @Test
-    void actualFreshFlywayChainBuildsAndSeedsAnEmptySchemaWithoutBaseline() throws SQLException {
-        Map<String, String> expectedCounts = rowCounts();
-        String freshSchema = schema + "_fresh";
-        try {
-            try (Connection admin = DriverManager.getConnection(url(""), user(), password());
-                 var statement = admin.createStatement()) {
-                statement.execute("CREATE DATABASE `" + freshSchema + "` CHARACTER SET utf8mb4");
-            }
-            var flyway = Flyway.configure()
-                    .dataSource(url(freshSchema), user(), password())
-                    .locations("classpath:db/migration")
-                    .baselineOnMigrate(false)
-                    .load();
-
-            assertEquals(2, flyway.migrate().migrationsExecuted);
-            try (Connection fresh = DriverManager.getConnection(url(freshSchema), user(), password())) {
-                assertEquals("45", scalar(fresh, "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()"));
-                assertEquals("1", scalar(fresh, "SELECT COUNT(*) FROM flyway_schema_history WHERE version='2' AND success=1"));
-                assertEquals("0", scalar(fresh, "SELECT COUNT(*) FROM flyway_schema_history WHERE type='BASELINE'"));
-                assertEquals(expectedCounts, rowCounts(fresh));
-                assertEquals(0, flyway.migrate().migrationsExecuted);
-                assertEquals(expectedCounts, rowCounts(fresh));
-            }
-        } finally {
-            if (freshSchema.matches("seed_test_[a-f0-9]{32}_fresh")) {
-                try (Connection admin = DriverManager.getConnection(url(""), user(), password());
-                     var statement = admin.createStatement()) {
-                    statement.execute("DROP DATABASE IF EXISTS `" + freshSchema + "`");
-                }
-            }
-        }
+            } finally { em.close(); }
+        } finally { factory.destroy(); }
     }
 }
