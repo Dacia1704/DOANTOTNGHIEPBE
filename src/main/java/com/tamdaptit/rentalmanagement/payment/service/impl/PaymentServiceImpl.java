@@ -351,6 +351,11 @@ public class PaymentServiceImpl implements PaymentService {
         return page(paymentRepository.findByRequiresReviewTrue(pageable(page, size)));
     }
 
+    @Override
+    public PageResponse<PaymentResponse> getAllPayments(int page, int size) {
+        return page(paymentRepository.findAll(pageable(page, size)));
+    }
+
     private PageRequest pageable(int page, int size) {
         return PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, 100), Sort.by(Sort.Direction.DESC, "createdAt", "id"));
     }

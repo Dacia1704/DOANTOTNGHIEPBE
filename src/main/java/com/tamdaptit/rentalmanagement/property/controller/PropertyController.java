@@ -2,6 +2,7 @@ package com.tamdaptit.rentalmanagement.property.controller;
 
 import com.tamdaptit.rentalmanagement.common.dto.*;
 import com.tamdaptit.rentalmanagement.property.dto.request.CreatePropertyRequest;
+import com.tamdaptit.rentalmanagement.property.dto.request.PropertyLocationRequest;
 import com.tamdaptit.rentalmanagement.property.dto.response.PropertyResponse;
 import com.tamdaptit.rentalmanagement.property.service.PropertyService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,6 +28,13 @@ public class PropertyController {
     @Operation(summary = "Tạo cơ sở và toàn bộ phòng trong một giao dịch")
     public ApiResponse<PropertyResponse> create(Principal principal, @RequestBody @Valid CreatePropertyRequest request) {
         return ApiResponse.success("Tạo cơ sở cho thuê thành công", properties.create(principal.getName(), request));
+    }
+
+    @PutMapping("/{id}/location")
+    @Operation(summary = "Cập nhật địa chỉ và vị trí bản đồ của cơ sở thuộc chủ trọ")
+    public ApiResponse<PropertyResponse> updateLocation(Principal principal, @PathVariable String id,
+            @RequestBody @Valid PropertyLocationRequest request) {
+        return ApiResponse.success("Cập nhật vị trí thành công", properties.updateLocation(principal.getName(), id, request));
     }
 
     @GetMapping("/mine")

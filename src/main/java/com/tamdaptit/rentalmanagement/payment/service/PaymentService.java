@@ -10,6 +10,7 @@ public interface PaymentService {
     PaymentResponse getById(String userId, String id, boolean admin);
     InvoiceResponse getInvoice(String userId, String paymentId, boolean admin);
     PageResponse<PaymentResponse> getHistory(String userId, int page, int size);
+    PageResponse<PaymentResponse> getAllPayments(int page, int size);
     PageResponse<PaymentResponse> getReviewQueue(int page, int size);
     VnPayIpnResponse processIpn(MultiValueMap<String, String> parameters);
     VnPayReturnResponse verifyReturn(MultiValueMap<String, String> parameters);

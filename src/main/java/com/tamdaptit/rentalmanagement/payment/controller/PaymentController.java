@@ -77,6 +77,13 @@ public class PaymentController {
         return ApiResponse.success(service.getReviewQueue(page, size));
     }
 
+    @GetMapping("/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<PageResponse<PaymentResponse>> all(
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
+        return ApiResponse.success(service.getAllPayments(page, size));
+    }
+
     private boolean isAdmin(Authentication auth) {
         return auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
     }
