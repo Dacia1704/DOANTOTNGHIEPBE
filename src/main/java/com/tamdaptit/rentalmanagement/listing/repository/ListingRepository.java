@@ -58,9 +58,19 @@ public interface ListingRepository extends JpaRepository<Listing, String> {
             countQuery = "select count(l) from Listing l where " + PUBLIC_CONDITION)
     Page<Listing> findPublished(LocalDateTime time, Pageable pageable);
 
+    // Haversine uses twice the mean Earth radius (6371.0088 km), clamped for rounding near antipodes.
     String PUBLIC_FILTER = "from Listing l where " + PUBLIC_CONDITION + """
               and (:provinceId is null or l.property.province.id = :provinceId)
               and (:wardId is null or l.property.ward.id = :wardId)
+              and (:radiusKm is null or (l.property.latitude is not null and l.property.longitude is not null
+                and 12742.0176 * asin(sqrt(least(1.0, greatest(0.0,
+                    power(sin(radians(l.property.latitude - :latitude) / 2.0), 2)
+                    + cos(radians(:latitude)) * cos(radians(l.property.latitude))
+                    * power(sin(radians(l.property.longitude - :longitude) / 2.0), 2))))) <= :radiusKm))
+              and (:south is null or (l.property.latitude is not null and l.property.longitude is not null
+                and l.property.latitude between :south and :north
+                and ((:west <= :east and l.property.longitude between :west and :east)
+                  or (:west > :east and (l.property.longitude >= :west or l.property.longitude <= :east)))))
               and exists (select r.id from Room r where r.property = l.property
                 and (:typeName is null or lower(r.roomType.name) = lower(:typeName))
                 and (:rentalStatus is null or r.rentalStatus = :rentalStatus)
@@ -76,7 +86,9 @@ public interface ListingRepository extends JpaRepository<Listing, String> {
             countQuery = "select count(l) " + PUBLIC_FILTER)
     Page<Listing> searchPublished(LocalDateTime time, String typeName, String provinceId, String wardId,
             RoomRentalStatus rentalStatus, BigDecimal minPrice, BigDecimal maxPrice,
-            List<String> amenityNames, long amenityCount, Pageable pageable);
+            List<String> amenityNames, long amenityCount,
+            BigDecimal latitude, BigDecimal longitude, BigDecimal radiusKm,
+            BigDecimal south, BigDecimal north, BigDecimal west, BigDecimal east, Pageable pageable);
 
     @Query("""
             select l from Listing l where (:status is null or

@@ -1344,6 +1344,7 @@ Khoản thu quá hạn, thu trùng hoặc không còn đủ điều kiện vẫn
 ### 11.3. Theo dõi kết quả
 
 - GET `/api/payments?page=0&size=10`: LANDLORD xem lịch sử của mình.
+- GET `/api/payments/all?page=0&size=10`: ADMIN xem toàn bộ giao dịch của mọi chủ trọ, gồm tất cả trạng thái; mới nhất trước. Không thay đổi phạm vi lịch sử của LANDLORD.
 - GET `/api/payments/{id}`: LANDLORD sở hữu hoặc ADMIN xem trạng thái đã ghi nhận trong hệ thống.
 - GET `/api/payments/{id}/invoice`: cùng quyền trên, trả id, invoiceNo, taxAmount, totalAmount, buyerName, issuedAt; chưa có hóa đơn trả 404.
 - GET `/api/payments/review?page=0&size=10`: ADMIN xem các khoản thu cần đối soát. MVP chưa có API hoàn tiền hoặc hủy SCHEDULED.
@@ -1394,9 +1395,23 @@ Phòng phải thuộc chủ trọ và AVAILABLE. Title bắt buộc, tối đa 2
 - GET `/api/listings/{id}`: công khai, chỉ chi tiết PUBLISHED còn hạn, các trường hợp khác trả 404.
 - GET `/api/listings/mine?page=0&size=10`: LANDLORD xem tin của mình ở mọi trạng thái; endpoint này vẫn yêu cầu xác thực.
 
-ListingResponse gồm id, roomId, landlordId, title, slug, description, status, rejectionReason, priorityLevel, packagePriorityLevel, submittedAt, pendingExpiresAt, publishedAt, expiresAt, createdAt. packagePriorityLevel chỉ trả lựa chọn còn hiệu lực của kỳ hiện tại; priorityLevel là mức hiển thị thực tế, có tính Boost và mức mặc định Business.
+ListingResponse gồm id, propertyId, landlordId, title, slug, description, status, rejectionReason, priorityLevel, packagePriorityLevel, submittedAt, pendingExpiresAt, publishedAt, expiresAt, createdAt, property, propertyName, rentalMode, landlordName. `property` chứa địa chỉ, latitude, longitude và các phòng của cơ sở. packagePriorityLevel chỉ trả lựa chọn còn hiệu lực của kỳ hiện tại; priorityLevel là mức hiển thị thực tế, có tính Boost và mức mặc định Business.
 
 Hết gói/hạ quota không xóa hoặc ẩn tin cũ trước expiresAt. Tin quá hạn không xuất hiện dù tác vụ nền chưa chuyển trạng thái. Đăng lại luôn PENDING, phải được duyệt lại để bắt đầu tháng hiển thị mới.
+
+### 12.2.1. Tìm tin theo vị trí bản đồ
+
+GET `/api/listings` nhận thêm các bộ tham số tùy chọn:
+
+- `latitude`, `longitude`, `radiusKm`: gửi đủ cả ba, bán kính > 0, đơn vị km; tính khoảng cách đường chim bay bằng Haversine.
+- `south`, `north`, `west`, `east`: gửi đủ bốn cạnh của khung bản đồ; `south <= north`. `west > east` nghĩa là khung đi qua kinh tuyến 180°.
+- Vĩ độ trong [-90,90], kinh độ trong [-180,180]. Thiếu bộ tham số, sai phạm vi hoặc sai kiểu số trả 400.
+- Có thể kết hợp cả hai bộ và các bộ lọc phòng hiện có; kết quả phải thỏa tất cả điều kiện. Tin thiếu một trong hai tọa độ bị loại khi lọc vị trí, vẫn được trả trong tìm kiếm thông thường.
+- Phân trang `page`/`size` (1–100), tổng số kết quả, điều kiện công khai, loại trùng cơ sở và thứ tự ưu tiên được giữ nguyên; không sắp xếp theo khoảng cách.
+- Ví dụ bán kính: `/api/listings?latitude=10.762622&longitude=106.660172&radiusKm=3&minPrice=2000000&size=20`.
+- Ví dụ khung: `/api/listings?south=10.7&north=10.9&west=106.6&east=106.8&size=50`.
+
+Tọa độ để FE đặt ghim nằm tại `data.data[].property.latitude` và `property.longitude`; chi tiết tin tại `data.property`. API danh sách admin/chờ duyệt cũng trả cùng cấu trúc vị trí. Backend không gọi Google API. Xem [tích hợp bản đồ và kế hoạch FE](GOOGLE_MAPS_INTEGRATION.md).
 
 ### 12.3. Chọn slot ưu tiên
 
@@ -1471,3 +1486,19 @@ Migration V6 chuyển mỗi Boost cũ thành gói 1 suất cao, 0 suất thấp;
 Tác vụ chạy mỗi phút, từng chủ trọ trong transaction riêng: đồng bộ subscription ACTIVE/SCHEDULED, đơn và payment quá hạn, PENDING quá 7 ngày, PUBLISHED hết tháng, Boost hết hạn và giá trị ưu tiên lưu sẵn. Chạy lặp không thêm kỳ hoặc hóa đơn, không tự gia hạn và không xóa lịch sử.
 
 Quota và truy vấn hiển thị xét thời gian thực tế. Danh sách tin tính ưu tiên từ kỳ/Boost còn hạn ngay trong truy vấn sắp xếp; response tính cùng các điều kiện hiệu lực, không dùng riêng listings.priority_level để quyết định quyền. Vì vậy tác vụ chạy chậm không giữ chỗ PENDING hoặc hiển thị ưu tiên đã hết hạn. Cột priority_level được giữ để tương thích, cập nhật khi thao tác tin/Boost và đồng bộ nền.
+
+## 15. Cập nhật vị trí cơ sở
+
+PUT `/api/properties/{id}/location`, JWT LANDLORD sở hữu cơ sở:
+
+```json
+{
+  "provinceId": "province-id",
+  "wardId": "ward-id",
+  "addressLine": "123 Nguyễn Trãi",
+  "latitude": 10.762622,
+  "longitude": 106.660172
+}
+```
+
+Thay thế địa chỉ và tọa độ trong một transaction; trả `ApiResponse<PropertyResponse>`, HTTP 200. Tỉnh/phường/địa chỉ bắt buộc và phường phải thuộc tỉnh. Hai tọa độ phải cùng có giá trị hoặc cùng null; gửi/bỏ cả hai để null sẽ xóa ghim. Vĩ độ [-90,90], kinh độ [-180,180]; 0 hợp lệ. Quy tắc cặp tọa độ cũng áp dụng khi POST tạo cơ sở. Sai dữ liệu trả 400, sai quyền/sở hữu 403, không tìm thấy cơ sở/tỉnh/phường 404. Vị trí dùng chung cho tất cả phòng và tin của cơ sở; cập nhật không đổi trạng thái duyệt tin. Xem [hợp đồng API và kế hoạch FE](GOOGLE_MAPS_INTEGRATION.md).

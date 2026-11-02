@@ -20,7 +20,7 @@ public class ListingController {
 
     @GetMapping
     public ApiResponse<PageResponse<ListingResponse>> published(@RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size, @ModelAttribute ListingSearchRequest request) {
+            @RequestParam(defaultValue = "10") int size, @Valid @ModelAttribute ListingSearchRequest request) {
         return ApiResponse.success(service.searchPublished(page, size, request));
     }
 
