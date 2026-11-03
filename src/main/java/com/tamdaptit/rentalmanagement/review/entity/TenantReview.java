@@ -40,7 +40,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class TenantReview {
+public class TenantReview implements ReviewEntry {
     @Id
     @UuidGenerator
     @Column(length = 36)
@@ -64,8 +64,15 @@ public class TenantReview {
     @Column(columnDefinition = "TEXT")
     private String comment;
 
-    @Column(name = "is_hidden")
+    @Builder.Default
+    @Column(name = "is_hidden", nullable = false)
     private Boolean hidden = false;
+
+    @Column(name = "hidden_at")
+    private LocalDateTime hiddenAt;
+
+    @Column(name = "hidden_reason", length = 500)
+    private String hiddenReason;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "hidden_by")
