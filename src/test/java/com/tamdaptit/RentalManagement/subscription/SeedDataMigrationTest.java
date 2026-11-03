@@ -30,7 +30,7 @@ class SeedDataMigrationTest {
             s.execute("CREATE DATABASE `"+schema+"` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci");
         }
         flyway=Flyway.configure().dataSource(url(schema),user(),password()).baselineOnMigrate(false).load();
-        assertEquals(2,flyway.migrate().migrationsExecuted);
+        assertEquals(3,flyway.migrate().migrationsExecuted);
         db=DriverManager.getConnection(url(schema),user(),password());
     }
     @AfterAll void cleanup() throws Exception {
@@ -93,7 +93,7 @@ class SeedDataMigrationTest {
 
     @Test void flywayRestartAndCurrentJpaMappingsValidate() throws Exception {
         assertEquals(0,flyway.migrate().migrationsExecuted); flyway.validate();
-        assertEquals(2,count("SELECT COUNT(*) FROM flyway_schema_history WHERE success=1"));
+        assertEquals(3,count("SELECT COUNT(*) FROM flyway_schema_history WHERE success=1"));
         none("SELECT COUNT(*) FROM flyway_schema_history WHERE type='BASELINE'");
         var factory=new LocalContainerEntityManagerFactoryBean();
         factory.setDataSource(new DriverManagerDataSource(url(schema),user(),password()));

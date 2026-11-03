@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 public class ListingReviewController {
     private final ListingReviewService reviews;
 
-    @GetMapping("/{id}/reviews")
+    @GetMapping(value = "/{id}/reviews", params = "target")
     public ApiResponse<ListingReviewsResponse> get(@PathVariable String id,
             @RequestParam(defaultValue = "ROOM") Target target, @RequestParam(required = false) String roomId,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "4") int size) {

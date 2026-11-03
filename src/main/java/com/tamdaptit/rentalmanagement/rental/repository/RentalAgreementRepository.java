@@ -12,6 +12,14 @@ import java.util.*;
 public interface RentalAgreementRepository extends JpaRepository<RentalAgreement,String> {
     List<RentalAgreementStatus> OCCUPIED = List.of(RentalAgreementStatus.DRAFT,RentalAgreementStatus.PENDING_CONFIRMATION,RentalAgreementStatus.ACTIVE);
     boolean existsByRoom_IdAndStatusIn(String roomId,Collection<RentalAgreementStatus> states);
+    boolean existsByRoom_Id(String roomId);
+    @Query("""
+        select count(a)>0 from RentalAgreement a
+        where a.tenant.id=:tenantId and a.landlord.id=:landlordId
+          and a.status in :states and a.tenantConfirmedAt is not null and a.landlordConfirmedAt is not null
+        """)
+    boolean hasConfirmedRelationship(@Param("tenantId") String tenantId, @Param("landlordId") String landlordId,
+        @Param("states") Collection<RentalAgreementStatus> states);
     Optional<RentalAgreement> findByRentalRequest_Id(String requestId);
     @EntityGraph(attributePaths={"rentalRequest"})
     List<RentalAgreement> findAllByRentalRequest_IdIn(Collection<String> requestIds);

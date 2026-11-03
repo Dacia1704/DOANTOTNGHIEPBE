@@ -139,6 +139,7 @@ public class RoomServiceImpl implements RoomService {
         Room room = rooms.findByIdForUpdate(id).orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
         if (!room.getProperty().getLandlord().getId().equals(userId)) throw new AppException(ErrorCode.NOT_ROOM_OWNER);
         if (agreements.existsByRoom_IdAndStatusIn(id, agreements.OCCUPIED)) throw new AppException(ErrorCode.ROOM_UNAVAILABLE);
+        if (agreements.existsByRoom_Id(id)) throw new AppException(ErrorCode.ROOM_HAS_RENTAL_HISTORY);
         var property = properties.findLockedById(room.getProperty().getId()).orElseThrow();
         if (rooms.countByProperty_Id(property.getId()) <= 1)
             throw new AppException(ErrorCode.INVALID_REQUEST, "Cơ sở phải có ít nhất một đơn vị cho thuê");
