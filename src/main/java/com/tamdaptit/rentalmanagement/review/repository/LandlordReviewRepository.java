@@ -19,6 +19,6 @@ public interface LandlordReviewRepository extends JpaRepository<LandlordReview, 
     @EntityGraph(attributePaths={"tenant", "rentalAgreement.landlord", "rentalAgreement.room.property", "landlord", "hiddenBy"})
     Page<LandlordReview> findAll(Specification<LandlordReview> spec, Pageable pageable);
 
-    @Query("select r.rating as rating, count(r) as total from LandlordReview r where r.hidden=false and r.landlord.id=:targetId group by r.rating")
+    @Query("select r.rating as rating, count(r) as total, sum(case when r.landlordReply is not null and trim(r.landlordReply) <> '' then 1 else 0 end) as replied from LandlordReview r where r.hidden=false and r.landlord.id=:targetId group by r.rating")
     List<RatingCount> ratings(@Param("targetId") String targetId);
 }

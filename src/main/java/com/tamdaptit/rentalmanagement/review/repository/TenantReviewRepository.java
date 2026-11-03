@@ -19,6 +19,6 @@ public interface TenantReviewRepository extends JpaRepository<TenantReview, Stri
     @EntityGraph(attributePaths={"landlord", "rentalAgreement", "tenant", "hiddenBy"})
     Page<TenantReview> findAll(Specification<TenantReview> spec, Pageable pageable);
 
-    @Query("select r.rating as rating, count(r) as total from TenantReview r where r.hidden=false and r.tenant.id=:targetId group by r.rating")
+    @Query("select r.rating as rating, count(r) as total, sum(0) as replied from TenantReview r where r.hidden=false and r.tenant.id=:targetId group by r.rating")
     List<RatingCount> ratings(@Param("targetId") String targetId);
 }

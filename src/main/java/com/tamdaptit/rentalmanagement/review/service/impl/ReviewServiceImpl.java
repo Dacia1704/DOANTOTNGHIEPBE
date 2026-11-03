@@ -128,7 +128,7 @@ public class ReviewServiceImpl implements ReviewService {
         Listing listing=publicListing(listingId);
         requireRoom(listing,roomId);
         Specification<RoomReview> spec=roomId==null?filter(false,"room.property",listing.getProperty().getId()):filter(false,"room",roomId);
-        return page(rooms.findAll(spec,pageable(page,size)),mapper::toResponse);
+        return page(rooms.findAll(spec,pageable(page,size)),this::response);
     }
 
     @Override
@@ -154,7 +154,7 @@ public class ReviewServiceImpl implements ReviewService {
     @Override
     public PageResponse<ReviewResponse> landlord(String landlordId,int page,int size) {
         publicLandlord(landlordId);
-        return page(landlords.findAll(filter(false,"landlord",landlordId),pageable(page,size)),mapper::toResponse);
+        return page(landlords.findAll(filter(false,"landlord",landlordId),pageable(page,size)),this::response);
     }
     @Override
     public ReviewSummaryResponse landlordSummary(String landlordId) {
@@ -168,7 +168,7 @@ public class ReviewServiceImpl implements ReviewService {
     @Override
     public PageResponse<ReviewResponse> tenant(String actor,String tenantId,int page,int size) {
         tenantAccess(actor,tenantId);
-        return page(tenants.findAll(filter(false,"tenant",tenantId),pageable(page,size)),mapper::toResponse);
+        return page(tenants.findAll(filter(false,"tenant",tenantId),pageable(page,size)),this::response);
     }
     @Override
     public ReviewSummaryResponse tenantSummary(String actor,String tenantId) {
@@ -261,9 +261,24 @@ public class ReviewServiceImpl implements ReviewService {
         return user.getUserRoles().stream().anyMatch(ur->ur.getRole().getCode()==role);
     }
     private ReviewResponse response(ReviewEntry entry) {
-        if(entry instanceof RoomReview r) return mapper.toResponse(r);
-        if(entry instanceof LandlordReview r) return mapper.toResponse(r);
-        return mapper.toResponse((TenantReview)entry);
+        ReviewResponse dto;
+        boolean matches;
+        var agreement = entry.getRentalAgreement();
+        if(entry instanceof RoomReview r) {
+            dto = mapper.toResponse(r);
+            matches = r.getRoom().getId().equals(agreement.getRoom().getId());
+        } else if(entry instanceof LandlordReview r) {
+            dto = mapper.toResponse(r);
+            matches = r.getLandlord().getId().equals(agreement.getLandlord().getId());
+        } else {
+            var r = (TenantReview) entry;
+            dto = mapper.toResponse(r);
+            matches = r.getLandlord().getId().equals(agreement.getLandlord().getId());
+        }
+        boolean verified = matches && eligible(agreement)
+                && entry.getTenant().getId().equals(agreement.getTenant().getId());
+        return new ReviewResponse(dto.id(), dto.type(), dto.rating(), dto.comment(), dto.landlordReply(),
+                dto.authorName(), dto.authorAvatarUrl(), dto.createdAt(), dto.updatedAt(), verified);
     }
     private ReviewDetailResponse detail(ReviewEntry entry) {
         return new ReviewDetailResponse(response(entry),entry.getRentalAgreement().getId(),Boolean.TRUE.equals(entry.getHidden()),
@@ -304,9 +319,10 @@ public class ReviewServiceImpl implements ReviewService {
     private static ReviewSummaryResponse summary(List<RatingCount> counts) {
         var distribution=new LinkedHashMap<Integer,Long>();
         for(int star=1;star<=5;star++) distribution.put(star,0L);
-        long total=0,sum=0;
-        for(var row:counts) {distribution.put(row.getRating(),row.getTotal());total+=row.getTotal();sum+=row.getRating()*row.getTotal();}
-        return new ReviewSummaryResponse(total,total==0?null:BigDecimal.valueOf(sum).divide(BigDecimal.valueOf(total),1,RoundingMode.HALF_UP),distribution);
+        long total=0,sum=0,replied=0;
+        for(var row:counts) {distribution.put(row.getRating(),row.getTotal());total+=row.getTotal();sum+=row.getRating()*row.getTotal();replied+=row.getReplied()==null?0:row.getReplied();}
+        return new ReviewSummaryResponse(total,total==0?null:BigDecimal.valueOf(sum).divide(BigDecimal.valueOf(total),1,RoundingMode.HALF_UP),distribution,
+                total==0?null:(int)Math.round(100.0*replied/total));
     }
     private static String text(String value,int max) {
         if(value==null) return null;

@@ -71,6 +71,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, "/api/payments/vnpay/ipn", "/api/payments/vnpay/return").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/listings/mine", "/api/listings/pending", "/api/listings/admin").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/listings/{id}/reveal-phone").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/listings", "/api/listings/{id}", "/api/listings/{id}/bookable-rooms").permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/api/listings/{id}/reviews", "/api/listings/{id}/reviews/summary",

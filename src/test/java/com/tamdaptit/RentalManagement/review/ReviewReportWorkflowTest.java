@@ -381,6 +381,19 @@ class ReviewReportWorkflowTest {
             .andExpect(jsonPath("$.data.data[0].hiddenReason").doesNotExist())
             .andExpect(jsonPath("$.data.data[0].tenant").doesNotExist());
         mvc.perform(get("/api/listings/rr_listing/rooms/rr_r1/reviews/summary")).andExpect(status().isOk());
+        mvc.perform(get("/api/listings/rr_listing/reviews").param("target","ROOM").param("roomId","rr_r1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.summary.totalReviews").value(1))
+            .andExpect(jsonPath("$.data.reviews.data[0].verifiedStay").value(true))
+            .andExpect(jsonPath("$.data.reviews.data[0].rentalAgreementId").doesNotExist());
+        var ownerReview=reviews.create("rr_t",ReviewType.LANDLORD,review("rr_active",5));
+        reviews.reply("rr_l",ReviewType.LANDLORD,ownerReview.id(),new ReviewReplyRequest("Thank you"));
+        mvc.perform(get("/api/listings/rr_listing/reviews").param("target","LANDLORD"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.summary.replyRate").value(100))
+            .andExpect(jsonPath("$.data.summary.totalReviews").value(1));
+        mvc.perform(get("/api/listings/rr_listing/reviews").param("target","ROOM").param("roomId","rr_r3"))
+            .andExpect(status().isNotFound());
         mvc.perform(get("/api/landlords/rr_l/reviews")).andExpect(status().isOk());
         for(String route:List.of("/api/reviews/mine?type=ROOM","/api/tenants/rr_t/reviews","/api/admin/reviews?type=ROOM","/api/reports/mine"))
             mvc.perform(get(route)).andExpect(status().isUnauthorized());
@@ -524,6 +537,8 @@ class ReviewReportWorkflowTest {
         com.tamdaptit.rentalmanagement.room.repository.RoomRepository.class,
         com.tamdaptit.rentalmanagement.listing.repository.ListingRepository.class})
     @Import({ReviewServiceImpl.class,ReportServiceImpl.class,ReportEvidenceService.class,ReviewController.class,
+        com.tamdaptit.rentalmanagement.review.service.ListingReviewService.class,
+        com.tamdaptit.rentalmanagement.review.controller.ListingReviewController.class,
         ReportController.class,GlobalExceptionHandler.class,SecurityConfig.class,JwtAuthenticationFilter.class,
         JwtAuthenticationEntryPoint.class,ObjectMapperConfig.class,ImageValidator.class})
     static class Config {

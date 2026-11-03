@@ -21,6 +21,16 @@ import java.util.List;
 import java.util.Optional;
 @Repository
 public interface ListingRepository extends JpaRepository<Listing, String> {
+    @Query("""
+            select l from Listing l join fetch l.property p join fetch p.landlord
+            where l.id = :id and l.status = 'PUBLISHED' and l.expiresAt > :time
+            """)
+    Optional<Listing> findPublishedContact(@Param("id") String id, @Param("time") LocalDateTime time);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("update Listing l set l.contactCount = coalesce(l.contactCount, 0) + 1 where l.id = :id")
+    int incrementContactCount(@Param("id") String id);
+
     @Query("select l from Listing l join fetch l.property p join fetch p.landlord where l.id=:id and " + ListingRepository.PUBLIC_CONDITION)
     Optional<Listing> findPublicForReview(@Param("id") String id, @Param("time") LocalDateTime time);
 
