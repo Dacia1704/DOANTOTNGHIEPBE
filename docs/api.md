@@ -1502,3 +1502,126 @@ PUT `/api/properties/{id}/location`, JWT LANDLORD sở hữu cơ sở:
 ```
 
 Thay thế địa chỉ và tọa độ trong một transaction; trả `ApiResponse<PropertyResponse>`, HTTP 200. Tỉnh/phường/địa chỉ bắt buộc và phường phải thuộc tỉnh. Hai tọa độ phải cùng có giá trị hoặc cùng null; gửi/bỏ cả hai để null sẽ xóa ghim. Vĩ độ [-90,90], kinh độ [-180,180]; 0 hợp lệ. Quy tắc cặp tọa độ cũng áp dụng khi POST tạo cơ sở. Sai dữ liệu trả 400, sai quyền/sở hữu 403, không tìm thấy cơ sở/tỉnh/phường 404. Vị trí dùng chung cho tất cả phòng và tin của cơ sở; cập nhật không đổi trạng thái duyệt tin. Xem [hợp đồng API và kế hoạch FE](GOOGLE_MAPS_INTEGRATION.md).
+
+## 16. Review
+
+Review được tạo từ hợp đồng đã có xác nhận hai bên, trạng thái ACTIVE/EXPIRED/TERMINATED và đã tới ngày bắt đầu thuê. Được đánh giá khi đang thuê và sau trả phòng, không có hạn chót sau checkout. Mỗi hợp đồng có tối đa một review cho mỗi loại ROOM/LANDLORD/TENANT. Review đã gửi không thể sửa/xóa; review bị admin ẩn vẫn chiếm lượt đã dùng.
+
+Yêu cầu PUT/DELETE vào `/api/reviews/rooms/{id}` không có route tương ứng, trả 404 và không thay đổi review. Gọi sai phương thức trên một route đã tồn tại trả 405 METHOD_NOT_ALLOWED.
+
+POST `/api/reviews/rooms` và `/api/reviews/landlords`: JWT TENANT là người thuê trên hợp đồng. POST `/api/reviews/tenants`: JWT LANDLORD là chủ trọ trên hợp đồng. Cùng payload:
+
+```json
+{
+  "rentalAgreementId": "agreement-id",
+  "rating": 5,
+  "comment": "Nội dung đánh giá"
+}
+```
+
+Rating là số nguyên JSON 1–5 (không nhận chuỗi hoặc số thập phân). Comment tùy chọn, tối đa 2.000 ký tự; lưu plain text đã trim. Request không nhận ID tác giả/đối tượng hoặc trường kiểm duyệt; trường JSON ngoài contract bị từ chối. Response `data` là ReviewResponse:
+
+```json
+{
+  "id": "review-id",
+  "type": "ROOM",
+  "rating": 5,
+  "comment": "Nội dung đánh giá",
+  "landlordReply": null,
+  "authorName": "Tên hiển thị",
+  "authorAvatarUrl": null,
+  "createdAt": "2026-11-03T10:00:00",
+  "updatedAt": "2026-11-03T10:00:00"
+}
+```
+
+Các API đọc:
+
+- GET `/api/rental-agreements/{id}/review-eligibility`: JWT TENANT/LANDLORD thuộc hợp đồng. Trả `{room, landlord, tenant}`, mỗi mục có `canCreate, reviewId, reason`. Không lộ review ID do bên kia viết. Reason là NOT_REVIEW_AUTHOR, CANNOT_REVIEW_SELF, REVIEW_NOT_ELIGIBLE hoặc mã review đã tồn tại.
+- GET `/api/reviews/mine?type=ROOM&page=0&size=10`: TENANT/LANDLORD xem review mình viết. Type bắt buộc, nhận ROOM/LANDLORD/TENANT. Mỗi item là `{review, rentalAgreementId, hidden, hiddenBy, hiddenAt, hiddenReason, targetId, targetName}`. Đối tượng ROOM dùng ID phòng và tên hiển thị ghép `propertyName - roomNumber`; LANDLORD/TENANT dùng ID user và fullName của người được đánh giá. Các API quản trị danh sách/ẩn/hiện cũng trả các trường đối tượng này.
+- GET `/api/listings/{listingId}/reviews`: công khai, review phòng gộp theo Property của tin.
+- GET `/api/listings/{listingId}/rooms/{roomId}/reviews`: công khai, chỉ review Room thuộc Property của tin; không yêu cầu Room đang AVAILABLE.
+- GET `/api/landlords/{landlordId}/reviews`: công khai nếu landlord có tin đang công khai.
+- GET `/api/tenants/{tenantId}/reviews`: JWT chính tenant, ADMIN hoặc LANDLORD đã có hợp đồng xác nhận với tenant. Landlord đủ điều kiện xem được review do các landlord khác viết, kể cả khi hợp đồng của mình đã kết thúc.
+- Các route danh sách công khai/tenant ở trên có route tương ứng thêm `/summary`.
+
+Listing phải PUBLISHED, chưa hết hạn và là tin công khai hiện hành của Property theo quy tắc listing hiện có; tin cũ đã bị tin mới thay thế trả 404. Review ẩn không xuất hiện trong danh sách/summary; admin xem review ẩn qua API quản trị, tác giả xem qua /mine. DTO công khai không trả thông tin hợp đồng, ID tác giả, email/điện thoại/giấy tờ hay metadata moderation.
+
+Summary trả `{totalReviews, averageRating, distribution}`; distribution có đủ khóa "1"–"5". Average làm tròn một chữ số, không có review thì null. Điểm Property tính từ từng RoomReview, không trung bình các trung bình Room; điểm landlord chỉ tính LandlordReview.
+
+GET `/api/landlord/reviews?type=ROOM&page=0&size=10`: JWT LANDLORD xem đánh giá nhận được. Type bắt buộc, chỉ nhận ROOM/LANDLORD (TENANT trả 400); page/size và thứ tự như các danh sách Review khác. Backend lấy landlord từ principal, lọc landlord trên hợp đồng; không nhận landlord ID để chọn người khác. Truy vấn độc lập với trạng thái/hạn tin đăng, kể cả khi tin hết hạn, bị ẩn hoặc Property đã đổi chủ. Review bị ẩn không xuất hiện và không trả metadata moderation.
+
+Mỗi item trong `data.data` là ReceivedReviewResponse:
+
+```json
+{
+  "review": {
+    "id": "review-id",
+    "type": "ROOM",
+    "rating": 5,
+    "comment": "Nội dung đánh giá",
+    "landlordReply": null,
+    "authorName": "Tên người đánh giá",
+    "authorAvatarUrl": null,
+    "createdAt": "2026-11-03T10:00:00",
+    "updatedAt": "2026-11-03T10:00:00"
+  },
+  "targetId": "room-id",
+  "targetName": "Nhà trọ A - 101",
+  "rentalAgreementId": "agreement-id",
+  "agreementCode": "HD-001",
+  "roomId": "room-id",
+  "roomNumber": "101",
+  "propertyId": "property-id",
+  "propertyName": "Nhà trọ A",
+  "canReply": true
+}
+```
+
+Với type LANDLORD, targetId/targetName là ID/tên chủ trọ được đánh giá; thông tin phòng/hợp đồng vẫn là ngữ cảnh hợp đồng làm căn cứ review. Tên đối tượng/phòng/cơ sở lấy dữ liệu hiện hành. `canReply` theo quyền phản hồi hiện tại: review đang hiển thị và người đăng nhập là landlord trên hợp đồng; vẫn true khi đã có phản hồi vì cho phép cập nhật phản hồi. API công khai tiếp tục dùng ReviewResponse, không bổ sung ID hợp đồng hoặc metadata quản lý.
+
+PUT `/api/reviews/rooms/{id}/reply` và `/api/reviews/landlords/{id}/reply`: LANDLORD trên hợp đồng tạo/cập nhật một phản hồi, body `{"reply":"Nội dung"}`, bắt buộc, tối đa 2.000 ký tự. Chủ Property mới không thay thế quyền của landlord trên hợp đồng; review bị ẩn không cho phản hồi. Không có phản hồi TenantReview.
+
+GET `/api/admin/reviews?type=ROOM&hidden=true&targetId=room-id&page=0&size=10`: ADMIN, type bắt buộc; hidden và targetId tùy chọn. targetId lần lượt là Room/landlord/tenant theo type. Trả PageResponse của ReviewDetailResponse như /mine.
+
+PATCH `/api/admin/reviews/{type}/{id}/visibility`: ADMIN; type nhận ROOM/LANDLORD/TENANT, body `{"hidden":true,"reason":"Lý do"}`. Khi ẩn bắt buộc lý do tối đa 500 ký tự; lưu admin/thời gian/lý do. Khi hiện lại xóa metadata ẩn hiện hành. Trả ReviewDetailResponse. Điểm tổng hợp cập nhật ngay; chưa có lịch sử đầy đủ các lần moderation.
+
+Danh sách dùng PageResponse hiện có, page từ 0, size 1–50, mặc định 10; sắp xếp createdAt DESC, id DESC. Các API thành công trả HTTP 200 và ApiResponse. Lỗi chính: REVIEW_NOT_ELIGIBLE (400), *_REVIEW_EXISTED (400), INVALID_RATING (400), NOT_AGREEMENT_PARTY/UNAUTHORIZED (403), REVIEW_HIDDEN (409), *_REVIEW_NOT_FOUND (404). Chưa đăng nhập gọi API riêng tư trả 401.
+
+## 17. Report vi phạm và bằng chứng
+
+POST `/api/reports`: JWT TENANT đang hoạt động. Payload:
+
+```json
+{
+  "targetType": "LISTING",
+  "targetId": "listing-id",
+  "reasonCode": "SCAM",
+  "description": "Nội dung báo cáo"
+}
+```
+
+targetType nhận LISTING/LANDLORD. LISTING phải là tin hiện đang công khai; backend suy ra landlord qua Property, không cần hợp đồng. LANDLORD chỉ báo cáo được khi tenant có hợp đồng đã xác nhận hai bên ở trạng thái ACTIVE/EXPIRED/TERMINATED với landlord đó. Không nhận quan hệ chỉ qua chat hoặc hợp đồng nháp/chờ xác nhận/đã hủy. Không tự báo cáo.
+
+GET `/api/reports/reasons?targetType=LISTING`: TENANT lấy danh mục reasonCode. Các mã SCAM, MISLEADING_INFORMATION, INVALID_PRICE, UNSAFE_CONDITION, INAPPROPRIATE_CONTENT, OTHER; INVALID_PRICE chỉ dùng cho LISTING. OTHER bắt buộc mô tả; description tối đa 5.000 ký tự. JSON ngoài contract (status, tenantId, handledBy, imageUrl...) bị từ chối.
+
+Một tenant chỉ có một report PENDING/PROCESSING cho mỗi đối tượng chính, bất kể reason. Report LISTING và LANDLORD độc lập dù cùng landlord; sau khi report đóng có thể tạo vụ việc mới. Backend khóa người gửi trong transaction để chặn gửi trùng đồng thời.
+
+Response tạo/nhận/đóng report là ReportResponse: `id, targetType, targetId, landlordId, reasonCode, description, status, handledBy, resolutionNote, resolvedAt, createdAt, updatedAt, targetName, handledByName`. targetName là tiêu đề tin đăng nếu targetType=LISTING, hoặc fullName chủ trọ nếu targetType=LANDLORD. handledBy vẫn là ID admin; handledByName là tên admin xử lý, null khi chưa được giao. Các trường tên lấy dữ liệu hiện hành và có trong response danh sách/chi tiết/quản trị tương ứng. Không có API sửa/xóa report. Các API khác:
+
+- GET `/api/reports/mine?status=PENDING&page=0&size=10`: TENANT xem của mình, status tùy chọn.
+- GET `/api/reports/{id}`: chính người gửi hoặc ADMIN; trả `{report: ReportResponse, evidences: [{id, contentUrl, createdAt}]}`. Vẫn đọc được khi tin đã bị ẩn/hết hạn. Landlord bị báo cáo không có quyền đọc hồ sơ.
+- POST `/api/reports/{id}/evidences`: người gửi, chỉ PENDING; multipart một part `file` mỗi request. Tối đa 5 ảnh/report; JPEG/PNG thực, tối đa 5 MiB, tối đa 4096 px mỗi chiều. Tạo report trước rồi upload từng ảnh; không bắt buộc ảnh và có thể thử lại upload khi lỗi.
+- GET `/api/reports/{id}/evidences/{evidenceId}/content`: người gửi hoặc ADMIN, kiểm tra cả hai ID. Trả bytes ảnh, Content-Type image/png hoặc image/jpeg, Cache-Control private/no-store, X-Content-Type-Options nosniff. Gửi Bearer token khi tải, không dùng URL trực tiếp trong img nếu client không đính kèm header; Angular có thể tải blob rồi tạo object URL.
+- GET `/api/admin/reports?status=PROCESSING&reasonCode=SCAM&page=0&size=10`: ADMIN, các filter tùy chọn.
+- GET `/api/admin/reports/summary`: ADMIN; số lượng theo PENDING/PROCESSING/RESOLVED/REJECTED.
+- POST `/api/admin/reports/{id}/assign`: ADMIN tự nhận report PENDING, chuyển PROCESSING và lưu handledBy.
+- POST `/api/admin/reports/{id}/resolve` hoặc `/reject`: chỉ ADMIN được giao xử lý, body `{"resolutionNote":"Kết quả"}`, bắt buộc tối đa 5.000 ký tự; chuyển RESOLVED/REJECTED và lưu resolvedAt.
+
+Không đóng thẳng từ PENDING, mở lại, giao lại hoặc thêm bằng chứng sau khi admin nhận. Nhận và đóng report tạo notification REPORT cho tenant trong cùng transaction; API đọc thông báo/realtime chưa thuộc module này. RESOLVED không tự ẩn tin/khóa tài khoản. Hai admin nhận/đóng đồng thời được tuần tự hóa bằng khóa report.
+
+Ảnh được lưu Cloudinary raw/authenticated với public ID do server tạo; download chỉ qua backend, không trả URL Cloudinary hoặc signed URL. Upload nằm ngoài transaction database; sau upload khóa và kiểm tra lại trạng thái/quyền/giới hạn trước khi lưu. Thất bại sẽ dọn đúng asset vừa tạo; nếu Cloudinary không xóa được, log `Report evidence cleanup required for authenticated asset ...` chứa ID để quản trị viên dọn lại. Không có API xóa bằng chứng trong MVP; asset bằng chứng public cũ không được phục vụ qua download mới.
+
+Lỗi chính: REPORT_ALREADY_OPEN (409), REPORT_CONTRACT_REQUIRED (403), CANNOT_REPORT_SELF (400), REPORT_NOT_FOUND/REPORT_EVIDENCE_NOT_FOUND (404), REPORT_NOT_PENDING (400, không upload được), REPORT_INVALID_TRANSITION (409), REPORT_NOT_ASSIGNED_TO_YOU (403), IMAGE_INVALID/IMAGE_TOO_MANY (400), IMAGE_UPLOAD_FAILED/REPORT_EVIDENCE_UNAVAILABLE (502). Phân trang như Review; thành công HTTP 200.
+
+Migration V3 thêm metadata moderation, chuẩn hóa is_hidden NOT NULL, index và CHECK target report. Các FK review → agreement/Room và report → Listing dùng RESTRICT để tránh cascade mất hồ sơ; xóa Room đã có lịch sử hợp đồng trả ROOM_HAS_RENTAL_HISTORY (409), Room đang có hợp đồng chiếm chỗ vẫn trả ROOM_UNAVAILABLE. Nếu có report cũ không target, migration dừng để xử lý dữ liệu thủ công, không xóa lịch sử tự động.

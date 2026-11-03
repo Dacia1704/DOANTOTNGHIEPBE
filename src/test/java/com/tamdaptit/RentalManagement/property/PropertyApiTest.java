@@ -82,7 +82,9 @@ class PropertyApiTest {
 
     @BeforeEach
     void reset() {
-        for (String table : new String[]{"room_amenities", "room_images", "property_amenities", "property_images", "rooms", "properties"})
+        for (String table : new String[]{"report_evidences", "reports", "room_reviews", "landlord_reviews", "tenant_reviews",
+                "rental_events", "rental_pdf_assets", "rental_agreements", "rental_requests", "listings",
+                "room_amenities", "room_images", "property_amenities", "property_images", "rooms", "properties"})
             jdbc.update("DELETE FROM " + table);
         jdbc.update("DELETE FROM property_types WHERE id <> '00000000-0000-0000-0000-000000000011'");
     }

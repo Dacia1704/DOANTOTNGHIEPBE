@@ -12,6 +12,7 @@ import java.util.List;
 
 @Repository
 public interface RoomRepository extends JpaRepository<Room, String> {
+    boolean existsByIdAndProperty_Id(String id, String propertyId);
 
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @org.springframework.data.jpa.repository.QueryHints(@jakarta.persistence.QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))

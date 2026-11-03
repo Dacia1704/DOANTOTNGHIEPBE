@@ -21,6 +21,11 @@ import java.util.List;
 import java.util.Optional;
 @Repository
 public interface ListingRepository extends JpaRepository<Listing, String> {
+    @Query("select l from Listing l join fetch l.property p join fetch p.landlord where l.id=:id and " + ListingRepository.PUBLIC_CONDITION)
+    Optional<Listing> findPublicForReview(@Param("id") String id, @Param("time") LocalDateTime time);
+
+    @Query("select count(l)>0 from Listing l where l.property.landlord.id=:landlordId and " + PUBLIC_CONDITION)
+    boolean hasPublicListing(@Param("landlordId") String landlordId, @Param("time") LocalDateTime time);
     String EFFECTIVE_PRIORITY = """
             case when exists (select a.id from BoostAllocation a join a.subscription b
                 where a.listing = l and a.priorityLevel = 2 and b.status = 'ACTIVE' and b.startAt <= :time and b.endAt > :time) then 2

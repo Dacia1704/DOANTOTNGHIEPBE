@@ -72,6 +72,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/payments/vnpay/ipn", "/api/payments/vnpay/return").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/listings/mine", "/api/listings/pending", "/api/listings/admin").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/listings", "/api/listings/{id}", "/api/listings/{id}/bookable-rooms").permitAll()
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/listings/{id}/reviews", "/api/listings/{id}/reviews/summary",
+                                "/api/listings/{id}/rooms/{roomId}/reviews", "/api/listings/{id}/rooms/{roomId}/reviews/summary",
+                                "/api/landlords/{id}/reviews", "/api/landlords/{id}/reviews/summary").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/room-types", "/api/room-types/filter",
                                 "/api/amenities", "/api/amenities/filter", "/api/provinces", "/api/wards").permitAll()
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()

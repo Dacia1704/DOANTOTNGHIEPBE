@@ -6,6 +6,14 @@ import org.springframework.http.HttpStatus;
 
 @Getter
 public enum ErrorCode {
+    REVIEW_NOT_ELIGIBLE(HttpStatus.BAD_REQUEST, "Hợp đồng chưa đủ điều kiện đánh giá"),
+    REVIEW_HIDDEN(HttpStatus.CONFLICT, "Đánh giá đã bị ẩn"),
+    REPORT_ALREADY_OPEN(HttpStatus.CONFLICT, "Bạn đã có báo cáo đang xử lý cho đối tượng này"),
+    REPORT_CONTRACT_REQUIRED(HttpStatus.FORBIDDEN, "Chỉ được báo cáo chủ trọ đã có hợp đồng được xác nhận"),
+    REPORT_INVALID_TRANSITION(HttpStatus.CONFLICT, "Trạng thái báo cáo không cho phép thao tác này"),
+    REPORT_NOT_ASSIGNED_TO_YOU(HttpStatus.FORBIDDEN, "Báo cáo được giao cho quản trị viên khác"),
+    REPORT_EVIDENCE_UNAVAILABLE(HttpStatus.BAD_GATEWAY, "Không thể tải ảnh bằng chứng"),
+    ROOM_HAS_RENTAL_HISTORY(HttpStatus.CONFLICT, "Phòng đã có lịch sử thuê, không thể xóa"),
     ROOM_UNAVAILABLE(HttpStatus.CONFLICT, "Phòng vừa được người khác giữ/thuê hoặc đang bảo trì"),
     ROOM_BUSY(HttpStatus.CONFLICT, "Phòng đang được xử lý, vui lòng thử lại"),
     REQUEST_ALREADY_PENDING(HttpStatus.CONFLICT, "Bạn đã gửi yêu cầu khác đang chờ cho phòng này"),
