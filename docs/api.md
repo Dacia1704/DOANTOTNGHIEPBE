@@ -1373,17 +1373,21 @@ Migration V5 lưu payments.vnp_create_date để QueryDr dùng đúng vnp_Create
 POST `/api/listings`, quyền LANDLORD, tạo và gửi PENDING ngay:
 
 ```json
-{"roomId":"uuid-phong","title":"Phòng cho thuê","description":"Nội dung tin"}
+{"propertyId":"uuid-co-so","title":"Phòng cho thuê","description":"Nội dung tin","priorityLevel":0,"boostSubscriptionId":"uuid-goi-boost-da-mua","boostPriorityLevel":2}
 ```
 
-Phòng phải thuộc chủ trọ và AVAILABLE. Title bắt buộc, tối đa 255 ký tự; description tối đa 20.000 ký tự. Server tạo slug và các mốc thời gian; không nhận trạng thái/ưu tiên/ngày đăng từ client.
+Cơ sở phải thuộc chủ trọ và có phòng/căn AVAILABLE. Title bắt buộc, tối đa 255 ký tự; description tối đa 20.000 ký tự. Server tạo slug, trạng thái và các mốc thời gian.
 
-- Quota là giới hạn đồng thời, chỉ tính PENDING có pendingExpiresAt > now và PUBLISHED có expiresAt > now.
+- `priorityLevel` tùy chọn 0–2: chọn ưu tiên gói dịch vụ, mặc định 0.
+- `boostSubscriptionId` và `boostPriorityLevel` (1 hoặc 2) cùng có hoặc cùng bỏ. Khi dùng Boost, `priorityLevel` phải là 0 hoặc bỏ. Boost phải thuộc chủ trọ, ACTIVE, còn hạn và còn lượt tương ứng. Không mua gói mới trong request tạo tin.
+- Tạo tin và trừ một lượt đăng cùng lượt ưu tiên đã chọn trong một transaction. Bất kỳ bước nào thất bại đều rollback, không để lại tin hoặc trừ lượt một phần.
+
+- Quota là lượt đã sử dụng của kỳ, bao gồm tin ẩn/hết hạn. Chỉ admin từ chối ngay lần duyệt đầu mới hoàn đúng các lượt đã trừ về nguồn gói tương ứng. Sau khi ẩn, hết hạn, đã duyệt hoặc gửi duyệt lại, từ chối không hoàn lượt.
 - Kiểm tra gói, quota và tin cùng phòng khi tạo, gửi lại và duyệt; bản ghi chủ trọ được khóa để chống thao tác đồng thời vượt quota.
 - PENDING giữ chỗ 7 ngày; duyệt tại quota đầy không đếm trùng chính tin đang duyệt. Quá hạn chờ thì admin không duyệt trực tiếp được.
 - PUT `/api/listings/{id}` với body `{"title":"Nội dung mới","description":"..."}`: chủ tin sửa nội dung khi tin không còn giữ quota (đã ẩn, từ chối hoặc quá hạn). Tin PENDING/PUBLISHED đang hiệu lực phải ẩn trước khi sửa; sửa không tự xuất bản hay tự kéo dài hạn.
 - POST `/api/listings/{id}/submit`: chủ tin gửi duyệt lại khi tin không còn giữ quota; kiểm tra quyền/quota và bắt đầu cửa sổ PENDING 7 ngày mới.
-- POST `/api/listings/{id}/hide`: chủ tin ẩn tin, giải phóng quota và slot theo gói; không xóa lịch sử hoặc kéo dài Boost.
+- POST `/api/listings/{id}/hide`: chủ tin ẩn tin và ngừng lựa chọn ưu tiên/Boost, giữ lượt đã dùng; không hoàn lượt hoặc kéo dài Boost.
 
 ### 12.2. Duyệt và hiển thị
 
@@ -1394,7 +1398,7 @@ Phòng phải thuộc chủ trọ và AVAILABLE. Title bắt buộc, tối đa 2
 - GET `/api/listings/{id}`: công khai, chỉ chi tiết PUBLISHED còn hạn, các trường hợp khác trả 404.
 - GET `/api/listings/mine?page=0&size=10`: LANDLORD xem tin của mình ở mọi trạng thái; endpoint này vẫn yêu cầu xác thực.
 
-ListingResponse gồm id, roomId, landlordId, title, slug, description, status, rejectionReason, priorityLevel, packagePriorityLevel, submittedAt, pendingExpiresAt, publishedAt, expiresAt, createdAt. packagePriorityLevel chỉ trả lựa chọn còn hiệu lực của kỳ hiện tại; priorityLevel là mức hiển thị thực tế, có tính Boost và mức mặc định Business.
+ListingResponse gồm id, propertyId, property, propertyName, rentalMode, landlordId, landlordName, title, slug, description, status, rejectionReason, priorityLevel, packagePriorityLevel, submittedAt, pendingExpiresAt, publishedAt, expiresAt, createdAt. Bổ sung `initialReview` (tin còn ở lần duyệt đầu) và `boostAllocation` (`{listingId,boostSubscriptionId,level}` hoặc null). Boost đã chọn xuất hiện cả khi PENDING còn hạn; priorityLevel vẫn là 0 đến khi được duyệt. packagePriorityLevel trả lựa chọn còn hiệu lực của kỳ hiện tại.
 
 Hết gói/hạ quota không xóa hoặc ẩn tin cũ trước expiresAt. Tin quá hạn không xuất hiện dù tác vụ nền chưa chuyển trạng thái. Đăng lại luôn PENDING, phải được duyệt lại để bắt đầu tháng hiển thị mới.
 
@@ -1438,8 +1442,8 @@ Thanh toán trong 15 phút bằng POST `/api/payments/vnpay/checkout`, body `{"t
 GET `/api/boost-subscriptions/active` trả mảng các gói đang hiệu lực. Mỗi phần tử gồm:
 
 - `subscription`: thông tin gói đã mua theo response ở trên.
-- `usedHighPrioritySlots`, `usedLowPrioritySlots`: số suất đang dùng.
-- `remainingHighPrioritySlots`, `remainingLowPrioritySlots`: số suất còn trống.
+- `usedHighPrioritySlots`, `usedLowPrioritySlots`: lượt đã dùng, kể cả phân bổ đã bỏ hoặc tin ẩn/hết hạn.
+- `remainingHighPrioritySlots`, `remainingLowPrioritySlots`: lượt còn lại.
 - `allocations`: danh sách `{listingId, boostSubscriptionId, level}`.
 
 Tổng quyền khả dụng là tổng số suất của các gói còn hiệu lực. Mỗi phân bổ thuộc một gói cụ thể; không tự chuyển phân bổ sang gói khác khi hết hạn.
@@ -1452,15 +1456,15 @@ PUT `/api/boost-subscriptions/allocations/{listingId}`:
 {"boostSubscriptionId":"uuid-goi-da-mua","level":2}
 ```
 
-- `level` chỉ nhận 1 (thấp) hoặc 2 (cao), bắt buộc. Tin phải thuộc chủ trọ, PUBLISHED và còn hạn.
+- `level` chỉ nhận 1 (thấp) hoặc 2 (cao), bắt buộc. Tin phải thuộc chủ trọ, PENDING còn hạn chờ duyệt hoặc PUBLISHED còn hạn hiển thị.
 - Gói đích phải ACTIVE và còn thời hạn; giới hạn lấy từ snapshot số suất tương ứng.
 - Mỗi tin chỉ giữ một phân bổ Boost. Gọi lại cùng body không tốn thêm suất. Đổi level hoặc boostSubscriptionId thay thế phân bổ cũ trong một transaction; nếu gói đích hết suất, phân bổ cũ được giữ nguyên.
 - Khóa chủ trọ ngăn các request đồng thời vượt suất. Các suất cao/thấp không hoán đổi với nhau và không reset theo lượt sử dụng.
 - Response `{listingId, boostSubscriptionId, level}` là mức Boost được gán, có thể khác mức hiển thị cuối cùng.
 
-DELETE `/api/boost-subscriptions/allocations/{listingId}` bỏ phân bổ và giải phóng suất. Lặp lại với tin thuộc chủ trọ đã không còn phân bổ vẫn thành công. Response theo ApiResponse, data null.
+DELETE `/api/boost-subscriptions/allocations/{listingId}` bỏ phân bổ, giữ lượt đã dùng. Lặp lại với tin thuộc chủ trọ đã không còn phân bổ vẫn thành công. Response theo ApiResponse, data null.
 
-Mức hiển thị cuối cùng = max(mức từ gói dịch vụ, mức Boost đang được gán). Boost không trừ suất gói dịch vụ, không thay đổi publishedAt/expiresAt hoặc số tin được phép đăng. Tin được ẩn sẽ giải phóng suất ngay; tin/gói hết hạn không còn hiệu lực ngay trong truy vấn, và phân bổ được dọn khi đồng bộ hoặc thao tác/xem gói Boost.
+Mức hiển thị cuối cùng = max(mức từ gói dịch vụ, mức Boost đang được gán). Boost không trừ lượt ưu tiên gói dịch vụ, không thay đổi publishedAt/expiresAt hoặc số tin được phép đăng. Ẩn tin, hết hạn, bỏ/đổi Boost không hoàn lượt. Chỉ từ chối ở lần duyệt đầu mới hoàn lượt; không ảnh hưởng giá, thanh toán, hạn gói hoặc những tin khác.
 
 Lỗi: 400 khi dữ liệu/mức ưu tiên/trạng thái tin không hợp lệ hoặc gói hết hiệu lực; 401 khi chưa xác thực; 403 khi sai vai trò; 404 khi tin/gói đã mua không thuộc chủ trọ hoặc không tồn tại; 409 `BOOST_SLOTS_EXCEEDED` khi hết suất đúng mức. Cấu hình cả hai số suất bằng 0 trả 400 `INVALID_BOOST_PACKAGE`.
 

@@ -319,7 +319,12 @@ public class ServiceSubscriptionServiceImpl implements ServiceSubscriptionServic
         subscriptionRepository.saveAndFlush(current);
         appendPeriod(order, null, time, time, false);
         var newPeriod = periodRepository.findBySubscription_IdOrderByPeriodNumberAsc(order.getSubscription().getId()).getFirst();
+        // An immediate upgrade increases rights without restoring already consumed credits.
         for (var listing : listingRepository.findByProperty_Landlord_Id(order.getLandlord().getId())) {
+            if (listing.getPostingQuotaPeriod() != null && listing.getPostingQuotaPeriod().getId().equals(oldPeriod.getId()))
+                listing.setPostingQuotaPeriod(newPeriod);
+            if (listing.getPriorityQuotaPeriod() != null && listing.getPriorityQuotaPeriod().getId().equals(oldPeriod.getId()))
+                listing.setPriorityQuotaPeriod(newPeriod);
             if (listing.getServiceSubscriptionPeriod() != null
                     && listing.getServiceSubscriptionPeriod().getId().equals(oldPeriod.getId())) {
                 if (listing.getPackagePriorityLevel() == 1 && order.getDefaultPriorityLevelSnapshot() == 1) {

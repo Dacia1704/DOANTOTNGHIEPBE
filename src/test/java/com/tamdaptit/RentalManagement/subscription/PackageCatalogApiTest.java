@@ -695,7 +695,8 @@ class PackageCatalogApiTest {
     private static void removeCommittedFixtures() {
         // Concurrency tests commit fixtures for worker transactions, in this class's isolated schema only.
         jdbc().update("DELETE FROM invoices");
-        jdbc().update("UPDATE listings SET service_subscription_period_id=NULL,package_priority_level=0");
+        jdbc().update("UPDATE listings SET service_subscription_period_id=NULL,package_priority_level=0,"
+                + "posting_quota_period_id=NULL,posting_quota_consumed=FALSE,priority_quota_period_id=NULL,consumed_priority_levels=0");
         jdbc().update("DELETE FROM service_subscription_periods");
         jdbc().update("DELETE FROM payments");
         jdbc().update("DELETE FROM boost_allocations");
@@ -722,9 +723,10 @@ class PackageCatalogApiTest {
         jdbc().update("INSERT INTO provinces(id,code,name) VALUES ('p-test','P-TEST','Test')");
         jdbc().update("INSERT INTO wards(id,province_id,code,name) VALUES ('w-test','p-test','W-TEST','Test')");
         jdbc().update("INSERT INTO room_types(id,name) VALUES ('rt-test','Test room')");
+        jdbc().update("INSERT INTO property_types(id,name) VALUES ('pt-quota-test','Quota test property') ON DUPLICATE KEY UPDATE name=VALUES(name)");
         for (int i = 1; i <= count; i++) {
             jdbc().update("INSERT INTO properties(id,landlord_id,property_type_id,name,rental_mode,province_id,ward_id,address_line) "
-                    + "VALUES (?,'owner','00000000-0000-0000-0000-000000000011','Test','BY_ROOM','p-test','w-test','Test address')", "room-" + i);
+                    + "VALUES (?,'owner','pt-quota-test','Test','BY_ROOM','p-test','w-test','Test address')", "room-" + i);
             jdbc().update("""
                     INSERT INTO rooms(id,property_id,room_number,room_type_id,price,area_m2)
                     VALUES (?,?,?,'rt-test',100,20)
@@ -897,11 +899,13 @@ class PackageCatalogApiTest {
     @Test
     void freeQuotaCountsPendingAndPublishedWithoutCountingApprovalTwice() throws Exception {
         createOwners(); roomFixtures(4);
-        var first = submitRoom(1); submitRoom(2); submitRoom(3);
+        var first = submitRoom(1); var second = submitRoom(2); submitRoom(3);
         var published = listings().approve("admin", first.id());
         assertEquals(ListingStatus.PUBLISHED, published.status());
         assertThrows(AppException.class, () -> submitRoom(4));
         listings().hide("owner", first.id());
+        assertThrows(AppException.class, () -> submitRoom(4));
+        listings().reject("admin", second.id(), "Initial rejection refunds one credit");
         assertEquals(ListingStatus.PENDING, submitRoom(4).status());
         assertThrows(AppException.class, () -> listings().create("other", new ListingRequest("room-1", "Invalid", null)));
         mvc.perform(post("/api/listings/" + first.id() + "/approve").with(user("owner").roles("LANDLORD")))
@@ -910,12 +914,12 @@ class PackageCatalogApiTest {
     }
 
     @Test
-    void pendingHoldsSevenDaysAndRepostAlwaysRequiresFreshApproval() {
+    void pendingExpiryKeepsSpentCreditsAndRepostAlwaysRequiresFreshApproval() {
         createOwners(); roomFixtures(4);
         var pending = submitRoom(1); submitRoom(2); submitRoom(3);
         clock.set("2026-02-07T10:00:00");
         assertThrows(AppException.class, () -> listings().approve("admin", pending.id()));
-        submitRoom(4);
+        assertThrows(AppException.class, () -> submitRoom(4));
         var resubmitted = listings().submit("owner", pending.id());
         assertEquals(LocalDateTime.parse("2026-02-14T10:00:00"), resubmitted.pendingExpiresAt());
         clock.set("2026-02-13T10:00:00");
@@ -943,7 +947,7 @@ class PackageCatalogApiTest {
     }
 
     @Test
-    void prioritySlotsCanBeMovedAndFeedUsesPriorityThenNewestPublishTime() throws Exception {
+    void priorityCreditsCannotBeMovedAndFeedUsesPriorityThenNewestPublishTime() throws Exception {
         createOwners(); roomFixtures(3);
         String pack = id(mvc.perform(admin(post("/api/service-packages")).contentType(APPLICATION_JSON)
                 .content(packageJson("SLOTS", "5", 1, 1, 0, false))).andExpect(status().isOk())
@@ -955,9 +959,29 @@ class PackageCatalogApiTest {
         listings().setPriority("owner", one.id(), 2); listings().setPriority("owner", two.id(), 1);
         assertEquals(List.of(one.id(), two.id(), three.id()), listings().getPublished(0, 10).getData().stream().map(ListingResponse::id).toList());
         assertThrows(AppException.class, () -> listings().setPriority("owner", three.id(), 2));
-        listings().setPriority("owner", one.id(), 0); listings().setPriority("owner", three.id(), 2);
+        listings().setPriority("owner", one.id(), 0);
+        assertThrows(AppException.class, () -> listings().setPriority("owner", three.id(), 2));
+        listings().setPriority("owner", one.id(), 2); // The same listing can reuse its consumed credit.
         listings().setPriority("owner", two.id(), 0);
-        assertEquals(List.of(three.id(), two.id(), one.id()), listings().getPublished(0, 10).getData().stream().map(ListingResponse::id).toList());
+        assertEquals(List.of(one.id(), three.id(), two.id()), listings().getPublished(0, 10).getData().stream().map(ListingResponse::id).toList());
+    }
+
+    @Test
+    void changingPriorityKeepsBothConsumedLevelsOnTheExistingListing() throws Exception {
+        createOwners(); roomFixtures(2);
+        String pack = id(mvc.perform(admin(post("/api/service-packages")).contentType(APPLICATION_JSON)
+                .content(packageJson("BOTH-LEVELS", "2", 1, 1, 0, false))).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        paid(createPrice(pack, 1), ServiceSubscriptionOrderType.PURCHASE);
+        var one = publishRoom(1); var two = publishRoom(2);
+        listings().setPriority("owner", one.id(), 2);
+        listings().setPriority("owner", one.id(), 1);
+        listings().setPriority("owner", one.id(), 2);
+        listings().setPriority("owner", one.id(), 0);
+        assertEquals(3, jdbc().queryForObject("SELECT consumed_priority_levels FROM listings WHERE id=?", Integer.class, one.id()));
+        assertThrows(AppException.class, () -> listings().setPriority("owner", two.id(), 2));
+        assertThrows(AppException.class, () -> listings().setPriority("owner", two.id(), 1));
+        assertEquals(2, listings().setPriority("owner", one.id(), 2).priorityLevel());
     }
 
     @Test
@@ -1038,7 +1062,7 @@ class PackageCatalogApiTest {
         assertEquals(2, listings().getPublished(0, 10).getTotalElements());
         assertEquals(2, subscriptions().getPeriods("owner", 0, 10).getTotalElements());
         assertEquals(0, jdbc().queryForObject("SELECT package_priority_level FROM listings WHERE id=?", Integer.class, listing.id()));
-        assertThrows(AppException.class, () -> submitRoom(3));
+        submitRoom(3); // A newly purchased renewal period grants its own posting credits.
     }
 
     @Test
@@ -1383,7 +1407,7 @@ class PackageCatalogApiTest {
     }
 
     @Test
-    void boostPurchasedBeforeListingsCanAllocateBothLevelsAndReleaseSlots() throws Exception {
+    void boostPurchasedBeforeListingsKeepsConsumedCreditsAfterRemovingOrHiding() throws Exception {
         createOwners();
         String boostId = id(mvc.perform(post("/api/boost-subscriptions").with(user("owner").roles("LANDLORD"))
                 .contentType(APPLICATION_JSON).content("{\"boostPackageId\":\"" + createBoost(1) + "\"}"))
@@ -1406,9 +1430,9 @@ class PackageCatalogApiTest {
                 .andExpect(status().isConflict());
         mvc.perform(delete("/api/boost-subscriptions/allocations/" + high.id()).with(user("owner").roles("LANDLORD")))
                 .andExpect(status().isOk());
-        assignBoost(normal.id(), boostId, 2);
+        assertThrows(AppException.class, () -> assignBoost(normal.id(), boostId, 2));
         listings().hide("owner", low.id());
-        assertEquals(1, allocations().getActive("owner").getFirst().remainingLowPrioritySlots());
+        assertEquals(0, allocations().getActive("owner").getFirst().remainingLowPrioritySlots());
         assertEquals(0, listings().getPublishedById(high.id()).priorityLevel());
         assertEquals(high.expiresAt(), listings().getPublishedById(high.id()).expiresAt());
     }
@@ -1430,12 +1454,17 @@ class PackageCatalogApiTest {
         assignBoost(high.id(), first.id(), 1);
         assertEquals(2, listings().getPublishedById(high.id()).priorityLevel());
         assignBoost(high.id(), second.id(), 2);
-        assignBoost(low.id(), first.id(), 1);
-        assertEquals(2, jdbc().queryForObject("SELECT COUNT(*) FROM boost_allocations", Integer.class));
-        assertEquals(1, allocations().getActive("owner").stream().filter(b -> b.subscription().id().equals(first.id()))
-                .findFirst().orElseThrow().remainingHighPrioritySlots());
+        assertThrows(AppException.class, () -> assignBoost(low.id(), first.id(), 1));
+        assignBoost(low.id(), first.id(), 2);
+        assertEquals(2, jdbc().queryForObject("SELECT COUNT(*) FROM boost_allocations WHERE active=TRUE", Integer.class));
+        assertEquals(0, allocations().getActive("owner").stream().filter(b -> b.subscription().id().equals(first.id()))
+                .findFirst().orElseThrow().remainingLowPrioritySlots());
         assignBoost(high.id(), second.id(), 2); // Repeating the same assignment consumes no extra slot.
-        assertEquals(2, jdbc().queryForObject("SELECT COUNT(*) FROM boost_allocations", Integer.class));
+        assertEquals(2, jdbc().queryForObject("SELECT COUNT(*) FROM boost_allocations WHERE active=TRUE", Integer.class));
+        assignBoost(high.id(), first.id(), 1); // Restore an earlier consumed selection without creating another usage.
+        assignBoost(high.id(), second.id(), 2);
+        assertEquals(3, jdbc().queryForObject("SELECT COUNT(*) FROM boost_allocations", Integer.class));
+        assertEquals(2, jdbc().queryForObject("SELECT COUNT(*) FROM boost_allocations WHERE active=TRUE", Integer.class));
     }
 
     @Test
@@ -1455,7 +1484,7 @@ class PackageCatalogApiTest {
         assertEquals(1, listings().getPublishedById(b.id()).priorityLevel());
         context.getBean(SubscriptionExpiryJob.class).refreshDueOwners();
         assertEquals(1, allocations().getActive("owner").size());
-        assertEquals(1, jdbc().queryForObject("SELECT COUNT(*) FROM boost_allocations", Integer.class));
+        assertEquals(1, jdbc().queryForObject("SELECT COUNT(*) FROM boost_allocations WHERE active=TRUE", Integer.class));
     }
 
     @Test
@@ -1469,7 +1498,7 @@ class PackageCatalogApiTest {
             var one = executor.submit(() -> { try { assignBoost(a.id(), boost.id(), 2); return true; } catch (AppException e) { return false; } });
             var two = executor.submit(() -> { try { assignBoost(b.id(), boost.id(), 2); return true; } catch (AppException e) { return false; } });
             assertNotEquals(one.get(15, TimeUnit.SECONDS), two.get(15, TimeUnit.SECONDS));
-            assertEquals(1, jdbc().queryForObject("SELECT COUNT(*) FROM boost_allocations", Integer.class));
+            assertEquals(1, jdbc().queryForObject("SELECT COUNT(*) FROM boost_allocations WHERE active=TRUE", Integer.class));
         } finally { removeCommittedFixtures(); }
     }
 
@@ -1493,7 +1522,7 @@ class PackageCatalogApiTest {
                 .andExpect(status().isBadRequest());
         mvc.perform(get("/api/boost-subscriptions/active").with(user("tenant").roles("TENANT")))
                 .andExpect(status().isForbidden());
-        assertEquals(0, jdbc().queryForObject("SELECT COUNT(*) FROM boost_allocations", Integer.class));
+        assertEquals(0, jdbc().queryForObject("SELECT COUNT(*) FROM boost_allocations WHERE active=TRUE", Integer.class));
     }
 
     private static String tierPrice(String code, String max, int high, int low, int defaultLevel, boolean stats, int amount) throws Exception {
@@ -1634,6 +1663,7 @@ class PackageCatalogApiTest {
     void publicCatalogOnlyShowsPublishedPostsWhileAdminSeesAllPosts() throws Exception {
         createOwners();
         roomFixtures(6);
+        paid(createPrice(createPackage("VISIBILITY"), 1), ServiceSubscriptionOrderType.PURCHASE);
         var visible = publishRoom(1);
         var pending = submitRoom(2);
         var hidden = publishRoom(3);
@@ -1721,6 +1751,286 @@ class PackageCatalogApiTest {
                 .andExpect(jsonPath("$.data.data[0].id").value("zz-latest-property-post"));
         assertEquals(2, listings().getMine("owner", 0, 10).getTotalElements());
         assertEquals(original.id(), listings().getPublishedById(original.id()).id());
+    }
+
+    @Test
+    void hidingPendingAndExpiringPendingNeverRefundPostingCredits() throws Exception {
+        createOwners(); roomFixtures(4);
+        var first = submitRoom(1); submitRoom(2); submitRoom(3);
+        listings().hide("owner", first.id());
+        assertEquals(3, usedCredits(0));
+        mvc.perform(post("/api/listings").with(user("owner").roles("LANDLORD"))
+                .contentType(APPLICATION_JSON).content("{\"propertyId\":\"room-4\",\"title\":\"Blocked\"}"))
+                .andExpect(status().isBadRequest());
+        listings().submit("owner", first.id());
+        assertEquals(3, usedCredits(0));
+        clock.set("2026-02-08T10:00:00");
+        context.getBean(SubscriptionLifecycleService.class).refreshOwner("owner");
+        assertEquals(3, usedCredits(0));
+    }
+
+    private static long usedCredits(int level) {
+        return level == 0
+                ? jdbc().queryForObject("SELECT COUNT(*) FROM listings WHERE posting_quota_consumed=TRUE", Long.class)
+                : jdbc().queryForObject("SELECT COUNT(*) FROM listings WHERE (consumed_priority_levels & ?) <> 0", Long.class, level);
+    }
+
+    private static String paidBoost() throws Exception {
+        var boost = boosts().create("owner", new BoostPurchaseRequest(createBoost(1)));
+        ipn(callback(checkout(boost.id(), PaymentType.BOOST_PACKAGE), "00"), "00");
+        return boost.id();
+    }
+
+    @Test
+    void createWithBoostReservesPendingCreditAndApprovalDoesNotConsumeTwice() throws Exception {
+        createOwners(); roomFixtures(1);
+        String boost = paidBoost();
+        String body = mvc.perform(post("/api/listings").with(user("owner").roles("LANDLORD"))
+                .contentType(APPLICATION_JSON).content(new ObjectMapper().writeValueAsString(
+                        new ListingRequest("room-1", "Boost at submission", "", 0, boost, 2))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.priorityLevel").value(0))
+                .andExpect(jsonPath("$.data.boostAllocation.boostSubscriptionId").value(boost))
+                .andExpect(jsonPath("$.data.boostAllocation.level").value(2))
+                .andExpect(jsonPath("$.data.initialReview").value(true))
+                .andReturn().getResponse().getContentAsString();
+        String listing = id(body);
+        assertEquals(1, usedCredits(0));
+        assertEquals(0, allocations().getActive("owner").getFirst().remainingHighPrioritySlots());
+        context.getBean(SubscriptionLifecycleService.class).refreshOwner("owner");
+        assertEquals(1, allocations().getActive("owner").getFirst().allocations().size());
+        assertEquals(0, listings().getPublished(0, 10).getTotalElements());
+        var published = listings().approve("admin", listing);
+        assertEquals(2, published.priorityLevel());
+        assertFalse(published.initialReview());
+        assertEquals(1, usedCredits(0));
+        assertEquals(0, allocations().getActive("owner").getFirst().remainingHighPrioritySlots());
+    }
+
+    @Test
+    void initialBoostRejectionRestoresExactlyThePreviousHighAndLowBalances() throws Exception {
+        createOwners(); roomFixtures(3);
+        String boost = paidBoost();
+        var existing = listings().create("owner", new ListingRequest("room-1", "Existing boost", "", 0, boost, 1));
+        listings().approve("admin", existing.id());
+        long postingBefore = usedCredits(0);
+        var before = allocations().getActive("owner").getFirst();
+        var pending = listings().create("owner", new ListingRequest("room-2", "Reject boost", "", 0, boost, 2));
+        assertEquals(postingBefore + 1, usedCredits(0));
+        listings().reject("admin", pending.id(), "Incomplete");
+        var after = allocations().getActive("owner").getFirst();
+        assertEquals(postingBefore, usedCredits(0));
+        assertEquals(before.remainingHighPrioritySlots(), after.remainingHighPrioritySlots());
+        assertEquals(before.remainingLowPrioritySlots(), after.remainingLowPrioritySlots());
+        assertEquals(before.allocations(), after.allocations());
+        assertThrows(AppException.class, () -> listings().reject("admin", pending.id(), "Again"));
+        assertEquals(postingBefore, usedCredits(0));
+    }
+
+    @Test
+    void hidingOrExpiringBeforeResubmissionCannotTurnLaterRejectionIntoARefund() throws Exception {
+        createOwners(); roomFixtures(2);
+        String boost = paidBoost();
+        var hidden = listings().create("owner", new ListingRequest("room-1", "Hidden pending", "", 0, boost, 2));
+        var expired = listings().create("owner", new ListingRequest("room-2", "Expired pending", "", 0, boost, 1));
+        listings().hide("owner", hidden.id());
+        listings().submit("owner", hidden.id());
+        listings().reject("admin", hidden.id(), "Not the initial review");
+        clock.set("2026-02-08T10:00:00");
+        // Resubmit without running the expiry job first.
+        assertEquals(null, listings().submit("owner", expired.id()).boostAllocation());
+        listings().reject("admin", expired.id(), "Not the initial review");
+        assertEquals(2, usedCredits(0));
+        var balance = allocations().getActive("owner").getFirst();
+        assertEquals(0, balance.remainingHighPrioritySlots());
+        assertEquals(0, balance.remainingLowPrioritySlots());
+        assertTrue(balance.allocations().isEmpty());
+    }
+
+    @Test
+    void secondReviewAfterInitialRefundDoesNotRefundAgain() {
+        createOwners(); roomFixtures(1);
+        var pending = submitRoom(1);
+        listings().reject("admin", pending.id(), "First review");
+        assertEquals(0, usedCredits(0));
+        listings().submit("owner", pending.id());
+        listings().reject("admin", pending.id(), "Second review");
+        assertEquals(1, usedCredits(0));
+    }
+
+    @Test
+    void invalidOrExhaustedBoostCreationRollsBackPostingAndAllocation() throws Exception {
+        createOwners(); roomFixtures(3);
+        String boost = paidBoost();
+        listings().create("owner", new ListingRequest("room-1", "Uses high credit", "", 0, boost, 2));
+        commitFixtures();
+        try {
+            for (var request : List.of(
+                    new ListingRequest("room-2", "No boost credit", "", 0, boost, 2),
+                    new ListingRequest("room-2", "Missing boost", "", 0, "missing", 1))) {
+                mvc.perform(post("/api/listings").with(user("owner").roles("LANDLORD"))
+                        .contentType(APPLICATION_JSON).content(new ObjectMapper().writeValueAsString(request)))
+                        .andExpect(status().is4xxClientError());
+                assertEquals(1, usedCredits(0));
+                assertEquals(1, jdbc().queryForObject("SELECT COUNT(*) FROM listings", Integer.class));
+                assertEquals(1, jdbc().queryForObject("SELECT COUNT(*) FROM boost_allocations", Integer.class));
+            }
+            for (var request : List.of(
+                    new ListingRequest("room-2", "Missing level", "", 0, boost, null),
+                    new ListingRequest("room-2", "Missing package", "", 0, null, 1),
+                    new ListingRequest("room-2", "Two priority sources", "", 2, boost, 1))) {
+                mvc.perform(post("/api/listings").with(user("owner").roles("LANDLORD"))
+                        .contentType(APPLICATION_JSON).content(new ObjectMapper().writeValueAsString(request)))
+                        .andExpect(status().isBadRequest());
+            }
+            mvc.perform(post("/api/listings").with(user("other").roles("LANDLORD"))
+                    .contentType(APPLICATION_JSON).content(new ObjectMapper().writeValueAsString(
+                            new ListingRequest("room-2", "Other owner", "", 0, boost, 1))))
+                    .andExpect(status().is4xxClientError());
+            assertEquals(1, usedCredits(0));
+        } finally { removeCommittedFixtures(); }
+    }
+
+    @Test
+    void concurrentBoostSubmissionsCannotSpendTheSameLastCredit() throws Exception {
+        createOwners(); roomFixtures(2);
+        String boost = paidBoost();
+        commitFixtures();
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var one = executor.submit(() -> {
+                try { listings().create("owner", new ListingRequest("room-1", "One", "", 0, boost, 2)); return true; }
+                catch (AppException e) { return false; }
+            });
+            var two = executor.submit(() -> {
+                try { listings().create("owner", new ListingRequest("room-2", "Two", "", 0, boost, 2)); return true; }
+                catch (AppException e) { return false; }
+            });
+            assertNotEquals(one.get(15, TimeUnit.SECONDS), two.get(15, TimeUnit.SECONDS));
+            assertEquals(1, usedCredits(0));
+            assertEquals(1, jdbc().queryForObject("SELECT COUNT(*) FROM listings", Integer.class));
+            assertEquals(1, jdbc().queryForObject("SELECT COUNT(*) FROM boost_allocations", Integer.class));
+        } finally { removeCommittedFixtures(); }
+    }
+
+    @Test
+    void initialRejectionRefundsPostingAndPriorityExactlyOnceAndResubmissionChargesAgain() throws Exception {
+        createOwners(); roomFixtures(2);
+        String pack = id(mvc.perform(admin(post("/api/service-packages")).contentType(APPLICATION_JSON)
+                .content(packageJson("REFUND", "2", 1, 1, 0, false))).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        paid(createPrice(pack, 1), ServiceSubscriptionOrderType.PURCHASE);
+        var pending = listings().create("owner", new ListingRequest("room-1", "Priority pending", "", 2));
+        assertEquals(1, usedCredits(0));
+        assertEquals(1, usedCredits(2));
+        assertEquals(2, pending.packagePriorityLevel());
+        context.getBean(SubscriptionLifecycleService.class).refreshOwner("owner");
+        assertEquals(2, listings().getMine("owner", 0, 10).getData().getFirst().packagePriorityLevel());
+        listings().reject("admin", pending.id(), "Missing details");
+        assertEquals(0, usedCredits(0));
+        assertEquals(0, usedCredits(2));
+        assertThrows(AppException.class, () -> listings().reject("admin", pending.id(), "Repeated"));
+        assertEquals(0, usedCredits(0));
+        listings().submit("owner", pending.id());
+        assertEquals(1, usedCredits(0));
+    }
+
+    @Test
+    void approvalDoesNotChargeTwiceAndLaterRejectionNeverRefundsAnApprovedListing() {
+        createOwners(); roomFixtures(3);
+        var one = submitRoom(1); submitRoom(2); submitRoom(3);
+        listings().approve("admin", one.id());
+        assertEquals(3, usedCredits(0));
+        listings().hide("owner", one.id());
+        listings().submit("owner", one.id());
+        listings().reject("admin", one.id(), "Rejected after having been public");
+        assertEquals(3, usedCredits(0));
+    }
+
+    @Test
+    void failedPriorityCreationRollsBackTheListingAndPostingCredit() throws Exception {
+        createOwners(); roomFixtures(2);
+        paid(createPrice(createPackage("NO-PRIORITY"), 1), ServiceSubscriptionOrderType.PURCHASE);
+        context.getBean(PlatformTransactionManager.class).commit(transaction); transaction = null;
+        try {
+            mvc.perform(post("/api/listings").with(user("owner").roles("LANDLORD"))
+                    .contentType(APPLICATION_JSON)
+                    .content("{\"propertyId\":\"room-1\",\"title\":\"Invalid priority\",\"priorityLevel\":2}"))
+                    .andExpect(status().isConflict());
+            assertEquals(0, jdbc().queryForObject("SELECT COUNT(*) FROM listings", Integer.class));
+            assertEquals(0, usedCredits(0));
+            mvc.perform(post("/api/listings").with(user("owner").roles("LANDLORD"))
+                    .contentType(APPLICATION_JSON)
+                    .content("{\"propertyId\":\"room-1\",\"title\":\"Invalid level\",\"priorityLevel\":3}"))
+                    .andExpect(status().isBadRequest());
+        } finally { removeCommittedFixtures(); }
+    }
+
+    @Test
+    void immediateUpgradeCarriesSpentCreditsEvenForHiddenListings() throws Exception {
+        createOwners(); roomFixtures(2);
+        String base = id(mvc.perform(admin(post("/api/service-packages")).contentType(APPLICATION_JSON)
+                .content(packageJson("BASE-QUOTA", "1", 1, 0, 0, false))).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        paid(createPrice(base, 1), ServiceSubscriptionOrderType.PURCHASE);
+        var pending = listings().create("owner", new ListingRequest("room-1", "Hidden spent credit", "", 2));
+        listings().hide("owner", pending.id());
+        String higher = id(mvc.perform(admin(post("/api/service-packages")).contentType(APPLICATION_JSON)
+                .content(packageJson("UPGRADE-QUOTA", "2", 2, 0, 0, false))).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        var upgrade = order(createPrice(higher, 1), ServiceSubscriptionOrderType.CHANGE);
+        if (upgrade.status() != APPLIED) ipn(callback(checkout(upgrade.id(), PaymentType.SERVICE_PACKAGE), "00"), "00");
+        assertEquals(1, usedCredits(0));
+        assertEquals(1, usedCredits(2));
+        String period = subscriptions().getCurrent("owner").currentPeriod().id();
+        assertEquals(1, jdbc().queryForObject("SELECT COUNT(*) FROM listings WHERE posting_quota_period_id=? AND priority_quota_period_id=?",
+                Integer.class, period, period));
+    }
+
+    @Test
+    void quotaMigrationCountsOldHiddenAndExpiredPostsButExcludesInitialRejections() throws Exception {
+        String migrationSchema = "quota_migration_test_" + UUID.randomUUID().toString().replace("-", "");
+        try (var admin = DriverManager.getConnection(url(""), dbUser(), dbPassword());
+             var statement = admin.createStatement()) {
+            statement.execute("CREATE DATABASE `" + migrationSchema + "` CHARACTER SET utf8mb4");
+            try {
+                Flyway.configure().dataSource(url(migrationSchema), dbUser(), dbPassword())
+                        .locations("classpath:db/migration").target("3").load().migrate();
+                var migrated = new JdbcTemplate(new DriverManagerDataSource(url(migrationSchema), dbUser(), dbPassword()));
+                migrated.update("INSERT INTO users(id,email,password) VALUES ('migration-owner','quota-migration@example.test','test')");
+                migrated.update("INSERT INTO provinces(id,code,name) VALUES ('migration-p','MIGRATION-P','Test')");
+                migrated.update("INSERT INTO wards(id,province_id,code,name) VALUES ('migration-w','migration-p','MIGRATION-W','Test')");
+                migrated.update("INSERT INTO property_types(id,name) VALUES ('migration-type','Quota migration test')");
+                migrated.update("""
+                        INSERT INTO properties(id,landlord_id,property_type_id,name,rental_mode,province_id,ward_id,address_line)
+                        VALUES ('migration-property','migration-owner','migration-type','Test','BY_ROOM','migration-p','migration-w','Test')
+                        """);
+                for (String state : List.of("HIDDEN", "EXPIRED", "PENDING", "REJECTED")) {
+                    migrated.update("""
+                            INSERT INTO listings(id,property_id,title,status,submitted_at,pending_expires_at,created_at)
+                            VALUES (?,'migration-property','Test',?,'2026-01-01','2026-01-08','2026-01-01')
+                            """, "migration-" + state, state);
+                }
+                migrated.update("""
+                        INSERT INTO listings(id,property_id,title,status,created_at,submitted_at,pending_expires_at)
+                        VALUES ('migration-resubmitted','migration-property','Test','PENDING','2026-01-01','2026-01-03','2026-01-10')
+                        """);
+                migrated.update("""
+                        INSERT INTO listings(id,property_id,title,status,published_at,expires_at)
+                        VALUES ('migration-previously-public','migration-property','Test','REJECTED','2026-01-01','2026-02-01')
+                        """);
+                int tableCount = migrated.queryForObject("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()", Integer.class);
+                Flyway.configure().dataSource(url(migrationSchema), dbUser(), dbPassword())
+                        .locations("classpath:db/migration").load().migrate();
+                assertEquals(tableCount, migrated.queryForObject("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()", Integer.class));
+                assertEquals(5, migrated.queryForObject("SELECT COUNT(*) FROM listings WHERE posting_quota_consumed=TRUE", Integer.class));
+                assertEquals(false, migrated.queryForObject("SELECT posting_quota_consumed FROM listings WHERE id='migration-REJECTED'", Boolean.class));
+                assertEquals(true, migrated.queryForObject("SELECT posting_quota_consumed FROM listings WHERE id='migration-previously-public'", Boolean.class));
+                assertEquals(true, migrated.queryForObject("SELECT initial_review FROM listings WHERE id='migration-PENDING'", Boolean.class));
+                assertEquals(1, migrated.queryForObject("SELECT COUNT(*) FROM listings WHERE initial_review=TRUE", Integer.class));
+            } finally {
+                if (migrationSchema.matches("quota_migration_test_[a-f0-9]{32}"))
+                    statement.execute("DROP DATABASE `" + migrationSchema + "`");
+            }
+        }
     }
 
     private static class TestClock extends Clock {

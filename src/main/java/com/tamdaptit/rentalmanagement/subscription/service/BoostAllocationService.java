@@ -39,7 +39,7 @@ public class BoostAllocationService {
         boosts.findByLandlord_IdAndStatus(landlordId, BoostSubscriptionStatus.ACTIVE).stream()
                 .filter(b -> !time.isBefore(b.getEndAt())).forEach(b -> b.setStatus(BoostSubscriptionStatus.EXPIRED));
         boosts.flush();
-        allocations.deleteAll(allocations.findStale(landlordId, time));
+        allocations.findStale(landlordId, time).forEach(a -> a.setActive(false));
         allocations.flush();
         return time;
     }
@@ -54,7 +54,7 @@ public class BoostAllocationService {
                     long low = assigned.stream().filter(a -> a.getPriorityLevel() == 1).count();
                     return new ActiveBoostResponse(mapper.toResponse(b), high, low,
                             b.getHighPrioritySlotsSnapshot() - high, b.getLowPrioritySlotsSnapshot() - low,
-                            assigned.stream().map(this::response).toList());
+                            assigned.stream().filter(a -> Boolean.TRUE.equals(a.getActive())).map(this::response).toList());
                 }).toList();
     }
 
@@ -64,20 +64,29 @@ public class BoostAllocationService {
             throw new AppException(ErrorCode.INVALID_REQUEST);
         var listing = listings.findByIdAndProperty_Landlord_Id(listingId, landlordId)
                 .orElseThrow(() -> new AppException(ErrorCode.LISTING_NOT_FOUND));
-        if (listing.getStatus() != ListingStatus.PUBLISHED || listing.getExpiresAt() == null
-                || !time.isBefore(listing.getExpiresAt())) throw new AppException(ErrorCode.INVALID_LISTING_STATUS);
+        boolean published = listing.getStatus() == ListingStatus.PUBLISHED && listing.getExpiresAt() != null
+                && time.isBefore(listing.getExpiresAt());
+        boolean pending = listing.getStatus() == ListingStatus.PENDING && listing.getPendingExpiresAt() != null
+                && time.isBefore(listing.getPendingExpiresAt());
+        if (!published && !pending) throw new AppException(ErrorCode.INVALID_LISTING_STATUS);
         var boost = boosts.findByIdAndLandlord_Id(request.boostSubscriptionId(), landlordId)
                 .orElseThrow(() -> new AppException(ErrorCode.SUBSCRIPTION_NOT_FOUND));
         if (boost.getStatus() != BoostSubscriptionStatus.ACTIVE || time.isBefore(boost.getStartAt())
                 || !time.isBefore(boost.getEndAt())) throw new AppException(ErrorCode.SUBSCRIPTION_EXPIRED);
-        long used = allocations.findBySubscription_Id(boost.getId()).stream()
-                .filter(a -> !a.getListing().getId().equals(listingId) && a.getPriorityLevel().equals(request.level())).count();
-        int limit = request.level() == 2 ? boost.getHighPrioritySlotsSnapshot() : boost.getLowPrioritySlotsSnapshot();
-        if (used >= limit) throw new AppException(ErrorCode.BOOST_SLOTS_EXCEEDED);
-        var allocation = allocations.findByListing_Id(listingId).orElseGet(BoostAllocation::new);
+        var previousUse = allocations.findByListing_IdAndSubscription_IdAndPriorityLevel(listingId, boost.getId(), request.level());
+        if (previousUse.isEmpty()) {
+            long used = allocations.findBySubscription_Id(boost.getId()).stream()
+                    .filter(a -> a.getPriorityLevel().equals(request.level())).count();
+            int limit = request.level() == 2 ? boost.getHighPrioritySlotsSnapshot() : boost.getLowPrioritySlotsSnapshot();
+            if (used >= limit) throw new AppException(ErrorCode.BOOST_SLOTS_EXCEEDED);
+        }
+        allocations.findByListing_IdAndActiveTrue(listingId).ifPresent(a -> a.setActive(false));
+        allocations.flush();
+        var allocation = previousUse.orElseGet(BoostAllocation::new);
         allocation.setSubscription(boost);
         allocation.setListing(listing);
         allocation.setPriorityLevel(request.level());
+        allocation.setActive(true);
         allocations.saveAndFlush(allocation);
         listingService.refreshOwner(landlordId);
         return response(allocation);
@@ -87,7 +96,7 @@ public class BoostAllocationService {
         prepare(landlordId);
         listings.findByIdAndProperty_Landlord_Id(listingId, landlordId)
                 .orElseThrow(() -> new AppException(ErrorCode.LISTING_NOT_FOUND));
-        allocations.findByListing_Id(listingId).ifPresent(allocations::delete);
+        allocations.findByListing_IdAndActiveTrue(listingId).ifPresent(a -> a.setActive(false));
         allocations.flush();
         listingService.refreshOwner(landlordId);
     }

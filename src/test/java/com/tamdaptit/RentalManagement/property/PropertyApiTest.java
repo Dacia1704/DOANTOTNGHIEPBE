@@ -76,6 +76,7 @@ class PropertyApiTest {
         jdbc.update("INSERT INTO wards(id,province_id,code,name) VALUES ('w','p','PROP-W','Ward')");
         jdbc.update("INSERT INTO room_types(id,name) VALUES ('rt','Property test room')");
         jdbc.update("INSERT INTO amenities(id,name) VALUES ('a','Property test amenity')");
+        jdbc.update("INSERT INTO property_types(id,name) VALUES ('00000000-0000-0000-0000-000000000011','Property test type')");
     }
 
     @BeforeEach

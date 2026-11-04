@@ -18,12 +18,17 @@ import com.tamdaptit.rentalmanagement.listing.entity.enums.ListingStatus;
 import com.tamdaptit.rentalmanagement.listing.mapper.ListingMapper;
 import com.tamdaptit.rentalmanagement.listing.repository.ListingRepository;
 import com.tamdaptit.rentalmanagement.listing.service.ListingService;
+import com.tamdaptit.rentalmanagement.subscription.dto.response.CurrentSubscriptionResponse;
 import com.tamdaptit.rentalmanagement.room.entity.enums.RoomRentalStatus;
 import com.tamdaptit.rentalmanagement.room.repository.RoomRepository;
 import com.tamdaptit.rentalmanagement.subscription.entity.ServiceSubscriptionPeriod;
 import com.tamdaptit.rentalmanagement.subscription.repository.BoostAllocationRepository;
 import com.tamdaptit.rentalmanagement.subscription.repository.ServiceSubscriptionPeriodRepository;
 import com.tamdaptit.rentalmanagement.subscription.service.ServiceSubscriptionService;
+import com.tamdaptit.rentalmanagement.subscription.service.BoostAllocationService;
+import com.tamdaptit.rentalmanagement.subscription.dto.request.BoostAllocationRequest;
+import com.tamdaptit.rentalmanagement.subscription.dto.response.BoostAllocationResponse;
+import org.springframework.beans.factory.ObjectProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -49,6 +54,8 @@ public class ListingServiceImpl implements ListingService {
     private final ServiceSubscriptionService subscriptions;
     private final ServiceSubscriptionPeriodRepository periods;
     private final BoostAllocationRepository boosts;
+    // Boost allocation also refreshes listings; resolve it only after the listing service is initialized.
+    private final ObjectProvider<BoostAllocationService> boostAllocationService;
     private final ListingMapper mapper;
     private final Clock subscriptionClock;
     private final RoomMapper roomMapper;
@@ -81,6 +88,10 @@ public class ListingServiceImpl implements ListingService {
     @Override
     @Transactional
     public ListingResponse create(String landlordId, ListingRequest request) {
+        if ((request.boostSubscriptionId() == null) != (request.boostPriorityLevel() == null)
+                || (request.boostSubscriptionId() != null && (request.boostSubscriptionId().isBlank()
+                    || (request.priorityLevel() != null && request.priorityLevel() != 0))))
+            throw new AppException(ErrorCode.INVALID_REQUEST);
         lockOwner(landlordId);
         var property = properties.findLockedById(request.propertyId())
                 .orElseThrow(() -> new AppException(ErrorCode.PROPERTY_NOT_FOUND));
@@ -88,6 +99,14 @@ public class ListingServiceImpl implements ListingService {
         var listing = Listing.builder().property(property).title(request.title().trim()).description(request.description())
                 .slug(UUID.randomUUID().toString()).build();
         submit(listing, landlordId, now());
+        selectPackagePriority(listing, subscriptions.getCurrent(landlordId),
+                request.priorityLevel() == null ? 0 : request.priorityLevel());
+        repository.saveAndFlush(listing);
+        if (request.boostSubscriptionId() != null) {
+            boostAllocationService.getObject().assign(landlordId, listing.getId(),
+                    new BoostAllocationRequest(
+                            request.boostSubscriptionId(), request.boostPriorityLevel()));
+        }
         return response(repository.saveAndFlush(listing));
     }
 
@@ -97,13 +116,9 @@ public class ListingServiceImpl implements ListingService {
             throw new AppException(ErrorCode.NO_ACTIVE_SUBSCRIPTION);
         }
         String excludeId = listing.getId() == null ? "" : listing.getId();
-        var quota = current.rights().maxListings();
         // Locking reads see the latest committed rows even when an admin transaction read before waiting for the owner lock.
         var live = repository.findByProperty_Landlord_Id(landlordId).stream()
                 .filter(l -> !l.getId().equals(excludeId) && holdsQuota(l, time)).toList();
-        if (quota != null && live.size() + 1 > quota) {
-            throw new AppException(ErrorCode.QUOTA_EXCEEDED);
-        }
         if (live.stream().anyMatch(l -> l.getProperty().getId().equals(listing.getProperty().getId()))) {
             throw new AppException(ErrorCode.ACTIVE_LISTING_EXISTED);
         }
@@ -114,6 +129,8 @@ public class ListingServiceImpl implements ListingService {
 
     private void submit(Listing listing, String landlordId, LocalDateTime time) {
         checkQuota(listing, landlordId, time);
+        var current = subscriptions.getCurrent(landlordId);
+        consumePosting(listing, landlordId, current);
         listing.setStatus(ListingStatus.PENDING);
         listing.setSubmittedAt(time);
         listing.setPendingExpiresAt(time.plusDays(7));
@@ -122,6 +139,44 @@ public class ListingServiceImpl implements ListingService {
         listing.setApprovedAt(null);
         clearSelection(listing);
         listing.setPriorityLevel(0);
+    }
+
+    private boolean samePeriod(ServiceSubscriptionPeriod period, String id) {
+        return java.util.Objects.equals(period == null ? null : period.getId(), id);
+    }
+
+    private void consumePosting(Listing listing, String landlordId, CurrentSubscriptionResponse current) {
+        String periodId = current.currentPeriod() == null ? null : current.currentPeriod().id();
+        if (Boolean.TRUE.equals(listing.getPostingQuotaConsumed()) && samePeriod(listing.getPostingQuotaPeriod(), periodId)) return;
+        long used = repository.findByProperty_Landlord_Id(landlordId).stream()
+                .filter(l -> Boolean.TRUE.equals(l.getPostingQuotaConsumed()) && samePeriod(l.getPostingQuotaPeriod(), periodId)).count();
+        Integer limit = current.rights().maxListings();
+        if (limit != null && used >= limit) throw new AppException(ErrorCode.QUOTA_EXCEEDED);
+        listing.setPostingQuotaPeriod(periodId == null ? null : periods.getReferenceById(periodId));
+        listing.setPostingQuotaConsumed(true);
+    }
+
+    private void selectPackagePriority(Listing listing, CurrentSubscriptionResponse current, int level) {
+        if (level < 0 || level > 2) throw new AppException(ErrorCode.INVALID_REQUEST);
+        if (level == 0 || (level == 1 && current.rights().defaultPriorityLevel() == 1)) {
+            clearSelection(listing);
+            return;
+        }
+        if (!current.canSubmitListings() || current.currentPeriod() == null)
+            throw new AppException(ErrorCode.NO_ACTIVE_SUBSCRIPTION);
+        String periodId = current.currentPeriod().id();
+        var period = periods.getReferenceById(periodId);
+        int consumed = samePeriod(listing.getPriorityQuotaPeriod(), periodId) ? listing.getConsumedPriorityLevels() : 0;
+        if ((consumed & level) == 0) {
+            long used = repository.findByProperty_Landlord_Id(listing.getProperty().getLandlord().getId()).stream()
+                    .filter(l -> samePeriod(l.getPriorityQuotaPeriod(), periodId) && (l.getConsumedPriorityLevels() & level) != 0).count();
+            int limit = level == 2 ? current.rights().highPrioritySlots() : current.rights().lowPrioritySlots();
+            if (used >= limit) throw new AppException(ErrorCode.PRIORITY_SLOTS_EXCEEDED);
+        }
+        listing.setPriorityQuotaPeriod(period);
+        listing.setConsumedPriorityLevels(consumed | level);
+        listing.setServiceSubscriptionPeriod(period);
+        listing.setPackagePriorityLevel(level);
     }
 
     private boolean holdsQuota(Listing listing, LocalDateTime time) {
@@ -157,6 +212,8 @@ public class ListingServiceImpl implements ListingService {
         if (holdsQuota(listing, time)) {
             throw new AppException(ErrorCode.INVALID_LISTING_STATUS);
         }
+        listing.setInitialReview(false);
+        boosts.findByListing_IdAndActiveTrue(id).ifPresent(a -> a.setActive(false));
         submit(listing, landlordId, time);
         return response(repository.saveAndFlush(listing));
     }
@@ -189,6 +246,7 @@ public class ListingServiceImpl implements ListingService {
         LocalDateTime time = now();
         checkQuota(listing, listing.getProperty().getLandlord().getId(), time);
         listing.setStatus(ListingStatus.PUBLISHED);
+        listing.setInitialReview(false);
         listing.setApprovedBy(admin);
         listing.setApprovedAt(time);
         listing.setPublishedAt(time);
@@ -206,6 +264,16 @@ public class ListingServiceImpl implements ListingService {
         var listing = pendingForAdmin(id);
         listing.setStatus(ListingStatus.REJECTED);
         listing.setRejectionReason(reason.trim());
+        if (Boolean.TRUE.equals(listing.getInitialReview()) && listing.getPublishedAt() == null) {
+            listing.setPostingQuotaConsumed(false);
+            listing.setPostingQuotaPeriod(null);
+            listing.setConsumedPriorityLevels(0);
+            listing.setPriorityQuotaPeriod(null);
+            boosts.deleteAll(boosts.findAllByListing_Id(id));
+        } else {
+            boosts.findByListing_IdAndActiveTrue(id).ifPresent(a -> a.setActive(false));
+        }
+        listing.setInitialReview(false);
         listing.setPriorityLevel(0);
         clearSelection(listing);
         return response(repository.saveAndFlush(listing));
@@ -217,7 +285,8 @@ public class ListingServiceImpl implements ListingService {
         lockOwner(landlordId);
         var listing = findOwned(landlordId, id);
         listing.setStatus(ListingStatus.HIDDEN);
-        boosts.findByListing_Id(id).ifPresent(boosts::delete);
+        listing.setInitialReview(false);
+        boosts.findByListing_IdAndActiveTrue(id).ifPresent(a -> a.setActive(false));
         listing.setPriorityLevel(0);
         clearSelection(listing);
         return response(repository.saveAndFlush(listing));
@@ -242,21 +311,7 @@ public class ListingServiceImpl implements ListingService {
             if (!current.canSubmitListings() || current.currentPeriod() == null) {
                 throw new AppException(ErrorCode.NO_ACTIVE_SUBSCRIPTION);
             }
-            if (level == 1 && current.rights().defaultPriorityLevel() == 1) {
-                clearSelection(listing);
-            } else {
-                int limit = level == 2 ? current.rights().highPrioritySlots() : current.rights().lowPrioritySlots();
-                String periodId = current.currentPeriod().id();
-                long used = repository.findByProperty_Landlord_Id(landlordId).stream()
-                        .filter(l -> !l.getId().equals(id) && published(l, time) && l.getServiceSubscriptionPeriod() != null
-                                && l.getServiceSubscriptionPeriod().getId().equals(periodId) && l.getPackagePriorityLevel() == level)
-                        .count();
-                if (used + 1 > limit) {
-                    throw new AppException(ErrorCode.PRIORITY_SLOTS_EXCEEDED);
-                }
-                listing.setServiceSubscriptionPeriod(periods.findById(periodId).orElseThrow());
-                listing.setPackagePriorityLevel(level);
-            }
+            selectPackagePriority(listing, current, level);
         }
         repository.saveAndFlush(listing);
         listing.setPriorityLevel(response(listing).priorityLevel());
@@ -346,7 +401,7 @@ public class ListingServiceImpl implements ListingService {
     }
 
     private int selected(Listing listing, ServiceSubscriptionPeriod period, LocalDateTime time) {
-        return published(listing, time) && period != null && listing.getServiceSubscriptionPeriod() != null
+        return holdsQuota(listing, time) && period != null && listing.getServiceSubscriptionPeriod() != null
                 && period.getId().equals(listing.getServiceSubscriptionPeriod().getId()) ? listing.getPackagePriorityLevel() : 0;
     }
 
@@ -355,8 +410,13 @@ public class ListingServiceImpl implements ListingService {
             return List.of();
         }
         var activeBoosts = new HashMap<String, Integer>();
-        boosts.findEffective(listings.stream().map(Listing::getId).toList(), time)
-                .forEach(a -> activeBoosts.merge(a.getListing().getId(), a.getPriorityLevel(), Math::max));
+        var boostSelections = new HashMap<String, BoostAllocationResponse>();
+        boosts.findSelected(listings.stream().map(Listing::getId).toList(), time).forEach(a -> {
+            activeBoosts.merge(a.getListing().getId(), a.getPriorityLevel(), Math::max);
+            boostSelections.put(a.getListing().getId(),
+                    new BoostAllocationResponse(
+                            a.getListing().getId(), a.getSubscription().getId(), a.getPriorityLevel()));
+        });
         var currentPeriods = effectivePeriods(listings, time);
         var propertyIds = listings.stream().map(l -> l.getProperty().getId()).distinct().toList();
         var allRooms = roomRepository.findAllByProperty_IdIn(propertyIds);
@@ -384,7 +444,8 @@ public class ListingServiceImpl implements ListingService {
                     .map(room -> roomMapper.toResponse(room, amenitiesByRoom.getOrDefault(room.getId(), List.of()),
                             imagesByRoom.getOrDefault(room.getId(), List.of()))).toList();
             return mapper.toResponse(listing, priority, selected, propertyMapper.toResponse(listing.getProperty(),
-                    sharedAmenities.getOrDefault(propertyId, List.of()), sharedImages.getOrDefault(propertyId, List.of()), roomResponses));
+                    sharedAmenities.getOrDefault(propertyId, List.of()), sharedImages.getOrDefault(propertyId, List.of()), roomResponses),
+                    boostSelections.get(listing.getId()));
         }).toList();
     }
 
@@ -401,12 +462,13 @@ public class ListingServiceImpl implements ListingService {
                     && !time.isBefore(listing.getPendingExpiresAt()))
                     || (listing.getStatus() == ListingStatus.PUBLISHED && !time.isBefore(listing.getExpiresAt()))) {
                 listing.setStatus(ListingStatus.EXPIRED);
+                listing.setInitialReview(false);
             }
             if (selected(listing, currentPeriods.get(landlordId), time) == 0) {
                 clearSelection(listing);
             }
         }
-        boosts.deleteAll(boosts.findStale(landlordId, time));
+        boosts.findStale(landlordId, time).forEach(a -> a.setActive(false));
         boosts.flush();
         var effective = responses(listings, time);
         for (int i = 0; i < listings.size(); i++) {

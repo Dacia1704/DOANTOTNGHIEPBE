@@ -1,5 +1,23 @@
 # Phân biệt Room và bài đăng
 
+## Lượt đăng và ưu tiên (02/11/2026)
+
+Quy tắc này thay thế cách tính suất đồng thời trước đây: tạo tin thành công trừ ngay một lượt đăng; `POST /api/listings` nhận thêm `priorityLevel` tùy chọn (0–2, mặc định 0) để trừ lượt ưu tiên theo gói trong cùng transaction. Nếu không đủ lượt, toàn bộ việc tạo tin được rollback.
+
+Không thêm bảng. Đã đối chiếu toàn bộ bảng/cột/FK và lịch sử Flyway của `rental_db` (46 bảng nghiệp vụ + bảng Flyway). Hạn mức vẫn lấy từ `service_subscription_periods` và `boost_service_package_subscriptions`. `listings.posting_quota_consumed`/`posting_quota_period_id` và `consumed_priority_levels`/`priority_quota_period_id` ghi nhận lượt đã dùng trong kỳ, độc lập với trạng thái hiển thị. `boost_allocations` giữ các lượt đã gán; `active` xác định lựa chọn đang áp dụng. Ẩn tin, hết hạn, bỏ/đổi ưu tiên hoặc Boost không hoàn lượt.
+
+`POST /api/listings` nhận cặp `boostSubscriptionId`/`boostPriorityLevel` (1/2) để dùng gói Boost đã mua ngay trong transaction tạo tin; không đồng thời chọn lượt ưu tiên riêng của gói dịch vụ. Hết lượt, gói chưa trả tiền/hết hạn hoặc không thuộc chủ trọ sẽ rollback cả tin và lượt đăng. Lựa chọn Boost được giữ trên PENDING còn hạn, xuất hiện trong `boostAllocation`; chỉ tính vào hiển thị công khai sau khi duyệt. Gói Boost vẫn giữ thời hạn đã mua, không bắt đầu lại khi duyệt.
+
+Flyway V5 chỉ thêm `listings.initial_review`. Tin mới có cờ true; duyệt, từ chối, ẩn, hết hạn hoặc gửi duyệt lại chuyển thành false và không bật lại. Chỉ admin từ chối PENDING còn hạn, có `initial_review=true` và chưa xuất bản mới hoàn đúng lượt của tin về nguồn gói tương ứng. Không đặt lại tổng hạn mức, không hoàn tiền hoặc ảnh hưởng những tin khác. Từ chối lần hai, kể cả sau khi lần đầu đã được hoàn và gửi lại, không được hoàn. Khi gửi lại, lựa chọn Boost cũ ngừng áp dụng, lượt đã dùng được giữ.
+
+Dữ liệu trước V5 không có lịch sử từng chuyển trạng thái: chỉ PENDING chưa xuất bản với `submitted_at` trùng `created_at` (sai số 1 giây) được nhận diện là lần gửi đầu. Không suy đoán hoàn lượt cho tin có mốc gửi lại khác ngày tạo. Migration được kiểm chứng trên schema riêng; database ứng dụng sẽ nhận V5 khi khởi động lại BE bằng Flyway.
+
+Kiểm chứng luồng Boost khi tạo tin: 87 test BE (80 PackageCatalogApiTest + 7 PropertyApiTest) qua trên MySQL 8.0.46 với schema ngẫu nhiên; có JPA validate, nâng schema V3→V5 không tăng số bảng, rollback khi Boost sai/hết lượt, hoàn đúng số dư ban đầu, không hoàn sau ẩn/hết hạn/gửi lại và tranh lượt cuối đồng thời. FE qua 19 test liên quan và production build; headless Edge kiểm tra form ở 1440px/390px qua Postman simulation, gồm Boost cao/thấp, lỗi 409 giữ nội dung và hiển thị lựa chọn ở tin chờ duyệt. Đây là kiểm tra UI với API giả lập; không phát sinh giao dịch VNPay thật.
+
+Cùng tin, cùng kỳ và cùng mức ưu tiên sử dụng lại lượt đã trừ. Gửi lại tin đã được hoàn lượt sẽ trừ lại. Kỳ gia hạn được mua có hạn mức riêng; nâng gói tức thời chuyển lượt đã dùng sang kỳ thay thế, không cấp lại lượt cũ. Free có 3 lượt, không tự reset theo tháng.
+
+Flyway `V4__consume_existing_listing_and_boost_quota.sql` chỉ bổ sung cột/index trên `listings` và `boost_allocations`, ghi nhận dữ liệu tin/ưu tiên hiện còn lưu. Lịch sử phân bổ từng bị xóa trước migration không thể khôi phục. Tạo cơ sở/phòng vật lý vẫn tách riêng với tạo tin đăng. Chưa áp dụng migration vào database ứng dụng trong phiên này.
+
 Room/Property là tài sản của chủ trọ. Tạo Room không tạo Listing và không làm phòng xuất hiện trên trang công khai hoặc danh sách bài đăng admin.
 
 ## Công khai

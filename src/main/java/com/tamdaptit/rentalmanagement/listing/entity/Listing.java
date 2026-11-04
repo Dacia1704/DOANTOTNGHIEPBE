@@ -78,6 +78,10 @@ public class Listing {
     @Column(name = "published_at")
     private LocalDateTime publishedAt;
 
+    @Column(name = "initial_review", nullable = false)
+    @Builder.Default
+    private Boolean initialReview = true;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "service_subscription_period_id")
     private ServiceSubscriptionPeriod serviceSubscriptionPeriod;
@@ -85,6 +89,23 @@ public class Listing {
     @Column(name = "package_priority_level", nullable = false)
     @Builder.Default
     private Integer packagePriorityLevel = 0;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "posting_quota_period_id")
+    private ServiceSubscriptionPeriod postingQuotaPeriod;
+
+    @Column(name = "posting_quota_consumed", nullable = false)
+    @Builder.Default
+    private Boolean postingQuotaConsumed = false;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "priority_quota_period_id")
+    private ServiceSubscriptionPeriod priorityQuotaPeriod;
+
+    // Bit 1 = low priority consumed; bit 2 = high priority consumed, even after deselection.
+    @Column(name = "consumed_priority_levels", nullable = false)
+    @Builder.Default
+    private Integer consumedPriorityLevels = 0;
 
     @Column(name = "priority_level")
     @Builder.Default
