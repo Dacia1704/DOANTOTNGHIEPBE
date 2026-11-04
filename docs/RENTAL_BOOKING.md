@@ -96,6 +96,8 @@ Các response dùng ApiResponse/PageResponse hiện có; lỗi bổ sung `errorC
 
 Giá, landlord, endDate và trạng thái không nhận từ client. Accept trả RentalAgreementResponse với id/requestId/status/pdfStatus/confirmationExpiresAt; FE dùng id để mở `/hop-dong/{id}`. Confirm gửi `{ "accepted": true, "expectedPdfSha256": "hash-64-hex-cua-PDF-da-tai" }`.
 
+RentalAgreementResponse có thêm `tenantId`, `landlordId` bên cạnh `tenantName`, `landlordName` trong mọi response tạo/xem/danh sách/xác nhận/checkout. Hai ID lấy từ quan hệ hợp đồng, không suy từ tên hiển thị hoặc chủ sở hữu hiện tại của Property. FE dùng tenantId để mở `GET /api/tenants/{tenantId}/reviews`, landlordId để tạo report LANDLORD qua `POST /api/reports`; quyền xem/báo cáo vẫn được backend kiểm tra. Chủ trọ xem review nhận được qua `GET /api/landlord/reviews?type=ROOM|LANDLORD`, xem [contract Review/Report](api.md#16-review).
+
 FE: `/tro/:id` → form; `/yeu-cau-thue` của tenant; `/quan-ly-dat-phong` của landlord (tab yêu cầu/hợp đồng); `/hop-dong/:id` xem PDF, xác nhận/từ chối/bàn giao. Menu tài khoản có liên kết tới các trang. Khi giữ/thuê, dropdown sửa trạng thái phòng bị khóa, BE vẫn kiểm tra invariant.
 
 ## Kiểm thử

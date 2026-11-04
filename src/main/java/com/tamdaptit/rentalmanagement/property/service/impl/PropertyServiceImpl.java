@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.math.BigDecimal;
 
 @Service
 @RequiredArgsConstructor
@@ -45,6 +46,7 @@ public class PropertyServiceImpl implements PropertyService {
     @Override
     @Transactional
     public PropertyResponse create(String userId, CreatePropertyRequest request) {
+        validateCoordinates(request.latitude(), request.longitude());
         validateUnits(request);
         Property property = propertyMapper.toEntity(request);
         property.setName(request.name().trim());
@@ -79,6 +81,34 @@ public class PropertyServiceImpl implements PropertyService {
         // Flush all constraints inside the transaction before returning the response.
         properties.flush();
         return response(property);
+    }
+
+    @Override
+    @Transactional
+    public PropertyResponse updateLocation(String userId, String id, PropertyLocationRequest request) {
+        Property property = properties.findLockedById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.PROPERTY_NOT_FOUND));
+        if (!property.getLandlord().getId().equals(userId)) throw new AppException(ErrorCode.NOT_PROPERTY_OWNER);
+        validateCoordinates(request.latitude(), request.longitude());
+        var province = provinces.findById(request.provinceId())
+                .orElseThrow(() -> new AppException(ErrorCode.PROVINCE_NOT_FOUND));
+        var ward = wards.findById(request.wardId()).orElseThrow(() -> new AppException(ErrorCode.WARD_NOT_FOUND));
+        if (!ward.getProvince().getId().equals(province.getId()))
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Phường không thuộc tỉnh/thành đã chọn");
+        property.setProvince(province);
+        property.setWard(ward);
+        property.setAddressLine(request.addressLine().trim());
+        property.setLatitude(request.latitude());
+        property.setLongitude(request.longitude());
+        properties.flush();
+        return response(property);
+    }
+
+    private void validateCoordinates(BigDecimal latitude, BigDecimal longitude) {
+        if ((latitude == null) != (longitude == null)
+                || (latitude != null && (latitude.abs().compareTo(BigDecimal.valueOf(90)) > 0
+                    || longitude.abs().compareTo(BigDecimal.valueOf(180)) > 0)))
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Vĩ độ và kinh độ phải đi cùng nhau và nằm trong phạm vi hợp lệ");
     }
 
     private void validateUnits(CreatePropertyRequest request) {

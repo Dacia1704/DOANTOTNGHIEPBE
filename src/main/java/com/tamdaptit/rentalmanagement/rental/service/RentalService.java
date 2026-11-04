@@ -239,7 +239,8 @@ public class RentalService {
         boolean tenant=a.getTenant().getId().equals(user),ready=a.getPdfStatus()==ContractPdfStatus.READY;
         return new RentalAgreementResponse(a.getId(),a.getRentalRequest()==null?null:a.getRentalRequest().getId(),a.getAgreementCode(),a.getRoom().getId(),
             s.getOrDefault("roomNumber",a.getRoom().getRoomNumber()),s.getOrDefault("propertyName",a.getRoom().getProperty().getName()),
-            s.getOrDefault("tenantName",a.getTenant().getFullName()),s.getOrDefault("landlordName",a.getLandlord().getFullName()),
+            a.getTenant().getId(),s.getOrDefault("tenantName",a.getTenant().getFullName()),
+            a.getLandlord().getId(),s.getOrDefault("landlordName",a.getLandlord().getFullName()),
             a.getPrice(),a.getDeposit(),a.getElectricityPrice(),a.getWaterPrice(),a.getServiceFee(),a.getStartDate(),a.getEndDate(),a.getStatus().name(),
             a.getPdfStatus().name(),ready?a.getPdfSha256():null,a.getConfirmationExpiresAt(),a.getLandlordConfirmedAt(),a.getTenantConfirmedAt(),
             tenant&&pending&&ready,tenant&&pending,ready,a.getLandlord().getId().equals(user)&&a.getStatus()==ACTIVE,a.getCancelReason());

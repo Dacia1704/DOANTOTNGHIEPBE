@@ -127,6 +127,35 @@ class RentalWorkflowTest {
         Set<String> contracts=ConcurrentHashMap.newKeySet();String id=ids.iterator().next();
         parallel(()->contracts.add(service.accept("owner",id).id()),()->contracts.add(service.accept("owner",id).id()));assertEquals(1,contracts.size());
     }
+    @Test void agreementResponsesExposePartyIdsFromCreationThroughCheckout() throws Exception {
+        var agreement=accept("a");
+        assertEquals("a",agreement.tenantId());assertEquals("owner",agreement.landlordId());
+        mvc.perform(get("/api/rental-agreements/"+agreement.id()).with(user("a").roles("TENANT")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.tenantId").value("a"))
+            .andExpect(jsonPath("$.data.landlordId").value("owner"));
+        mvc.perform(get("/api/landlord/rental-agreements").with(user("owner").roles("LANDLORD")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.data[0].tenantId").value("a"))
+            .andExpect(jsonPath("$.data.data[0].landlordId").value("owner"));
+        worker.process(agreement.id());
+        var ready=service.agreement("a",agreement.id(),false);
+        var confirmed=service.confirm("a",agreement.id(),new RentalAgreementConfirmRequest(true,ready.pdfSha256()));
+        assertEquals("a",confirmed.tenantId());assertEquals("owner",confirmed.landlordId());
+        var checkout=service.checkout("owner",agreement.id(),new RentalCheckoutRequest(true,"Đã bàn giao"));
+        assertEquals("a",checkout.tenantId());assertEquals("owner",checkout.landlordId());
+        assertEquals("a",service.agreements("a",false,0,10).getData().getFirst().tenantId());
+    }
+    @Test void checkoutHistoryProtectsRoomBeforeAnyReviewExists() throws Exception {
+        var agreement=accept("a");
+        worker.process(agreement.id());
+        var ready=service.agreement("a",agreement.id(),false);
+        service.confirm("a",agreement.id(),new RentalAgreementConfirmRequest(true,ready.pdfSha256()));
+        service.checkout("owner",agreement.id(),new RentalCheckoutRequest(true,"Đã bàn giao"));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/rooms/r")
+                .with(user("owner").roles("LANDLORD")))
+            .andExpect(status().isConflict()).andExpect(jsonPath("$.errorCode").value("ROOM_HAS_RENTAL_HISTORY"));
+        assertEquals(1,jdbc.queryForObject("SELECT COUNT(*) FROM rental_agreements",Integer.class));
+        assertEquals(2,jdbc.queryForObject("SELECT COUNT(*) FROM rooms",Integer.class));
+    }
     @Test void pdfRetryUsesSnapshotAndConfirmRequiresTheDownloadedVersion() throws Exception {
         var a=accept("a");assertEquals("PENDING_CONFIRMATION",a.status());assertFalse(a.canConfirm());
         assertEquals(ErrorCode.CONTRACT_PDF_NOT_READY,assertThrows(AppException.class,()->service.confirm("a",a.id(),new RentalAgreementConfirmRequest(true,"a".repeat(64)))).getErrorCode());
@@ -137,7 +166,12 @@ class RentalWorkflowTest {
         clock.time=clock.time.plusSeconds(120);storage.fail=false;worker.process(a.id());
         var ready=service.agreement("a",a.id(),false);assertEquals("READY",ready.pdfStatus());assertTrue(ready.canConfirm());
         var ref=service.pdf("a",a.id(),false);byte[] pdf=storage.download(ref.publicId());assertEquals(ref.hash(),RentalContractPdfService.sha256(pdf));
-        try(var doc=Loader.loadPDF(pdf)){String text=new PDFTextStripper().getText(doc);assertTrue(text.contains("HỢP ĐỒNG THUÊ PHÒNG TRỌ"));assertTrue(text.contains("Nguyễn Văn A"));assertTrue(text.contains("3.000.000 đồng/tháng"));assertTrue(text.contains("Ba triệu đồng"));assertFalse(text.contains("9.000.000"));assertTrue(text.contains("012345678901"));}
+        try(var doc=Loader.loadPDF(pdf)) {
+            String text=new PDFTextStripper().getText(doc).replaceAll("\\s+"," ");
+            for(String expected:List.of("HỢP ĐỒNG THUÊ PHÒNG TRỌ","Nguyễn Văn A","3.000.000 đồng/tháng","Ba triệu đồng","012345678901"))
+                assertTrue(text.contains(expected),expected);
+            assertFalse(text.contains("9.000.000"));
+        }
         assertEquals(ErrorCode.CONTRACT_CHANGED,assertThrows(AppException.class,()->service.confirm("a",a.id(),new RentalAgreementConfirmRequest(true,"0".repeat(64)))).getErrorCode());
         service.confirm("a",a.id(),new RentalAgreementConfirmRequest(true,ref.hash()));
         var again=service.confirm("a",a.id(),new RentalAgreementConfirmRequest(true,ref.hash()));assertEquals("ACTIVE",again.status());

@@ -18,6 +18,12 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Object>> handleMethodNotAllowed(Exception ex) {
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(ApiResponse.builder()
+                .code(405).errorCode("METHOD_NOT_ALLOWED").message("Phương thức không được hỗ trợ").build());
+    }
+
     @ExceptionHandler(org.springframework.dao.PessimisticLockingFailureException.class)
     public ResponseEntity<ApiResponse<Object>> handleRoomBusy(Exception ex) {
         return ResponseEntity.status(409).body(ApiResponse.builder().code(409)
@@ -159,9 +165,9 @@ public class GlobalExceptionHandler {
     }
 
     // 7. Loi trang thai HTTP khong xu ly duoc
-    @ExceptionHandler(NoResourceFoundException.class)
+    @ExceptionHandler({NoResourceFoundException.class, org.springframework.web.servlet.NoHandlerFoundException.class})
     public ResponseEntity<ApiResponse<Object>> handleNoResourceFound(
-            NoResourceFoundException ex) {
+            Exception ex) {
 
         ApiResponse<Object> response =
                 ApiResponse.builder()

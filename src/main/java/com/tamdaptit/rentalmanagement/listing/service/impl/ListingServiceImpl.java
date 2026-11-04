@@ -38,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -332,6 +333,7 @@ public class ListingServiceImpl implements ListingService {
     @Override
     public PageResponse<ListingResponse> searchPublished(int page, int size,
             ListingSearchRequest request) {
+        validateLocationSearch(request);
         if (page < 0 || size < 1 || size > 100
                 || (request.minPrice() != null && request.minPrice().signum() < 0)
                 || (request.maxPrice() != null && request.maxPrice().signum() < 0)
@@ -345,7 +347,27 @@ public class ListingServiceImpl implements ListingService {
         return page(repository.searchPublished(time, blankToNull(request.roomTypeName()),
                 blankToNull(request.provinceId()), blankToNull(request.wardId()), request.rentalStatus(),
                 request.minPrice(), request.maxPrice(), names.isEmpty() ? List.of("") : names, names.size(),
+                request.latitude(), request.longitude(), request.radiusKm(),
+                request.south(), request.north(), request.west(), request.east(),
                 PageRequest.of(page, size)), time);
+    }
+
+    private void validateLocationSearch(ListingSearchRequest request) {
+        boolean radius = request.latitude() != null || request.longitude() != null || request.radiusKm() != null;
+        boolean bounds = request.south() != null || request.north() != null || request.west() != null || request.east() != null;
+        if (radius && (request.latitude() == null || request.longitude() == null || request.radiusKm() == null))
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Tìm theo bán kính cần đủ latitude, longitude và radiusKm");
+        if (bounds && (request.south() == null || request.north() == null || request.west() == null || request.east() == null))
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Khung bản đồ cần đủ south, north, west và east");
+        if ((radius && (request.radiusKm().signum() <= 0
+                    || request.latitude().abs().compareTo(BigDecimal.valueOf(90)) > 0
+                    || request.longitude().abs().compareTo(BigDecimal.valueOf(180)) > 0))
+                || (bounds && (request.south().compareTo(request.north()) > 0
+                    || request.south().abs().compareTo(BigDecimal.valueOf(90)) > 0
+                    || request.north().abs().compareTo(BigDecimal.valueOf(90)) > 0
+                    || request.west().abs().compareTo(BigDecimal.valueOf(180)) > 0
+                    || request.east().abs().compareTo(BigDecimal.valueOf(180)) > 0)))
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Phạm vi tìm kiếm vị trí không hợp lệ");
     }
 
     private String blankToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }

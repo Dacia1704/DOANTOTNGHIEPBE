@@ -21,6 +21,21 @@ import java.util.List;
 import java.util.Optional;
 @Repository
 public interface ListingRepository extends JpaRepository<Listing, String> {
+    @Query("""
+            select l from Listing l join fetch l.property p join fetch p.landlord
+            where l.id = :id and l.status = 'PUBLISHED' and l.expiresAt > :time
+            """)
+    Optional<Listing> findPublishedContact(@Param("id") String id, @Param("time") LocalDateTime time);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("update Listing l set l.contactCount = coalesce(l.contactCount, 0) + 1 where l.id = :id")
+    int incrementContactCount(@Param("id") String id);
+
+    @Query("select l from Listing l join fetch l.property p join fetch p.landlord where l.id=:id and " + ListingRepository.PUBLIC_CONDITION)
+    Optional<Listing> findPublicForReview(@Param("id") String id, @Param("time") LocalDateTime time);
+
+    @Query("select count(l)>0 from Listing l where l.property.landlord.id=:landlordId and " + PUBLIC_CONDITION)
+    boolean hasPublicListing(@Param("landlordId") String landlordId, @Param("time") LocalDateTime time);
     String EFFECTIVE_PRIORITY = """
             case when exists (select a.id from BoostAllocation a join a.subscription b
                 where a.listing = l and a.active = true and a.priorityLevel = 2 and b.status = 'ACTIVE' and b.startAt <= :time and b.endAt > :time) then 2
@@ -58,9 +73,19 @@ public interface ListingRepository extends JpaRepository<Listing, String> {
             countQuery = "select count(l) from Listing l where " + PUBLIC_CONDITION)
     Page<Listing> findPublished(LocalDateTime time, Pageable pageable);
 
+    // Haversine uses twice the mean Earth radius (6371.0088 km), clamped for rounding near antipodes.
     String PUBLIC_FILTER = "from Listing l where " + PUBLIC_CONDITION + """
               and (:provinceId is null or l.property.province.id = :provinceId)
               and (:wardId is null or l.property.ward.id = :wardId)
+              and (:radiusKm is null or (l.property.latitude is not null and l.property.longitude is not null
+                and 12742.0176 * asin(sqrt(least(1.0, greatest(0.0,
+                    power(sin(radians(l.property.latitude - :latitude) / 2.0), 2)
+                    + cos(radians(:latitude)) * cos(radians(l.property.latitude))
+                    * power(sin(radians(l.property.longitude - :longitude) / 2.0), 2))))) <= :radiusKm))
+              and (:south is null or (l.property.latitude is not null and l.property.longitude is not null
+                and l.property.latitude between :south and :north
+                and ((:west <= :east and l.property.longitude between :west and :east)
+                  or (:west > :east and (l.property.longitude >= :west or l.property.longitude <= :east)))))
               and exists (select r.id from Room r where r.property = l.property
                 and (:typeName is null or lower(r.roomType.name) = lower(:typeName))
                 and (:rentalStatus is null or r.rentalStatus = :rentalStatus)
@@ -76,7 +101,9 @@ public interface ListingRepository extends JpaRepository<Listing, String> {
             countQuery = "select count(l) " + PUBLIC_FILTER)
     Page<Listing> searchPublished(LocalDateTime time, String typeName, String provinceId, String wardId,
             RoomRentalStatus rentalStatus, BigDecimal minPrice, BigDecimal maxPrice,
-            List<String> amenityNames, long amenityCount, Pageable pageable);
+            List<String> amenityNames, long amenityCount,
+            BigDecimal latitude, BigDecimal longitude, BigDecimal radiusKm,
+            BigDecimal south, BigDecimal north, BigDecimal west, BigDecimal east, Pageable pageable);
 
     @Query("""
             select l from Listing l where (:status is null or

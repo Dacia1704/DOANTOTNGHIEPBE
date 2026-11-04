@@ -147,6 +147,12 @@ class PackageCatalogApiTest {
         context.register(TestConfig.class);
         context.refresh();
         mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+        // Keep migrations intact, then replace V2 demo assets with this suite's isolated fixtures.
+        for (String table : new String[]{"room_amenities", "room_images", "property_amenities", "property_images",
+                "rooms", "properties", "service_package_prices", "boost_service_packages"})
+            jdbc().update("DELETE FROM " + table);
+        jdbc().update("DELETE FROM service_packages WHERE code <> 'FREE'");
+        jdbc().update("INSERT INTO property_types(id,name) VALUES ('00000000-0000-0000-0000-000000000011','Subscription test type')");
     }
 
     @AfterAll
@@ -1703,6 +1709,100 @@ class PackageCatalogApiTest {
         mvc.perform(get("/api/listings/admin")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/listings/admin").with(user("owner").roles("LANDLORD"))).andExpect(status().isForbidden());
         mvc.perform(get("/api/listings/admin").with(user("tenant").roles("TENANT"))).andExpect(status().isForbidden());
+    }
+
+    private void mapFixtures() {
+        createOwners();
+        roomFixtures(8);
+        for (int i = 1; i <= 8; i++) {
+            jdbc().update("""
+                    INSERT INTO listings(id,property_id,title,status,published_at,expires_at)
+                    VALUES (?,?,'Map test','PUBLISHED','2026-01-01 10:00:00','2026-02-28 10:00:00')
+                    """, "map-" + i, "room-" + i);
+        }
+        jdbc().update("UPDATE properties SET latitude=10.762622,longitude=106.660172 WHERE id IN ('room-1','room-5','room-6','room-7')");
+        jdbc().update("UPDATE properties SET latitude=10.772622,longitude=106.660172 WHERE id='room-2'");
+        jdbc().update("UPDATE properties SET latitude=11,longitude=106.660172 WHERE id='room-3'");
+        jdbc().update("UPDATE properties SET longitude=106.660172 WHERE id='room-8'");
+        jdbc().update("UPDATE rooms SET price=200 WHERE id='room-2'");
+        jdbc().update("UPDATE listings SET expires_at='2026-01-30 10:00:00' WHERE id='map-5'");
+        jdbc().update("UPDATE listings SET status='HIDDEN' WHERE id='map-6'");
+        jdbc().update("UPDATE listings SET status='PENDING',submitted_at='2026-01-30 10:00:00',pending_expires_at='2026-02-06 10:00:00' WHERE id='map-7'");
+    }
+
+    @Test
+    void radiusSearchKeepsPriorityPaginationAndExistingFiltersWithoutExposingPrivatePosts() throws Exception {
+        mapFixtures();
+        paid(tierPrice("MAP-PLAN", "10", 1, 0, 0, false, 100), ServiceSubscriptionOrderType.PURCHASE);
+        listings().setPriority("owner", "map-2", 2);
+        String nearby = "/api/listings?latitude=10.762622&longitude=106.660172&radiusKm=2";
+        mvc.perform(get(nearby).param("size", "1")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(2))
+                .andExpect(jsonPath("$.data.totalPages").value(2))
+                .andExpect(jsonPath("$.data.data[0].id").value("map-2"))
+                .andExpect(jsonPath("$.data.data[0].priorityLevel").value(2))
+                .andExpect(jsonPath("$.data.data[0].property.latitude").value(10.772622));
+        mvc.perform(get(nearby).param("size", "1").param("page", "1")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(2))
+                .andExpect(jsonPath("$.data.data[0].id").value("map-1"));
+        mvc.perform(get(nearby).param("minPrice", "150")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.data[0].id").value("map-2"));
+        mvc.perform(get(nearby).param("wardId", "missing")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(0));
+        mvc.perform(get("/api/listings?latitude=10.762622&longitude=106.660172&radiusKm=0.00001"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.data[0].id").value("map-1"));
+        mvc.perform(get("/api/listings")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(5));
+        mvc.perform(get("/api/listings/map-1")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.property.longitude").value(106.660172));
+        mvc.perform(admin(get("/api/listings/pending"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.data[0].property.latitude").value(10.762622));
+    }
+
+    @Test
+    void mapBoundsIncludeEdgesIntersectRadiusAndDeduplicatePropertyPosts() throws Exception {
+        mapFixtures();
+        jdbc().update("""
+                INSERT INTO listings(id,property_id,title,status,published_at,expires_at)
+                VALUES ('map-old','room-1','Older map post','PUBLISHED','2025-12-31 10:00:00','2026-02-28 10:00:00')
+                """);
+        String bounds = "/api/listings?south=10.762622&north=10.772622&west=106.660172&east=106.660172";
+        mvc.perform(get(bounds)).andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(2));
+        mvc.perform(get(bounds).param("latitude", "10.762622").param("longitude", "106.660172").param("radiusKm", "0.5"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.data[0].id").value("map-1"));
+        mvc.perform(get("/api/listings?south=20&north=21&west=105&east=106"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(0));
+    }
+
+    @Test
+    void locationSearchWorksAtZeroCoordinatesAndAcrossTheDateLine() throws Exception {
+        mapFixtures();
+        jdbc().update("UPDATE properties SET latitude=0,longitude=179.9 WHERE id='room-1'");
+        jdbc().update("UPDATE properties SET latitude=0,longitude=-179.9 WHERE id='room-2'");
+        jdbc().update("UPDATE properties SET latitude=0,longitude=0 WHERE id='room-3'");
+        mvc.perform(get("/api/listings?south=-1&north=1&west=179&east=-179"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(2));
+        mvc.perform(get("/api/listings?latitude=0&longitude=180&radiusKm=25"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(2));
+        mvc.perform(get("/api/listings?latitude=0&longitude=0&radiusKm=1"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.data[0].id").value("map-3"));
+    }
+
+    @Test
+    void rejectsIncompleteOutOfRangeAndMalformedMapSearchParameters() throws Exception {
+        for (String query : new String[]{"latitude=10", "longitude=106", "radiusKm=2", "latitude=10&longitude=106",
+                "latitude=91&longitude=106&radiusKm=2", "latitude=10&longitude=-181&radiusKm=2",
+                "latitude=10&longitude=106&radiusKm=0", "latitude=10&longitude=106&radiusKm=-1",
+                "latitude=NaN&longitude=106&radiusKm=2", "latitude=10&longitude=Infinity&radiusKm=2",
+                "south=10&north=11&west=106", "south=11&north=10&west=106&east=107",
+                "south=-91&north=10&west=106&east=107", "south=10&north=91&west=106&east=107",
+                "south=10&north=11&west=-181&east=107", "south=10&north=11&west=106&east=181"}) {
+            mvc.perform(get("/api/listings?" + query)).andExpect(status().isBadRequest());
+        }
     }
 
     @Test

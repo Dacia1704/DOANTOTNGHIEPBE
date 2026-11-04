@@ -71,6 +71,8 @@ class PropertyApiTest {
         context.refresh();
         mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
         jdbc = context.getBean(JdbcTemplate.class);
+        // This suite uses its own catalog fixtures instead of the V2 demo property types.
+        jdbc.update("INSERT INTO property_types(id,name) VALUES ('00000000-0000-0000-0000-000000000011','Property test type')");
         jdbc.update("INSERT INTO users(id,email,password) VALUES ('owner','owner@property.test','test'),('other','other@property.test','test')");
         jdbc.update("INSERT INTO provinces(id,code,name) VALUES ('p','PROP-P','Province')");
         jdbc.update("INSERT INTO wards(id,province_id,code,name) VALUES ('w','p','PROP-W','Ward')");
@@ -81,7 +83,9 @@ class PropertyApiTest {
 
     @BeforeEach
     void reset() {
-        for (String table : new String[]{"room_amenities", "room_images", "property_amenities", "property_images", "rooms", "properties"})
+        for (String table : new String[]{"report_evidences", "reports", "room_reviews", "landlord_reviews", "tenant_reviews",
+                "rental_events", "rental_pdf_assets", "rental_agreements", "rental_requests", "listings",
+                "room_amenities", "room_images", "property_amenities", "property_images", "rooms", "properties"})
             jdbc.update("DELETE FROM " + table);
         jdbc.update("DELETE FROM property_types WHERE id <> '00000000-0000-0000-0000-000000000011'");
     }
@@ -196,6 +200,80 @@ class PropertyApiTest {
                 .andExpect(status().isConflict());
         mvc.perform(put("/api/rooms/" + roomId).with(user("other").roles("LANDLORD"))
                 .contentType(APPLICATION_JSON).content(request)).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void coordinatesAreOptionalButMustBeAValidPairOnCreation() throws Exception {
+        String request = body("BY_ROOM", "[{\"roomNumber\":\"A\"}]");
+        for (String coordinates : new String[]{"\"latitude\":10", "\"longitude\":106",
+                "\"latitude\":91,\"longitude\":106", "\"latitude\":10,\"longitude\":-181"}) {
+            mvc.perform(post("/api/properties").with(user("owner").roles("LANDLORD"))
+                    .contentType(APPLICATION_JSON).content(request.replace("\"addressLine\":", coordinates + ",\"addressLine\":")))
+                    .andExpect(status().isBadRequest());
+        }
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM properties", Integer.class));
+        String response = create(request.replace("\"addressLine\":", "\"latitude\":0,\"longitude\":0,\"addressLine\":"));
+        String id = JsonPath.read(response, "$.data.id");
+        mvc.perform(get("/api/properties/" + id).with(user("owner").roles("LANDLORD")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.latitude").value(0))
+                .andExpect(jsonPath("$.data.longitude").value(0));
+        mvc.perform(get("/api/properties/mine").with(user("owner").roles("LANDLORD")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.data[0].latitude").value(0));
+    }
+
+    @Test
+    void ownerUpdatesSharedLocationAndCanClearCoordinates() throws Exception {
+        String response = create(body("BY_ROOM", "[{\"roomNumber\":\"A\"},{\"roomNumber\":\"B\"}]"));
+        String id = JsonPath.read(response, "$.data.id");
+        String roomId = JsonPath.read(response, "$.data.rooms[0].id");
+        String location = """
+                {"provinceId":"p","wardId":"w","addressLine":"  New address  ",
+                 "latitude":10.762622,"longitude":106.660172}
+                """;
+        mvc.perform(put("/api/properties/" + id + "/location").with(user("owner").roles("LANDLORD"))
+                .contentType(APPLICATION_JSON).content(location))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.addressLine").value("New address"))
+                .andExpect(jsonPath("$.data.latitude").value(10.762622))
+                .andExpect(jsonPath("$.data.longitude").value(106.660172))
+                .andExpect(jsonPath("$.data.rooms.length()").value(2))
+                .andExpect(jsonPath("$.data.rooms[0].id").value(roomId))
+                .andExpect(jsonPath("$.data.rooms[0].latitude").value(10.762622))
+                .andExpect(jsonPath("$.data.rooms[1].longitude").value(106.660172))
+                .andExpect(jsonPath("$.data.rooms[0].price").value(3000000));
+        mvc.perform(get("/api/rooms/" + roomId).with(user("owner").roles("LANDLORD")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.addressLine").value("New address"));
+        mvc.perform(put("/api/properties/" + id + "/location").with(user("owner").roles("LANDLORD"))
+                .contentType(APPLICATION_JSON).content(location.replace("10.762622", "null").replace("106.660172", "null")))
+                .andExpect(status().isOk());
+        assertNull(jdbc.queryForObject("SELECT latitude FROM properties WHERE id=?", java.math.BigDecimal.class, id));
+        assertNull(jdbc.queryForObject("SELECT longitude FROM properties WHERE id=?", java.math.BigDecimal.class, id));
+    }
+
+    @Test
+    void locationUpdateEnforcesOwnershipAndRejectsInvalidAddressWithoutChanges() throws Exception {
+        String id = JsonPath.read(create(body("WHOLE", "[{\"roomNumber\":\"HOUSE\"}]")), "$.data.id");
+        String location = """
+                {"provinceId":"p","wardId":"w","addressLine":"New address","latitude":10,"longitude":106}
+                """;
+        for (String role : new String[]{"LANDLORD", "TENANT", "ADMIN"}) {
+            mvc.perform(put("/api/properties/" + id + "/location").with(user("other").roles(role))
+                    .contentType(APPLICATION_JSON).content(location)).andExpect(status().isForbidden());
+        }
+        mvc.perform(put("/api/properties/missing/location").with(user("owner").roles("LANDLORD"))
+                .contentType(APPLICATION_JSON).content(location)).andExpect(status().isNotFound());
+        jdbc.update("INSERT INTO provinces(id,code,name) VALUES ('location-p','LOC-P','Other province')");
+        for (String invalid : new String[]{location.replace("\"longitude\":106", "\"longitude\":null"),
+                location.replace("\"latitude\":10", "\"latitude\":-91"),
+                location.replace("\"longitude\":106", "\"longitude\":181"),
+                location.replace("New address", "  "), location.replace("\"p\"", "\"location-p\"")}) {
+            mvc.perform(put("/api/properties/" + id + "/location").with(user("owner").roles("LANDLORD"))
+                    .contentType(APPLICATION_JSON).content(invalid)).andExpect(status().isBadRequest());
+        }
+        mvc.perform(put("/api/properties/" + id + "/location").with(user("owner").roles("LANDLORD"))
+                .contentType(APPLICATION_JSON).content(location.replace("\"w\"", "\"missing\"")))
+                .andExpect(status().isNotFound());
+        assertEquals("123 Test", jdbc.queryForObject("SELECT address_line FROM properties WHERE id=?", String.class, id));
+        assertNull(jdbc.queryForObject("SELECT latitude FROM properties WHERE id=?", java.math.BigDecimal.class, id));
     }
 
     @Test

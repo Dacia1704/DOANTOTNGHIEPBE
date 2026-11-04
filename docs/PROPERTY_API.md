@@ -7,6 +7,7 @@ API dùng `ApiResponse<T>` hiện tại. JWT bắt buộc; tạo thành công tr
 - `POST /api/properties`: JSON tạo Property, tiện ích chung, các Room và tiện ích riêng trong một transaction.
 - `GET /api/properties/mine?page=0&size=10`: danh sách cơ sở của tài khoản hiện tại; size 1–100.
 - `GET /api/properties/{id}`: chi tiết cơ sở và các Room; chỉ chủ cơ sở được xem (403 nếu không sở hữu, 404 nếu không tồn tại).
+- `PUT /api/properties/{id}/location`: chủ cơ sở thay thế địa chỉ và tọa độ; trả PropertyResponse. Body và kế hoạch FE: [GOOGLE_MAPS_INTEGRATION.md](GOOGLE_MAPS_INTEGRATION.md).
 
 ```json
 {
@@ -17,6 +18,8 @@ API dùng `ApiResponse<T>` hiện tại. JWT bắt buộc; tạo thành công tr
   "provinceId": "province-id",
   "wardId": "ward-id",
   "addressLine": "123 Nguyễn Trãi",
+  "latitude": 10.762622,
+  "longitude": 106.660172,
   "amenityIds": ["camera-id", "parking-id"],
   "defaultRoom": {
     "roomTypeId": "room-type-id",
@@ -37,7 +40,7 @@ API dùng `ApiResponse<T>` hiện tại. JWT bắt buộc; tạo thành công tr
 }
 ```
 
-`landlordId` lấy từ Principal. `floors` và mỗi danh sách `rooms` phải có phần tử. `floorNumber` có thể null, khi có phải >= 0; không sinh số phòng từ tầng. `totalFloors` tùy chọn, >= 0. `latitude`/`longitude` tùy chọn, trong khoảng [-90,90]/[-180,180]. Ward phải thuộc Province.
+`landlordId` lấy từ Principal. `floors` và mỗi danh sách `rooms` phải có phần tử. `floorNumber` có thể null, khi có phải >= 0; không sinh số phòng từ tầng. `totalFloors` tùy chọn, >= 0. `latitude`/`longitude` tùy chọn nhưng phải cùng có giá trị hoặc cùng null, trong khoảng [-90,90]/[-180,180]. Tọa độ 0 hợp lệ. Ward phải thuộc Province.
 
 `defaultRoom` có thể bỏ qua khi mỗi Room có đủ dữ liệu. Mỗi trường null của Room dùng giá trị mặc định tương ứng; số 0 là override thực sự đối với phí. Kết quả phải có roomType, price > 0, areaM2 > 0, maxOccupants > 0; các phí không âm. Default chỉ là input, không lưu vào Property. `amenityIds` của Property và Room độc lập, không kế thừa; ID trùng được loại bỏ.
 
@@ -54,7 +57,7 @@ Response Property có `id`, `landlordId`, `name`, `propertyTypeId`, `propertyTyp
 
 ## Migration và phạm vi tương thích
 
-`V11__property_rental_units.sql` tạo bốn bảng properties/property_types/property_amenities/property_images; chuyển dữ liệu địa chỉ/chủ sở hữu khỏi rooms sau khi backfill. Mỗi Room cũ có một Property riêng với cùng UUID, rentalMode BY_ROOM, roomNumber LEGACY, PropertyType tạm “Cơ sở chuyển đổi”. Không tự gom phòng theo địa chỉ hoặc suy luận loại bất động sản. Cần phân loại lại dữ liệu cũ bằng một tác vụ riêng; scope này chưa có API sửa Property.
+`V11__property_rental_units.sql` tạo bốn bảng properties/property_types/property_amenities/property_images; chuyển dữ liệu địa chỉ/chủ sở hữu khỏi rooms sau khi backfill. Mỗi Room cũ có một Property riêng với cùng UUID, rentalMode BY_ROOM, roomNumber LEGACY, PropertyType tạm “Cơ sở chuyển đổi”. Không tự gom phòng theo địa chỉ hoặc suy luận loại bất động sản. Cần phân loại lại dữ liệu cũ bằng một tác vụ riêng; API location bổ sung chỉ cập nhật địa chỉ/tọa độ.
 
 Room UUID được giữ nguyên nên Listing, RentalAgreement và RoomImage vẫn tham chiếu Room hiện tại. Listing vẫn `Listing -> Room`; chỉ sửa đường dẫn truy cập owner và query qua `Room.property`. Chat lấy landlord qua Property. RentalRequest vẫn tham chiếu Listing và giữ landlord snapshot, RentalAgreement vẫn tham chiếu Room và giữ snapshot, không đổi nghiệp vụ của các module này.
 
