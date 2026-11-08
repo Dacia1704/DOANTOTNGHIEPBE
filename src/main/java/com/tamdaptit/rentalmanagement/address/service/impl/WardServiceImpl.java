@@ -15,6 +15,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
@@ -26,12 +28,14 @@ public class WardServiceImpl implements WardService {
     private final ProvinceRepository provinces;
 
     @Override
+    @Cacheable("provinces")
     public List<ProvinceResponse> provinces() {
         return provinces.findAllByOrderByCodeAsc().stream()
                 .map(p -> new ProvinceResponse(p.getId(), p.getCode(), p.getName())).toList();
     }
 
     @Override
+    @Cacheable("wards")
     public PageResponse<WardResponse> list(String provinceId, String q, int page, int size) {
         if (page < 0 || size < 1 || size > 100 || (q != null && q.length() > 100)) {
             throw new AppException(ErrorCode.INVALID_REQUEST, "page >= 0, size between 1 and 100, q <= 100 characters");
@@ -55,22 +59,26 @@ public class WardServiceImpl implements WardService {
     }
 
     @Override
+    @Cacheable("wards")
     public WardResponse get(String id) { return WardResponse.from(find(id)); }
 
     @Transactional
     @Override
+    @CacheEvict(cacheNames="wards", allEntries=true)
     public WardResponse create(WardRequest request) {
         return write(new Ward(), request);
     }
 
     @Transactional
     @Override
+    @CacheEvict(cacheNames="wards", allEntries=true)
     public WardResponse update(String id, WardRequest request) {
         return write(find(id), request);
     }
 
     @Transactional
     @Override
+    @CacheEvict(cacheNames="wards", allEntries=true)
     public void delete(String id) {
         Ward ward = find(id);
         if (wards.countReferences(id) > 0) {

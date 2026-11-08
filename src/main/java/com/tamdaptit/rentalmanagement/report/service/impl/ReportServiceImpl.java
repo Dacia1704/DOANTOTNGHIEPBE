@@ -6,9 +6,8 @@ import com.tamdaptit.rentalmanagement.identity.entity.User;
 import com.tamdaptit.rentalmanagement.identity.entity.enums.*;
 import com.tamdaptit.rentalmanagement.identity.repository.UserRepository;
 import com.tamdaptit.rentalmanagement.listing.repository.ListingRepository;
-import com.tamdaptit.rentalmanagement.notification.entity.Notification;
 import com.tamdaptit.rentalmanagement.notification.entity.enums.NotificationType;
-import com.tamdaptit.rentalmanagement.notification.repository.NotificationRepository;
+import com.tamdaptit.rentalmanagement.notification.service.NotificationPublisher;
 import com.tamdaptit.rentalmanagement.rental.entity.enums.RentalAgreementStatus;
 import com.tamdaptit.rentalmanagement.rental.repository.RentalAgreementRepository;
 import com.tamdaptit.rentalmanagement.report.dto.request.*;
@@ -39,7 +38,7 @@ public class ReportServiceImpl implements ReportService {
     private final UserRepository users;
     private final ListingRepository listings;
     private final RentalAgreementRepository agreements;
-    private final NotificationRepository notifications;
+    private final NotificationPublisher notifications;
     private final ReportMapper mapper;
     private final Clock clock;
 
@@ -147,8 +146,8 @@ public class ReportServiceImpl implements ReportService {
         return mapper.toResponse(report);
     }
     private void notifyTenant(Report report,String body) {
-        notifications.save(Notification.builder().user(report.getTenant()).type(NotificationType.REPORT)
-            .title("Cập nhật báo cáo").body(body).referenceType("REPORT").referenceId(report.getId()).read(false).build());
+        notifications.enqueue(report.getTenant().getId(),NotificationType.REPORT,
+            "Cập nhật báo cáo",body,"REPORT",report.getId());
     }
     private User user(String id,RoleCode role) {
         var user=users.findByIdWithRolesAndPermissions(id).orElseThrow(()->new AppException(USER_NOT_FOUND));

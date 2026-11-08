@@ -19,7 +19,6 @@ public class RentalPdfWorker {
     private final RentalRequestRepository requests;
     private final RentalContractPdfService renderer;
     private final RentalPdfStorage storage;
-    private final RentalEvents events;
     private final JdbcTemplate jdbc;
     private final Clock clock;
     @Scheduled(fixedDelayString="${app.rental.job-delay-ms:5000}")
@@ -28,7 +27,6 @@ public class RentalPdfWorker {
         for(String id:agreements.expired(now,PageRequest.of(0,25))) safely(()->rentals.expireAgreement(id));
         for(String id:requests.expired(now,PageRequest.of(0,25))) safely(()->rentals.expireRequest(id));
         for(String id:agreements.pdfJobs(now,PageRequest.of(0,5))) safely(()->process(id));
-        safely(events::deliver);
     }
     public void process(String id) {
         var claim=jobs.claim(id); if(claim==null) return;

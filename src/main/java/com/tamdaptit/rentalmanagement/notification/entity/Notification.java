@@ -63,6 +63,7 @@ public class Notification {
     private String referenceId;
 
     @Column(name = "is_read")
+    @Builder.Default
     private Boolean read = false;
 
     @CreationTimestamp
