@@ -12,6 +12,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -23,6 +25,7 @@ public class PropertyTypeServiceImpl implements PropertyTypeService {
     private final PropertyTypeMapper mapper;
 
     @Override
+    @Cacheable("propertyTypes")
     public PageResponse<PropertyTypeResponse> getAll(int page, int size) {
         var result = propertyTypes.findAll(PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, 100), Sort.by("name")));
         return PageResponse.<PropertyTypeResponse>builder().currentPage(result.getNumber()).pageSize(result.getSize())
@@ -31,10 +34,12 @@ public class PropertyTypeServiceImpl implements PropertyTypeService {
     }
 
     @Override
+    @Cacheable("propertyTypes")
     public PropertyTypeResponse getById(String id) { return mapper.toResponse(find(id)); }
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames="propertyTypes", allEntries=true)
     public PropertyTypeResponse create(PropertyTypeRequest request) {
         var type = mapper.toEntity(request);
         apply(type, request);
@@ -43,6 +48,7 @@ public class PropertyTypeServiceImpl implements PropertyTypeService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames="propertyTypes", allEntries=true)
     public PropertyTypeResponse update(String id, PropertyTypeRequest request) {
         var type = find(id);
         apply(type, request);
@@ -60,6 +66,7 @@ public class PropertyTypeServiceImpl implements PropertyTypeService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames="propertyTypes", allEntries=true)
     public void delete(String id) {
         var type = find(id);
         if (properties.existsByPropertyType_Id(id)) throw new AppException(ErrorCode.PROPERTY_TYPE_IN_USE);

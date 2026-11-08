@@ -109,7 +109,8 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
             String destination = accessor.getDestination();
             if (StompCommand.SEND.equals(accessor.getCommand())) {
                 if (!"/app/chat.send".equals(destination)) throw new AccessDeniedException("Không thể gửi tới địa chỉ này.");
-            } else if (!"/user/queue/messages".equals(destination) && !"/user/queue/errors".equals(destination)) {
+            } else if (!"/user/queue/messages".equals(destination) && !"/user/queue/errors".equals(destination)
+                    && !"/user/queue/notifications".equals(destination)) {
                 String prefix = "/topic/conversations/";
                 if (destination == null || !destination.startsWith(prefix)
                         || !participantRepository.existsByConversationIdAndUserId(destination.substring(prefix.length()), authentication.getName())) {

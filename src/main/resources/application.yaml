@@ -49,9 +49,14 @@ spring:
 
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
-    port: 5672
+    port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USER:admin}
     password: ${RABBITMQ_PASSWORD:admin123}
+    connection-timeout: 2s
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
     listener:
       simple:
         retry:
@@ -59,6 +64,7 @@ spring:
           max-attempts: 3
           initial-interval: 2000
         default-requeue-rejected: false
+        prefetch: 20
 
   # MailHog (local dev) - bắt SMTP, xem web UI tại http://localhost:8025
   mail:
@@ -92,6 +98,11 @@ logging:
     com.tamdaptit.rentalmanagement: DEBUG
 
 app:
+  cache:
+    ttl: ${CACHE_TTL:30m}
+  notifications:
+    relay-enabled: ${NOTIFICATIONS_RELAY_ENABLED:true}
+    relay-delay-ms: ${NOTIFICATIONS_RELAY_DELAY_MS:2000}
   cloudinary:
     cloud-name: vhbnmvru
     api-key: "143753777698223"

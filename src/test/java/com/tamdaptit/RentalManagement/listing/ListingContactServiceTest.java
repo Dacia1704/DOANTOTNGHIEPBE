@@ -1,5 +1,6 @@
 package com.tamdaptit.rentalmanagement.listing;
 
+import com.tamdaptit.rentalmanagement.listing.service.impl.ListingContactServiceImpl;
 import com.tamdaptit.rentalmanagement.common.exception.AppException;
 import com.tamdaptit.rentalmanagement.common.exception.ErrorCode;
 import com.tamdaptit.rentalmanagement.identity.entity.User;
@@ -19,7 +20,7 @@ import static org.mockito.Mockito.*;
 class ListingContactServiceTest {
     private final Clock clock = Clock.fixed(Instant.parse("2026-11-03T00:00:00Z"), ZoneId.of("Asia/Ho_Chi_Minh"));
     private final ListingRepository listings = mock(ListingRepository.class);
-    private final ListingContactService service = new ListingContactService(listings, clock);
+    private final ListingContactService service = new ListingContactServiceImpl(listings, clock);
 
     private void publishedWithPhone(String phone) {
         var owner = User.builder().id("owner").phone(phone).build();

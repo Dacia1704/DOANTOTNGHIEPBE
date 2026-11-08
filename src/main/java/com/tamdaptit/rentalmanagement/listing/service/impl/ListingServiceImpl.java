@@ -63,6 +63,7 @@ public class ListingServiceImpl implements ListingService {
     private final com.tamdaptit.rentalmanagement.rental.service.RentalAvailabilityService booking;
     private final RoomAmenityRepository roomAmenities;
     private final RoomImageRepository roomImages;
+    private final com.tamdaptit.rentalmanagement.notification.service.NotificationPublisher notifications;
     private final com.tamdaptit.rentalmanagement.property.repository.PropertyRepository properties;
     private final com.tamdaptit.rentalmanagement.property.repository.PropertyAmenityRepository propertyAmenities;
     private final com.tamdaptit.rentalmanagement.property.repository.PropertyImageRepository propertyImages;
@@ -255,6 +256,9 @@ public class ListingServiceImpl implements ListingService {
         listing.setRejectionReason(null);
         repository.saveAndFlush(listing);
         listing.setPriorityLevel(response(listing).priorityLevel());
+        notifications.enqueue(listing.getProperty().getLandlord().getId(),
+                com.tamdaptit.rentalmanagement.notification.entity.enums.NotificationType.SYSTEM,
+                "Tin đăng đã được duyệt", "Tin đăng “"+listing.getTitle()+"” đã được xuất bản.", "LISTING", id);
         return response(repository.saveAndFlush(listing));
     }
 
@@ -277,6 +281,9 @@ public class ListingServiceImpl implements ListingService {
         listing.setInitialReview(false);
         listing.setPriorityLevel(0);
         clearSelection(listing);
+        notifications.enqueue(listing.getProperty().getLandlord().getId(),
+                com.tamdaptit.rentalmanagement.notification.entity.enums.NotificationType.SYSTEM,
+                "Tin đăng cần chỉnh sửa", "Tin đăng “"+listing.getTitle()+"” bị từ chối. Vui lòng xem lý do trong quản lý tin đăng.", "LISTING", id);
         return response(repository.saveAndFlush(listing));
     }
 

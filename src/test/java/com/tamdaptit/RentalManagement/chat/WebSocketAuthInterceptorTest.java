@@ -77,6 +77,9 @@ class WebSocketAuthInterceptorTest {
     @Test void privateQueuesAreAllowedButOtherUsersTopicsAreRejected() {
         assertNotNull(interceptor.preSend(message(StompCommand.SUBSCRIBE, "/user/queue/messages", true), channel));
         assertNotNull(interceptor.preSend(message(StompCommand.SUBSCRIBE, "/user/queue/errors", true), channel));
+        assertNotNull(interceptor.preSend(message(StompCommand.SUBSCRIBE, "/user/queue/notifications", true), channel));
+        assertThrows(AccessDeniedException.class, () ->
+                interceptor.preSend(message(StompCommand.SUBSCRIBE, "/user/other/queue/notifications", true), channel));
         assertThrows(AccessDeniedException.class, () ->
                 interceptor.preSend(message(StompCommand.SUBSCRIBE, "/topic/conversations/other", true), channel));
         when(participants.existsByConversationIdAndUserId("mine", "sender")).thenReturn(true);
