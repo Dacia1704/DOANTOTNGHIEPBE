@@ -10,7 +10,7 @@ Review giúp người thuê đánh giá phòng/chủ trọ và chủ trọ đán
 
 MVP gồm tạo/xem đánh giá, điểm tổng hợp, phản hồi của chủ trọ, admin ẩn/hiện đánh giá; gửi/theo dõi báo cáo, tải bằng chứng và admin xử lý. Thống kê vận hành báo cáo chỉ cần số lượng theo trạng thái. Báo cáo doanh thu, xuất Excel/PDF, tố cáo review, chat hoặc tenant nằm ngoài phạm vi MVP.
 
-Người dùng đã xác nhận: đánh giá trong thời gian thuê và sau trả phòng; review không thể sửa hoặc xóa; landlord có quan hệ hợp đồng được xem toàn bộ review về tenant; chỉ báo cáo landlord đã có hợp đồng; xử lý report theo phạm vi mặc định, chưa thêm xử phạt tự động. Chi tiết và tiêu chí kiểm chứng được đồng bộ bên dưới.
+Người dùng đã xác nhận: đánh giá trong thời gian thuê và sau trả phòng; review không thể sửa hoặc xóa; landlord đang hoạt động được xem toàn bộ review đang hiển thị về tenant mà không cần hợp đồng giữa hai bên (cập nhật 09/11/2026); chỉ báo cáo landlord đã có hợp đồng; xử lý report theo phạm vi mặc định, chưa thêm xử phạt tự động. Chi tiết và tiêu chí kiểm chứng được đồng bộ bên dưới.
 
 ## 2. Hiện trạng đã đối chiếu
 
@@ -47,7 +47,7 @@ Nguồn chính: [yêu cầu CSDL](requirements/CSDL.txt), [schema hiện tại](
 - Điểm Property trên trang Listing là tổng hợp review các Room thuộc Property; điểm landlord chỉ lấy `LandlordReview`. Không trộn hai nhóm điểm hoặc lấy trung bình của các trung bình Room.
 - Tổng hợp trả `totalReviews`, `averageRating`, phân bố 1–5 sao. Không có review thì `averageRating=null`, tổng bằng 0. Query chỉ tính `is_hidden=false`, làm tròn điểm cuối cùng đến một chữ số thập phân.
 - DTO công khai chỉ có nội dung review, tên hiển thị phù hợp, avatar nếu có, điểm và thời gian. Không lộ hợp đồng, email, số điện thoại, giấy tờ, ghi chú moderation hoặc entity User đầy đủ.
-- Đánh giá tenant không công khai. Chính tenant, admin và landlord có hợp đồng đã được xác nhận với tenant đó được đọc toàn bộ review đang hiển thị về tenant, bao gồm review do landlord khác viết; không giới hạn vào hợp đồng của người xem. Quan hệ hợp đồng vẫn có giá trị sau trả phòng; landlord chưa có hợp đồng với tenant bị từ chối. Quyền đọc toàn bộ không bỏ qua quy tắc review bị ẩn bên dưới.
+- Đánh giá tenant không công khai. Chính tenant, admin và landlord đang hoạt động được đọc toàn bộ review đang hiển thị về tenant, bao gồm review do landlord khác viết. Landlord không cần có hợp đồng với tenant; có thể xem trước khi lập hợp đồng hoặc ngay khi xem hợp đồng nháp/chờ xác nhận. Quyền đọc toàn bộ không bỏ qua quy tắc review bị ẩn bên dưới.
 - Tác giả có thể xem review bị ẩn của mình kèm trạng thái/lý do. Chỉ admin đọc toàn bộ review ẩn. Các bên khác không đọc được qua URL chi tiết hoặc tham số `includeHidden`.
 - Phân trang mặc định 10, tối đa 50; sắp xếp `createdAt DESC, id DESC`, chỉ cho các kiểu sort đã định nghĩa. MVP tính điểm trực tiếp bằng aggregate query, chưa cache.
 
@@ -176,7 +176,7 @@ Nếu cần chia nhỏ bản phát hành: Review trước; Report kèm bằng ch
 - Chỉ landlord trên hợp đồng được phản hồi; tài khoản landlord khác và chủ Property mới không lấy được quyền qua thay đổi sở hữu.
 - Admin ẩn/hiện cập nhật đúng metadata. Review bị ẩn biến mất khỏi mọi API công khai và aggregate, kể cả filter/phân trang; tác giả/admin vẫn xem được đúng phạm vi.
 - Review tổng hợp Property tính theo số review thực, không trung bình các trung bình; không có dữ liệu trả average null. TenantReview và ID hợp đồng không rò qua API công khai.
-- Landlord có hợp đồng đã xác nhận với tenant xem được cả review do landlord khác viết, kể cả sau trả phòng; landlord không có hợp đồng bị chặn. Review bị ẩn vẫn chỉ tác giả/admin được xem theo quyền riêng.
+- Landlord đang hoạt động xem được cả review do landlord khác viết khi chưa có hợp đồng, hợp đồng đang nháp/chờ xác nhận hoặc đã trả phòng. Tenant khác và người chưa đăng nhập bị chặn. Review bị ẩn vẫn chỉ tác giả/admin được xem theo quyền riêng.
 
 ### Report và storage
 
@@ -200,7 +200,7 @@ Nếu cần chia nhỏ bản phát hành: Review trước; Report kèm bằng ch
 
 1. **Thời điểm đánh giá:** trong suốt thời gian thuê và cả sau khi trả phòng; mỗi loại vẫn tối đa một review cho mỗi hợp đồng.
 2. **Tính bất biến:** review không thể sửa hoặc xóa sau khi gửi. Phản hồi của landlord và thao tác admin ẩn/hiện là các thao tác riêng theo mục 3.3.
-3. **Quyền xem tenant review:** landlord có hợp đồng đã xác nhận với tenant được xem toàn bộ review đang hiển thị về tenant đó, kể cả review do landlord khác viết. Không mở công khai và không bỏ qua quy tắc ẩn review.
+3. **Quyền xem tenant review (cập nhật 09/11/2026):** landlord đang hoạt động được xem toàn bộ review đang hiển thị về tenant đó, kể cả review do landlord khác viết, không cần hợp đồng giữa hai bên. Không mở công khai và không bỏ qua quy tắc ẩn review.
 4. **Điều kiện báo cáo landlord:** chỉ tenant đã có hợp đồng được xác nhận với landlord đó; không mở rộng sang quan hệ chỉ qua chat.
 5. **Xử lý report:** trước mắt theo mặc định: nhận xử lý và ghi kết quả, chưa có tự động ẩn tin/khóa tài khoản, chưa thêm lịch sử xử lý đầy đủ hoặc giao lại người xử lý.
 

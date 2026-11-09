@@ -60,7 +60,7 @@ public class UserController {
     public ApiResponse<UserResponse> deleteAvatar(Principal principal) { return ApiResponse.success(service.deleteAvatar(principal.getName())); }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USER_READ')")
     public ApiResponse<PageResponse<UserResponse>> list(@RequestParam(required = false) String q,
             @RequestParam(required = false) UserStatus status,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
@@ -68,24 +68,24 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USER_READ')")
     public ApiResponse<UserResponse> get(@PathVariable String id) { return ApiResponse.success(service.get(id)); }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') and hasAuthority('USER_MANAGE')")
     public ApiResponse<UserResponse> create(@RequestBody @Valid CreateUserRequest request) {
         return ApiResponse.<UserResponse>builder().code(201).message("Created").data(service.create(request)).build();
     }
 
     @RequestMapping(path = "/{id}", method = {RequestMethod.PUT, RequestMethod.PATCH})
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') and hasAuthority('USER_MANAGE')")
     public ApiResponse<UserResponse> update(@PathVariable String id, @RequestBody @Valid UpdateUserRequest request) {
         return ApiResponse.success(service.update(id, request));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') and hasAuthority('USER_MANAGE')")
     public ApiResponse<Void> delete(@PathVariable String id) {
         service.delete(id);
         return ApiResponse.success("Deleted", null);

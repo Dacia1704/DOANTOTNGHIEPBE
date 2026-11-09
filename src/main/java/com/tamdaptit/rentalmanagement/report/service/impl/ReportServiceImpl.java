@@ -90,7 +90,7 @@ public class ReportServiceImpl implements ReportService {
     public ReportDetailResponse detail(String actor,String id) {
         var viewer=user(actor,null);
         var report=reports.findById(id).orElseThrow(()->new AppException(REPORT_NOT_FOUND));
-        if(!actor.equals(report.getTenant().getId()) && !hasRole(viewer,RoleCode.ADMIN))
+        if(!actor.equals(report.getTenant().getId()) && !hasPermission(viewer,"REPORT_READ"))
             throw new AppException(UNAUTHORIZED);
         return new ReportDetailResponse(mapper.toResponse(report),
             evidences.findByReport_IdOrderByCreatedAtAscIdAsc(id).stream().map(mapper::toResponse).toList());
@@ -105,12 +105,12 @@ public class ReportServiceImpl implements ReportService {
     }
     @Override
     public PageResponse<ReportResponse> admin(String actor,ReportStatus status,ReportReason reason,int page,int size) {
-        user(actor,RoleCode.ADMIN);
+        permission(actor,"REPORT_READ");
         return page(reports.findAll(filter(null,status,reason),pageable(page,size)));
     }
     @Override
     public Map<ReportStatus,Long> summary(String actor) {
-        user(actor,RoleCode.ADMIN);
+        permission(actor,"REPORT_READ");
         var result=new EnumMap<ReportStatus,Long>(ReportStatus.class);
         for(var status:ReportStatus.values()) result.put(status,0L);
         for(var count:reports.counts()) result.put(count.getStatus(),count.getTotal());
@@ -119,7 +119,7 @@ public class ReportServiceImpl implements ReportService {
     @Override
     @Transactional(isolation=Isolation.READ_COMMITTED)
     public ReportResponse assign(String actor,String id) {
-        var admin=user(actor,RoleCode.ADMIN);
+        var admin=permission(actor,"REPORT_HANDLE");
         var report=reports.lock(id).orElseThrow(()->new AppException(REPORT_NOT_FOUND));
         if(report.getStatus()!=ReportStatus.PENDING) throw new AppException(REPORT_INVALID_TRANSITION);
         report.setStatus(ReportStatus.PROCESSING);
@@ -131,7 +131,7 @@ public class ReportServiceImpl implements ReportService {
     @Override
     @Transactional(isolation=Isolation.READ_COMMITTED)
     public ReportResponse close(String actor,String id,ReportStatus outcome,ReportResolutionRequest body) {
-        user(actor,RoleCode.ADMIN);
+        permission(actor,"REPORT_HANDLE");
         if(outcome!=ReportStatus.RESOLVED && outcome!=ReportStatus.REJECTED) throw new AppException(INVALID_REQUEST);
         String note=required(body.resolutionNote(),5000);
         var report=reports.lock(id).orElseThrow(()->new AppException(REPORT_NOT_FOUND));
@@ -153,6 +153,15 @@ public class ReportServiceImpl implements ReportService {
         var user=users.findByIdWithRolesAndPermissions(id).orElseThrow(()->new AppException(USER_NOT_FOUND));
         if(user.getStatus()!=UserStatus.ACTIVE || (role!=null && !hasRole(user,role))) throw new AppException(UNAUTHORIZED);
         return user;
+    }
+    private User permission(String actor,String code) {
+        var viewer=user(actor,null);
+        if(!hasPermission(viewer,code)) throw new AppException(UNAUTHORIZED);
+        return viewer;
+    }
+    private boolean hasPermission(User user,String code) {
+        return user.getUserRoles().stream().flatMap(ur->ur.getRole().getRolePermissions().stream())
+            .anyMatch(rp->code.equals(rp.getPermission().getCode()));
     }
     private boolean hasRole(User user,RoleCode role) {
         return user.getUserRoles().stream().anyMatch(ur->ur.getRole().getCode()==role);

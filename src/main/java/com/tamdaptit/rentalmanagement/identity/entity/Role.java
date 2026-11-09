@@ -33,6 +33,8 @@ import java.util.Set;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class Role {
+    @Column(name="permission_version", nullable=false)
+    private long permissionVersion;
 
     @Id
     @UuidGenerator
