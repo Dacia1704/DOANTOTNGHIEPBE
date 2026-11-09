@@ -34,4 +34,10 @@ public class Province {
 
     @Column(nullable = false, length = 100)
     private String name;
+
+    @Column(name = "centroid_lat", precision = 10, scale = 8)
+    private java.math.BigDecimal centroidLat;
+
+    @Column(name = "centroid_lng", precision = 11, scale = 8)
+    private java.math.BigDecimal centroidLng;
 }

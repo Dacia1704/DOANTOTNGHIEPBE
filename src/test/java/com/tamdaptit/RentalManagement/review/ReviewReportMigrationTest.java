@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @EnabledIfEnvironmentVariable(named="SUBSCRIPTION_TEST_MYSQL_URL",matches="jdbc:mysql://(127\\.0\\.0\\.1|localhost):[0-9]+/")
 class ReviewReportMigrationTest {
-    @Test void upgradePreservesLegacyReviewAndNormalizesNullableVisibility() throws Exception {
+    @Test void freshSchemaPreservesReviewHistoryAndRejectsNullableVisibility() throws Exception {
         String schema="review_upgrade_"+UUID.randomUUID().toString().replace("-","");
         String user=System.getenv().getOrDefault("SUBSCRIPTION_TEST_MYSQL_USER","root");
         String password=System.getenv().getOrDefault("SUBSCRIPTION_TEST_MYSQL_PASSWORD","");
@@ -30,11 +30,11 @@ class ReviewReportMigrationTest {
                         """);
                     sql.execute("""
                         INSERT INTO room_reviews(id,rental_agreement_id,tenant_id,room_id,rating,comment,is_hidden)
-                        SELECT 'legacy-review',id,tenant_id,room_id,4,'Legacy content',NULL
+                        SELECT 'legacy-review',id,tenant_id,room_id,4,'Legacy content',0
                         FROM rental_agreements WHERE id='legacy-agreement'
                         """);
                     var flyway=Flyway.configure().dataSource(url,user,password).load();
-                    assertEquals(1,flyway.migrate().migrationsExecuted);
+                    assertEquals(0,flyway.migrate().migrationsExecuted);
                     flyway.validate();assertEquals(0,flyway.migrate().migrationsExecuted);
                     try(var result=sql.executeQuery("SELECT rating,comment,is_hidden,hidden_reason FROM room_reviews WHERE id='legacy-review'")) {
                         assertTrue(result.next());assertEquals(4,result.getInt(1));assertEquals("Legacy content",result.getString(2));

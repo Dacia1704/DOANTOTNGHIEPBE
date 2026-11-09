@@ -1,6 +1,6 @@
 # Nền tảng dữ liệu gói dịch vụ và Boost
 
-Phạm vi tài liệu này: migration V3–V5, entity và enum. API và service cho gói dịch vụ, VNPay, tin đăng/ưu tiên và Boost được mô tả tại mục 8–14 trong `api.md`. Có IPN và QueryDr kiểm tra lại giao dịch khi chạy localhost; kiểm thử tự động không thay thế nghiệm thu giao dịch trên hệ thống VNPay. Thứ tự công việc theo `SUBSCRIPTION_PAYMENT_PLAN.md`.
+Tài liệu giải thích entity, enum và nghiệp vụ gói dịch vụ/Boost. Các số migration V3–V8 bên dưới là lịch sử trước khi gộp schema; source hiện tại chỉ dùng Flyway V1 (schema) và V2 (seed). Không tìm hoặc áp dụng lại các migration cũ. API và service được mô tả tại mục 8–14 trong `api.md`; cài đặt theo [README hệ thống](../../AIService/README.md).
 
 Chỉ thêm 3 bảng: `service_package_prices`, `service_subscription_orders`, `service_subscription_periods`. Thông tin suất ưu tiên lưu trực tiếp trên `listings`. V4 chỉ bổ sung cột/index vào bảng hiện có, không tạo bảng thứ tư. Schema được kiểm chứng trên MySQL 8.0.42, bao gồm JPA validate toàn bộ entity.
 

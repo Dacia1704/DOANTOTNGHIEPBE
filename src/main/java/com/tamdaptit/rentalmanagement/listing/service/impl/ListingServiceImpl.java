@@ -13,6 +13,7 @@ import com.tamdaptit.rentalmanagement.identity.repository.UserRepository;
 import com.tamdaptit.rentalmanagement.listing.dto.request.ListingRequest;
 import com.tamdaptit.rentalmanagement.listing.dto.request.ListingContentRequest;
 import com.tamdaptit.rentalmanagement.listing.dto.response.ListingResponse;
+import com.tamdaptit.rentalmanagement.listing.dto.response.ListingPriceStatisticsResponse;
 import com.tamdaptit.rentalmanagement.listing.entity.Listing;
 import com.tamdaptit.rentalmanagement.listing.entity.enums.ListingStatus;
 import com.tamdaptit.rentalmanagement.listing.mapper.ListingMapper;
@@ -32,6 +33,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -340,9 +342,32 @@ public class ListingServiceImpl implements ListingService {
     @Override
     public PageResponse<ListingResponse> searchPublished(int page, int size,
             ListingSearchRequest request) {
+        if (page < 0 || size < 1 || size > 100)
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        return searchPublished(request, PageRequest.of(page, size));
+    }
+
+    @Override
+    public List<ListingResponse> searchPublishedMap(ListingSearchRequest request) {
+        return searchPublished(request, Pageable.unpaged()).getData().stream()
+                .filter(listing -> listing.property().latitude() != null
+                        && listing.property().longitude() != null)
+                .toList();
+    }
+
+    @Override
+    public List<ListingPriceStatisticsResponse> priceStatistics(
+            String provinceId, String wardId) {
+        provinceId = blankToNull(provinceId);
+        wardId = blankToNull(wardId);
+        if (provinceId == null && wardId != null) throw new AppException(ErrorCode.INVALID_REQUEST);
+        return provinceId == null ? repository.priceStatisticsByProvince(now())
+                : repository.priceStatisticsByWard(now(), provinceId, wardId);
+    }
+
+    private PageResponse<ListingResponse> searchPublished(ListingSearchRequest request, Pageable pageable) {
         validateLocationSearch(request);
-        if (page < 0 || size < 1 || size > 100
-                || (request.minPrice() != null && request.minPrice().signum() < 0)
+        if ((request.minPrice() != null && request.minPrice().signum() < 0)
                 || (request.maxPrice() != null && request.maxPrice().signum() < 0)
                 || (request.minPrice() != null && request.maxPrice() != null
                     && request.minPrice().compareTo(request.maxPrice()) > 0))
@@ -356,7 +381,7 @@ public class ListingServiceImpl implements ListingService {
                 request.minPrice(), request.maxPrice(), names.isEmpty() ? List.of("") : names, names.size(),
                 request.latitude(), request.longitude(), request.radiusKm(),
                 request.south(), request.north(), request.west(), request.east(),
-                PageRequest.of(page, size)), time);
+                pageable), time);
     }
 
     private void validateLocationSearch(ListingSearchRequest request) {

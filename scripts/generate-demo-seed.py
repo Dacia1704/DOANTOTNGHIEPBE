@@ -1,6 +1,8 @@
-"""Regenerate V2 demo rows; preserve the checked-in administrative reference snapshot."""
+"""Generate V2 from the synchronized administrative snapshot. Standard library only."""
 from collections import defaultdict
 from pathlib import Path
+import argparse
+import hashlib
 import json
 import re
 import uuid
@@ -8,6 +10,16 @@ import uuid
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATIONS = ROOT / 'src/main/resources/db/migration'
 SEED = MIGRATIONS / 'V2__seed_reference_and_demo_data.sql'
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--snapshot', type=Path, default=ROOT / 'scripts/data/administrative-units.json')
+parser.add_argument('--output', type=Path, default=SEED)
+parser.add_argument('--landlords', type=int, default=68)
+parser.add_argument('--tenants', type=int, default=1000)
+parser.add_argument('--properties-per-landlord', type=int, choices=(8, 16), default=16)
+parser.add_argument('--rentals-per-tenant', type=int, default=2)
+args = parser.parse_args()
+if args.landlords < 4 or args.tenants < 4 or args.properties_per_landlord < 8 or args.rentals_per_tenant < 1:
+    parser.error('landlords/tenants >= 4, properties-per-landlord >= 8, rentals-per-tenant >= 1')
 PASSWORD = '$2a$10$RZccNo16W1rYiEPBjvswBu9IqqiiEtrEFNn9xltUs83/bQKuBzyBW'
 AVATAR = 'https://img.icons8.com/nolan/1200/user-default.jpg'
 IMAGES = [
@@ -15,13 +27,8 @@ IMAGES = [
     'https://tse4.mm.bing.net/th/id/OIP.r9I-If7EKBzj6RECd9adjQHaFj?r=0&pid=Api&h=220&P=0',
     'https://cdn.pixabay.com/photo/2023/12/30/07/31/living-room-8477521_1280.jpg',
 ]
-old = SEED.read_text(encoding='utf-8')
-if '-- BEGIN REFERENCE DATA' in old:
-    reference = old.split('-- BEGIN REFERENCE DATA\n', 1)[1].split('-- END REFERENCE DATA', 1)[0]
-else:
-    # Keep the existing address snapshot and taxonomies verbatim, without the old demo users/assets.
-    reference = old[old.index('-- 1. ROLES'):old.index('-- 2. FICTIONAL')]
-    reference += old[old.index('-- 3. OFFICIAL'):old.index('-- 7. FICTIONAL')]
+reference = (ROOT / 'scripts/data/reference-catalog.sql').read_text(encoding='utf-8')
+snapshot = json.loads(args.snapshot.read_text(encoding='utf-8'))
 
 def uid(key):
     return str(uuid.uuid5(uuid.NAMESPACE_URL, 'trotot-demo-v2/' + str(key)))
@@ -48,25 +55,47 @@ def value(v):
 rows = defaultdict(list)
 def add(table, **fields):
     rows[table].append(fields)
-    return fields['id']
+    return fields.get('id', fields.get('public_id'))
 
 catalog_ids = {}
 for table in ['property_types', 'room_types', 'amenities']:
     catalog_ids[table] = dict(re.findall(rf"INSERT INTO {table} .*?\nSELECT '([^']+)', '([^']+)'", reference))
     catalog_ids[table] = {name: id for id, name in catalog_ids[table].items()}
 
-# Address IDs/codes come from the committed snapshot, not invented ward identifiers.
-province_rows = re.findall(r"\('([^']+)', '([^']+)', '([^']+)'\)", reference)
-ward_rows = re.findall(r"\('([^']+)', '([^']+)', '([^']+)', '([^']+)'\)", reference)
-provinces = {code: (id, name) for id, code, name in province_rows}
+# Lookups by code work with either synchronized random IDs or offline snapshot IDs.
+provinces = {}
 wards = defaultdict(list)
-for id, code, province_code, name in ward_rows:
-    wards[provinces[province_code][0]].append((id, name))
-if len(provinces) != 34 or sum(map(len, wards.values())) != 3321:
-    raise ValueError('Unexpected address reference format/count')
+ward_locations = {}
+centers = {}
+for p in snapshot['provinces']:
+    code, name = p['code'], p['name']
+    if not re.fullmatch(r'\d{2}', code) or not p['wards']:
+        raise ValueError('Invalid administrative snapshot')
+    province_id = SQL(f"(SELECT id FROM provinces WHERE code='{code}')")
+    provinces[code] = (province_id, name)
+    centers[code] = (p['centroidLat'], p['centroidLng'])
+    reference += ('\nINSERT INTO provinces (id,code,name,centroid_lat,centroid_lng) VALUES ('
+                  + ','.join(value(v) for v in [uid('province/' + code), code, name, *centers[code]])
+                  + ') AS incoming ON DUPLICATE KEY UPDATE centroid_lat=COALESCE(provinces.centroid_lat,incoming.centroid_lat),'
+                    'centroid_lng=COALESCE(provinces.centroid_lng,incoming.centroid_lng);\n')
+    for w in p['wards']:
+        wc, wn = w['code'], w['name']
+        if not re.fullmatch(r'\d{5}', wc) or w['centroidLat'] is None or w['centroidLng'] is None:
+            raise ValueError('Ward needs a real administrative code and centroid')
+        wid = SQL(f"(SELECT id FROM wards WHERE code='{wc}')")
+        wards[province_id].append((wid, wn))
+        ward_locations[wid] = (w['centroidLat'], w['centroidLng'])
+        reference += ('INSERT INTO wards (id,province_id,code,name,centroid_lat,centroid_lng) VALUES ('
+                      + ','.join(value(v) for v in [uid('ward/' + wc), province_id, wc, wn, *ward_locations[wid]])
+                      + ') AS incoming ON DUPLICATE KEY UPDATE centroid_lat=COALESCE(wards.centroid_lat,incoming.centroid_lat),'
+                        'centroid_lng=COALESCE(wards.centroid_lng,incoming.centroid_lng);\n')
+for items in wards.values():
+    items.sort(key=lambda w: (0 if 'Cầu Giấy' in w[1] else 1 if w[1].startswith('Phường') else 2, w[1]))
+if len(provinces) != 34:
+    raise ValueError('Expected 34 provinces in the current snapshot')
 
 users = {}
-for role, count in [('admin', 3), ('landlord', 24), ('tenant', 100)]:
+for role, count in [('admin', 3), ('landlord', args.landlords), ('tenant', args.tenants)]:
     for n in range(1, count + 1):
         suffix = '' if n == 1 else f'{n:02d}'
         key = f'{role}{n}'
@@ -134,7 +163,7 @@ def payment(owner, target, kind, amount, status, key, package_id, paid_days=-5, 
             buyer_name='Khách hàng Demo', issued_at=at(paid_days), created_at=at(paid_days))
 
 active_periods = {}
-for n in range(1, 25):
+for n in range(1, args.landlords + 1):
     owner = users[f'landlord{n}']
     for state, code, start, end in ([('EXPIRED', 'STARTER', -180, -90)] if n % 4 in [1, 2] else []) + (
         [('ACTIVE', 'PRO' if n % 4 == 1 else 'STANDARD', -5, 85)] if n % 4 in [1, 2] else []):
@@ -165,7 +194,7 @@ for n in range(1, 25):
     payment(owner, oid, 'SERVICE_PACKAGE', package[code][7], pstatus, key, uid('package/' + code), -2, status == 'REQUIRES_REVIEW')
 
 active_boosts = {}
-for n in range(1, 25):
+for n in range(1, args.landlords + 1):
     owner = users[f'landlord{n}']
     for state in ['EXPIRED', 'CANCELLED', 'PENDING_PAYMENT'] + (['ACTIVE'] if n % 4 in [1, 3] else []):
         p = boosts[(n - 1) % len(boosts)]
@@ -182,30 +211,28 @@ for n in range(1, 25):
         payment(owner, sid, 'BOOST_PACKAGE', p['price'], ps, key, p['id'], start)
         if state == 'ACTIVE': active_boosts[n] = sid
 
-# Coordinates are fictional nearby points for map/filter demos, not verified street addresses.
-centers = {'01': (21.0285, 105.8542), '79': (10.7769, 106.7009), '48': (16.0544, 108.2022),
-           '31': (20.8449, 106.6881), '92': (10.0452, 105.7469), '46': (16.4637, 107.5909)}
-cities = list(centers)
+# Fictional points near the actual ward centroid, rather than near a province-wide guess.
+cities = sorted(provinces)
 published = []
 first_rooms = {}
-for n in range(1, 25):
+for n in range(1, args.landlords + 1):
     paid = n in active_periods
-    for k in range(8):
+    for k in range(args.properties_per_landlord):
         key = f'{n}/{k}'
         city = cities[(n + k - 1) % len(cities)]
         province_id, province_name = provinces[city]
-        ward_id, ward_name = wards[province_id][(n * 7 + k) % len(wards[province_id])]
-        whole = k == 7
+        ward_id, ward_name = wards[province_id][((n - 1) // 34 + k // 4) % len(wards[province_id])]
+        whole = k % 8 == 7
         property_id = uid('property/' + key)
         label = ('Nhà nguyên căn' if whole else ['Nhà trọ', 'Căn hộ dịch vụ', 'Khu lưu trú'][k % 3])
         pname = f'{label} Demo {n:02d}-{k + 1:02d}'
-        lat, lng = centers[city]
+        lat, lng = ward_locations[ward_id]
         add('properties', id=property_id, landlord_id=users[f'landlord{n}'],
             property_type_id=catalog_ids['property_types']['Nhà riêng' if whole else ['Nhà trọ', 'Tòa căn hộ dịch vụ', 'Khu lưu trú sinh viên'][k % 3]],
             name=pname, rental_mode='WHOLE' if whole else 'BY_ROOM', total_floors=2 if whole else 4,
             province_id=province_id, ward_id=ward_id, address_line=f'{20 + n * 3 + k} đường Demo, {ward_name}',
-            latitude=round(lat + ((n % 7) - 3) * .006 + k * .002, 8),
-            longitude=round(lng + ((n % 5) - 2) * .008 + k * .002, 8))
+            latitude=round(lat + ((n % 7) - 3) * .001 + (k % 4) * .0005, 8),
+            longitude=round(lng + ((n % 5) - 2) * .001 + (k % 4) * .0005, 8))
         for order, image in enumerate(IMAGES):
             add('property_images', id=uid(f'property-image/{key}/{order}'), property_id=property_id,
                 url=image, public_id=None, sort_order=order)
@@ -229,7 +256,9 @@ for n in range(1, 25):
             for name in ['Nhà vệ sinh riêng', 'Cửa sổ', 'Giường'] + (['Điều hòa', 'Bếp riêng'] if r % 2 == 0 else ['Ban công', 'Tủ quần áo']):
                 add('room_amenities', id=uid(f'room-amenity/{key}/{r}/{name}'), room_id=room_id,
                     amenity_id=catalog_ids['amenities'][name])
-        state = ['PUBLISHED', 'PUBLISHED', 'PUBLISHED' if paid else 'HIDDEN', 'PENDING', 'REJECTED', 'HIDDEN', 'EXPIRED', 'PUBLISHED' if paid else 'HIDDEN'][k]
+        state = ['PUBLISHED', 'PUBLISHED', 'PUBLISHED' if paid else 'HIDDEN', 'PENDING', 'REJECTED', 'HIDDEN', 'EXPIRED', 'PUBLISHED' if paid else 'HIDDEN'][k % 8]
+        if not paid and k >= 8 and state in ('PUBLISHED', 'PENDING'):
+            state = 'HIDDEN'
         listing_id = uid('listing/' + key)
         period, code = active_periods.get(n, (None, 'FREE'))
         package_priority = 2 if paid and state == 'PUBLISHED' and k == 0 else 0
@@ -245,12 +274,16 @@ for n in range(1, 25):
             expires_at=at(-30) if state == 'EXPIRED' else at(25) if state in ['PUBLISHED', 'HIDDEN'] else None,
             service_subscription_period_id=period if package_priority else None, package_priority_level=package_priority,
             priority_level=max(package_priority, boost_priority), view_count=0, contact_count=0, created_at=at(-65))
+        rows['listings'][-1].update(initial_review=False, posting_quota_consumed=state != 'REJECTED',
+                                    posting_quota_period_id=period if paid else None,
+                                    priority_quota_period_id=period if package_priority else None,
+                                    consumed_priority_levels=package_priority)
         if n in active_boosts and k in [0, 1]:
             add('boost_allocations', id=uid('allocation/' + key), boost_subscription_id=active_boosts[n],
                 listing_id=listing_id, priority_level=boost_priority)
         if state == 'PUBLISHED': published.append((listing_id, property_id, n, province_id, ward_id))
 
-for n in range(1, 101):
+for n in range(1, args.tenants + 1):
     tenant = users[f'tenant{n}']
     listing_id, property_id, owner_number, province_id, ward_id = published[(n - 1) % len(published)]
     profile_id = uid(f'tenant-profile/{n}')
@@ -260,11 +293,14 @@ for n in range(1, 101):
         tenant_type=['STUDENT', 'WORKER', 'FAMILY', 'OTHER'][n % 4], occupants=1 + n % 3,
         move_in_date=date(14), max_distance_km=5 + n % 6, price_tolerance_pct=20,
         top_priority=['PRICE', 'LOCATION', 'AREA', 'AMENITIES'][n % 4], allow_personalization=n % 10 != 0)
+    lat, lng = ward_locations[ward_id]
+    rows['tenant_profiles'][-1].update(anchor_label='Điểm mốc demo gần ' + dict(wards[province_id])[ward_id],
+                                      anchor_latitude=lat, anchor_longitude=lng)
     add('tenant_profile_wards', id=uid(f'tenant-ward/{n}'), tenant_profile_id=profile_id, ward_id=ward_id)
     for name in ['WiFi', 'Nhà vệ sinh riêng']:
         add('tenant_profile_amenities', id=uid(f'tenant-amenity/{n}/{name}'), tenant_profile_id=profile_id,
             amenity_id=catalog_ids['amenities'][name], is_required=name == 'Nhà vệ sinh riêng')
-    for offset in range(5):
+    for offset in range(10):
         lid = published[(n + offset) % len(published)][0]
         add('saved_listings', id=uid(f'saved/{n}/{offset}'), tenant_id=tenant, listing_id=lid)
         add('listing_view_history', id=uid(f'view/{n}/{offset}'), tenant_id=tenant, listing_id=lid, created_at=at(-offset))
@@ -279,31 +315,143 @@ for n in range(1, 101):
     for m, text in enumerate(['Chào chủ trọ, phòng này còn trống không ạ?', 'Chào bạn, cơ sở vẫn còn phòng. Bạn muốn xem phòng vào thời gian nào?', 'Chiều cuối tuần em qua xem được không ạ?', 'Được bạn nhé, bạn nhắn trước khi đến giúp mình.']):
         add('chat_messages', id=uid(f'chat-message/{n}/{m}'), conversation_id=conversation,
             sender_id=tenant if m % 2 == 0 else users[f'landlord{owner_number}'], content=text, created_at=at(-1, m * 10))
-    if n <= 60:
+    if n <= args.tenants:
         state = ['PENDING', 'REJECTED', 'CANCELLED', 'EXPIRED'][n % 4]
         add('rental_requests', id=uid(f'request/{n}'), listing_id=listing_id, room_id=first_rooms[property_id],
             tenant_id=tenant, landlord_id=users[f'landlord{owner_number}'], message='Em muốn thuê và hẹn xem phòng (dữ liệu demo).',
             proposed_move_in_date=date(14), tenant_full_name=f'Người thuê Demo {n:02d}',
             tenant_email=('tenant' if n == 1 else f'tenant{n:02d}') + '@gmail.com',
-            occupant_count=1 + n % 3, duration_months=6, status=state,
+            occupant_count=1 + n % 2, duration_months=6, status=state,
             expires_at=at(2) if state == 'PENDING' else at(-1),
             responded_at=None if state in ['PENDING', 'EXPIRED'] else at(-1), created_at=at(-2))
     add('notifications', id=uid(f'notification/{n}'), user_id=tenant, type='SYSTEM', title='Chào mừng đến Trọ Tốt',
         body='Tài khoản demo đã sẵn sàng. Bạn có thể tìm trọ, lưu tin và nhắn tin với chủ trọ.', is_read=n % 3 == 0)
 
+# Revoked, expired token fixtures cannot be used to authenticate.
+for key, user in users.items():
+    add('refresh_tokens', id=uid('expired-refresh/' + key), user_id=user,
+        token=hashlib.sha256(('expired-demo/' + key).encode()).hexdigest(),
+        expires_at=at(-30), revoked=True, created_at=at(-60))
+
+room_by_id = {r['id']: r for r in rows['rooms']}
+active_room_ids = set()
+for n in range(1, args.tenants + 1):
+    tenant = users[f'tenant{n}']
+    for j in range(args.rentals_per_tenant):
+        position = (n - 1) * args.rentals_per_tenant + j
+        listing_id, property_id, owner_number, province_id, ward_id = published[position % len(published)]
+        room_id = first_rooms[property_id]
+        room = room_by_id[room_id]
+        landlord = users[f'landlord{owner_number}']
+        key = f'history/{n}/{j}'
+        request_id, agreement_id = uid('request/' + key), uid('agreement/' + key)
+        end = -15 - (position // len(published)) * 70
+        start = end - 60
+        add('rental_requests', id=request_id, listing_id=listing_id, room_id=room_id,
+            tenant_id=tenant, landlord_id=landlord, message='Yêu cầu thuê đã hoàn thành (demo).',
+            proposed_move_in_date=date(start), tenant_full_name=f'Người thuê Demo {n:02d}',
+            tenant_email=('tenant' if n == 1 else f'tenant{n:02d}') + '@gmail.com',
+            occupant_count=2, duration_months=2, status='ACCEPTED', responded_at=at(start - 2),
+            expires_at=at(start - 1), created_at=at(start - 3))
+        agreement_code = f'DEMO-HISTORY-{n:05d}-{j:02d}'
+        asset_id = f'demo-not-uploaded/{agreement_id}'
+        snapshot_sql = SQL("JSON_OBJECT('fixture',TRUE,'agreementCode'," + value(agreement_code)
+                           + ",'price'," + value(str(room['price'])) + ",'deposit'," + value(str(room['price']))
+                           + ",'startDate',DATE_FORMAT(" + at(start) + ",'%Y-%m-%d'),'endDate',DATE_FORMAT("
+                           + at(end) + ",'%Y-%m-%d'),'tenantName'," + value(f'Người thuê Demo {n:02d}')
+                           + ",'landlordName'," + value(f'Chủ trọ Demo {owner_number:02d}')
+                           + ",'terms','Hợp đồng dữ liệu mẫu, không có giá trị giao dịch.')")
+        add('rental_agreements', id=agreement_id, agreement_code=agreement_code,
+            rental_request_id=request_id, room_id=room_id, tenant_id=tenant, landlord_id=landlord,
+            price=room['price'], deposit=room['price'], electricity_price=room['electricity_price'],
+            water_price=room['water_price'], service_fee=room['service_fee'], payment_cycle_months=1,
+            start_date=date(start), end_date=date(end), created_by_role='LANDLORD',
+            status='EXPIRED' if j % 2 == 0 else 'TERMINATED',
+            terms_text='Hợp đồng demo đã kết thúc; đủ điều kiện đánh giá.',
+            landlord_confirmed_at=at(start - 2), tenant_confirmed_at=at(start - 1), created_at=at(start - 2),
+            pdf_status='FAILED', pdf_error='Demo: chưa upload PDF; không có tài liệu từ Cloudinary.',
+            pdf_attempt_count=6, pdf_public_id=asset_id, contract_snapshot=snapshot_sql)
+        add('rental_pdf_assets', public_id=asset_id, agreement_id=agreement_id,
+            created_at=at(start - 2), last_cleanup_at=at(-1))
+        add('rental_events', id=uid('rental-event/' + key), actor_id=landlord, recipient_id=tenant,
+            reference_id=agreement_id, reference_type='RENTAL_AGREEMENT', transition='AGREEMENT_CONFIRMED',
+            created_at=at(start - 1), delivered_at=at(start - 1, 1))
+        hidden = position % 13 == 0
+        moderation = dict(is_hidden=hidden, hidden_by=users['admin1'] if hidden else None,
+                          hidden_at=at(-2) if hidden else None,
+                          hidden_reason='Ẩn đánh giá demo để minh họa kiểm duyệt.' if hidden else None)
+        add('room_reviews', id=uid('room-review/' + key), rental_agreement_id=agreement_id,
+            tenant_id=tenant, room_id=room_id, rating=[5, 4, 5, 3, 4, 2, 5][position % 7],
+            comment=['Phòng sạch, WiFi ổn định, đúng hình ảnh.', 'Khu vực thuận tiện, chủ trọ hỗ trợ tốt.',
+                     'Cần cải thiện cách âm, giá thuê phù hợp.'][position % 3],
+            landlord_reply='Cảm ơn bạn đã góp ý, chúng tôi sẽ tiếp tục cải thiện.',
+            created_at=at(end + 2), **moderation)
+        add('landlord_reviews', id=uid('landlord-review/' + key), rental_agreement_id=agreement_id,
+            tenant_id=tenant, landlord_id=landlord, rating=3 + position % 3,
+            comment='Chủ trọ phản hồi nhanh, chi phí minh bạch (demo).',
+            landlord_reply='Cảm ơn bạn đã tin tưởng.', created_at=at(end + 3), **moderation)
+        add('tenant_reviews', id=uid('tenant-review/' + key), rental_agreement_id=agreement_id,
+            landlord_id=landlord, tenant_id=tenant, rating=3 + (position + 1) % 3,
+            comment='Người thuê thanh toán đúng hạn, giữ gìn phòng (demo).',
+            created_at=at(end + 4), **moderation)
+    # Pending/current contracts use a separate room so historical reviews remain stable.
+    if n % 4 == 0:
+        listing_id, property_id, owner_number, _, _ = published[(n - 1) % len(published)]
+        room_id = next((r['id'] for r in rows['rooms'] if r['property_id'] == property_id
+                        and r['id'] not in active_room_ids and r['rental_status'] == 'AVAILABLE'), None)
+        if room_id:
+            active_room_ids.add(room_id)
+            room = room_by_id[room_id]
+            state = ['ACTIVE', 'PENDING_CONFIRMATION', 'DRAFT', 'CANCELLED'][(n // 4) % 4]
+            aid = uid(f'current-agreement/{n}')
+            add('rental_agreements', id=aid, agreement_code=f'DEMO-CURRENT-{n:05d}', room_id=room_id,
+                tenant_id=tenant, landlord_id=users[f'landlord{owner_number}'], price=room['price'],
+                deposit=room['price'], start_date=date(-5 if state == 'ACTIVE' else 7), end_date=date(180),
+                status=state, created_by_role='LANDLORD', terms_text='Hợp đồng demo đang xử lý.',
+                landlord_confirmed_at=at(-6) if state in ['ACTIVE', 'PENDING_CONFIRMATION'] else None,
+                tenant_confirmed_at=at(-5) if state == 'ACTIVE' else None,
+                confirmation_expires_at=at(3) if state == 'PENDING_CONFIRMATION' else None,
+                pdf_status='FAILED', pdf_attempt_count=6, pdf_error='Demo: chưa tạo PDF.', created_at=at(-7))
+            if state == 'ACTIVE':
+                room['rental_status'] = 'RENTED'
+    listing_id, _, owner_number, _, _ = published[(n - 1) % len(published)]
+    state = ['PENDING', 'PROCESSING', 'RESOLVED', 'REJECTED'][n % 4]
+    report_id = uid(f'report/{n}')
+    add('reports', id=report_id, tenant_id=tenant,
+        listing_id=listing_id if n % 2 == 0 else None,
+        landlord_id=users[f'landlord{owner_number}'] if n % 2 else None,
+        reason_code='MISLEADING_INFORMATION' if n % 2 == 0 else 'OTHER',
+        description='Báo cáo dữ liệu mẫu, cần đối chiếu thông tin và hình ảnh minh họa.',
+        status=state, handled_by=users['admin1'] if state != 'PENDING' else None,
+        resolution_note='Đã kiểm tra và phản hồi báo cáo demo.' if state in ['RESOLVED', 'REJECTED'] else None,
+        resolved_at=at(-1) if state in ['RESOLVED', 'REJECTED'] else None, created_at=at(-3))
+    for k, image in enumerate(IMAGES[:2]):
+        add('report_evidences', id=uid(f'evidence/{n}/{k}'), report_id=report_id,
+            image_url=image, image_public_id=None, created_at=at(-3))
+    for kind in ['REPORT', 'RENTAL_REQUEST', 'RENTAL_AGREEMENT', 'CHAT']:
+        reference_type, reference_id = {
+            'REPORT': ('REPORT', report_id),
+            'RENTAL_REQUEST': ('RENTAL_REQUEST', uid(f'request/{n}')),
+            'RENTAL_AGREEMENT': ('RENTAL_AGREEMENT', uid(f'agreement/history/{n}/0')),
+            'CHAT': ('CHAT_CONVERSATION', uid(f'chat/{n}')),
+        }[kind]
+        add('notifications', id=uid(f'notification/{n}/{kind}'), user_id=tenant, type=kind,
+            title='Thông báo minh họa ' + kind, body='Dữ liệu demo để xem lịch sử và trạng thái.',
+            reference_type=reference_type, reference_id=reference_id, is_read=n % 2 == 0, created_at=at(-1))
+
 # Event-backed counters stay consistent with their histories and daily breakdown.
 for lid, _, _, _, _ in published:
-    for d in range(5):
+    for d in range(10):
         views = sum(r['listing_id'] == lid and r['created_at'] == at(-d) for r in rows['listing_view_history'])
         contacts = sum(r['listing_id'] == lid and r['created_at'] == at(-d) for r in rows['listing_contact_events'])
         add('listing_daily_stats', id=uid(f'stat/{lid}/{d}'), listing_id=lid, stat_date=date(-d), view_count=views, contact_count=contacts)
 
 out = ["-- V2: Reference catalog and fictional demo data for a fresh database.\n"
-       "-- All 127 accounts use BCrypt(10) password 123456 and @gmail.com emails.\n"
+       "-- Demo accounts use BCrypt(10) password 123456 and @gmail.com emails.\n"
        "-- Example accounts: admin@gmail.com, landlord@gmail.com, tenant@gmail.com.\n"
        "-- Relative timestamps keep active subscriptions/listings usable on migration day.\n"
        "-- External image URLs have NULL Cloudinary public_id. No remote payments/mail/uploads are performed.\n"
-       "-- Generated by scripts/generate-demo-seed.py; see docs/DEMO_DATABASE.md.\n\n"
+       "-- Generated by scripts/generate-demo-seed.py; see ../AIService/README.md.\n\n"
        "SET NAMES utf8mb4;\nSET @seed_previous_time_zone = @@session.time_zone;\nSET time_zone = '+07:00';\nSET @seed_now = CURRENT_TIMESTAMP;\n\n-- BEGIN REFERENCE DATA\n",
        reference, '-- END REFERENCE DATA\n\n']
 # Cross-domain billing foreign keys require this explicit topological ordering.
@@ -313,17 +461,28 @@ order = ['users', 'user_roles', 'service_packages', 'service_package_prices', 'b
          'property_amenities', 'rooms', 'room_images', 'room_amenities', 'listings', 'boost_allocations',
          'tenant_profiles', 'tenant_profile_wards', 'tenant_profile_amenities', 'saved_listings',
          'listing_view_history', 'listing_contact_events', 'listing_search_history', 'chat_conversations',
-         'chat_conversation_participants', 'chat_messages', 'rental_requests', 'notifications', 'listing_daily_stats']
+         'chat_conversation_participants', 'chat_messages', 'rental_requests', 'rental_agreements',
+         'rental_events', 'rental_pdf_assets', 'room_reviews', 'landlord_reviews', 'tenant_reviews',
+         'reports', 'report_evidences', 'refresh_tokens', 'notifications', 'listing_daily_stats']
 assert set(order) == set(rows)
+schema_tables = set(re.findall(r'CREATE TABLE\s+`?(\w+)`?\s*\(',
+                              (MIGRATIONS / 'V1__fullsql.sql').read_text(encoding='utf-8')))
+reference_tables = set(re.findall(r'INSERT INTO\s+`?(\w+)`?', reference))
+assert schema_tables == set(rows) | reference_tables, 'Every application table must have demo rows'
 for table in order:
     entries = rows[table]
     columns = list(dict.fromkeys(k for entry in entries for k in entry))
     out.append(f'-- {table}: {len(entries)} rows\n')
     for offset in range(0, len(entries), 200):
         out.append(f'INSERT INTO `{table}` (' + ', '.join(f'`{c}`' for c in columns) + ') VALUES\n')
-        out.append(',\n'.join('(' + ', '.join(value(entry.get(c)) for c in columns) + ')' for entry in entries[offset:offset+200]) + ';\n\n')
+        out.append(',\n'.join('(' + ', '.join(value(entry.get(c, SQL('DEFAULT'))) for c in columns) + ')' for entry in entries[offset:offset+200]) + ';\n\n')
 out.append('UPDATE listings l SET view_count=(SELECT COUNT(*) FROM listing_view_history v WHERE v.listing_id=l.id),\n'
            'contact_count=(SELECT COUNT(*) FROM listing_contact_events c WHERE c.listing_id=l.id);\n'
            'SET time_zone = @seed_previous_time_zone;\n')
-SEED.write_text(''.join(out), encoding='utf-8')
-print(json.dumps({table: len(entries) for table, entries in rows.items()}, indent=2))
+args.output.write_text(''.join(out), encoding='utf-8')
+counts = {table: len(entries) for table, entries in rows.items()}
+counts.update(provinces=len(provinces), wards=sum(map(len, wards.values())))
+counts_path = (ROOT / 'scripts/data/demo-counts.json' if args.output.resolve() == SEED.resolve()
+               else args.output.with_suffix('.counts.json'))
+counts_path.write_text(json.dumps(counts, indent=2), encoding='utf-8')
+print(json.dumps(counts, indent=2))

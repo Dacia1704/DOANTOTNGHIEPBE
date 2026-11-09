@@ -1,5 +1,7 @@
 # Luồng đặt phòng và hợp đồng
 
+> Schema hi?n t?i ?? g?p v?o Flyway V1, seed d?ng V2. C?c t?n migration/s? b?ng v? k?t qu? ki?m ch?ng c? ng?y ? d??i ph?n ?nh l?ch s? tri?n khai; kh?ng ?p d?ng l?i migration c?. C?i ??t theo [README chung](../../AIService/README.md).
+
 Triển khai BE trong `src/main/java/com/tamdaptit/rentalmanagement/rental`; FE Angular trong `../DOANTOTNGHIEPFE/src/app/features/rental` và booking dialog hiện có của Listing. Không dùng payments/VNPay cho luồng thuê.
 
 ## Hành vi
