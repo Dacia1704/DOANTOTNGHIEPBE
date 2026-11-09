@@ -1,5 +1,6 @@
 package com.tamdaptit.rentalmanagement.review.service;
 
+import com.tamdaptit.rentalmanagement.review.service.impl.ListingReviewServiceImpl;
 import com.tamdaptit.rentalmanagement.common.dto.PageResponse;
 import com.tamdaptit.rentalmanagement.common.exception.AppException;
 import com.tamdaptit.rentalmanagement.common.exception.ErrorCode;
@@ -21,7 +22,7 @@ class ListingReviewServiceTest {
     private final ReviewService reviews = mock(ReviewService.class);
     private final ListingRepository listings = mock(ListingRepository.class);
     private final Clock clock = Clock.fixed(Instant.parse("2026-11-03T00:00:00Z"), ZoneId.of("Asia/Ho_Chi_Minh"));
-    private final ListingReviewService service = new ListingReviewService(reviews, listings, clock);
+    private final ListingReviewService service = new ListingReviewServiceImpl(reviews, listings, clock);
 
     private PageResponse<ReviewResponse> page() {
         return PageResponse.<ReviewResponse>builder().currentPage(1).pageSize(4).totalPages(2).totalElements(5)

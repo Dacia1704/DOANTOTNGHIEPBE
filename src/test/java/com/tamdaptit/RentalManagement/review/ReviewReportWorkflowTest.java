@@ -98,7 +98,7 @@ class ReviewReportWorkflowTest {
 
     @BeforeEach void reset() {
         for(String table:List.of("report_evidences","reports","room_reviews","landlord_reviews","tenant_reviews",
-            "notifications","rental_events","rental_pdf_assets","rental_agreements","rental_requests","listings","rooms","properties")) {
+            "notification_outbox","notifications","rental_events","rental_pdf_assets","rental_agreements","rental_requests","listings","rooms","properties")) {
             jdbc.update("DELETE FROM "+table);
         }
         jdbc.update("UPDATE users SET status='ACTIVE' WHERE id LIKE 'rr_%'");
@@ -280,7 +280,7 @@ class ReviewReportWorkflowTest {
         assertNotNull(closed.resolvedAt());assertEquals("rr_a",closed.handledBy());assertEquals("Verified",closed.resolutionNote());
         error(REPORT_INVALID_TRANSITION,()->reports.assign("rr_a",id));
         error(REPORT_INVALID_TRANSITION,()->reports.close("rr_a",id,ReportStatus.REJECTED,new ReportResolutionRequest("Again")));
-        assertEquals(2,jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE reference_id=?",Integer.class,id));
+        assertEquals(2,jdbc.queryForObject("SELECT COUNT(*) FROM notification_outbox WHERE reference_id=?",Integer.class,id));
         assertEquals("PUBLISHED",jdbc.queryForObject("SELECT status FROM listings WHERE id='rr_listing'",String.class));
         assertNotEquals(id,listingReport());
         assertEquals(1,reports.summary("rr_a").get(ReportStatus.RESOLVED));
@@ -290,7 +290,7 @@ class ReviewReportWorkflowTest {
         var result=parallel(()->assign("rr_a",id),()->assign("rr_b",id));
         assertEquals(1,Collections.frequency(result,"OK"));
         assertEquals(1,Collections.frequency(result,REPORT_INVALID_TRANSITION));
-        assertEquals(1,jdbc.queryForObject("SELECT COUNT(*) FROM notifications",Integer.class));
+        assertEquals(1,jdbc.queryForObject("SELECT COUNT(*) FROM notification_outbox WHERE reference_id=?",Integer.class,id));
     }
     Object assign(String actor,String id){try{reports.assign(actor,id);return "OK";}catch(AppException ex){return ex.getErrorCode();}}
     @Test void concurrentClosingCreatesOnlyOneOutcomeAndOneNotification() throws Exception {
@@ -302,11 +302,11 @@ class ReviewReportWorkflowTest {
         var result=parallel(close,close);
         assertEquals(1,Collections.frequency(result,"OK"));
         assertEquals(1,Collections.frequency(result,REPORT_INVALID_TRANSITION));
-        assertEquals(2,jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE reference_id=?",Integer.class,id));
+        assertEquals(2,jdbc.queryForObject("SELECT COUNT(*) FROM notification_outbox WHERE reference_id=?",Integer.class,id));
     }
-    @Test void notificationInsertFailureRollsBackAssignment() {
+    @Test void notificationOutboxInsertFailureRollsBackAssignment() {
         String id=listingReport();
-        jdbc.execute("CREATE TRIGGER rr_fail_notification BEFORE INSERT ON notifications FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Simulated notification failure'");
+        jdbc.execute("CREATE TRIGGER rr_fail_notification BEFORE INSERT ON notification_outbox FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Simulated notification outbox failure'");
         try {
             assertThrows(org.springframework.dao.DataAccessException.class,()->reports.assign("rr_a",id));
             var report=reports.detail("rr_t",id).report();
@@ -537,8 +537,8 @@ class ReviewReportWorkflowTest {
         UserRepository.class,com.tamdaptit.rentalmanagement.rental.repository.RentalAgreementRepository.class,
         com.tamdaptit.rentalmanagement.room.repository.RoomRepository.class,
         com.tamdaptit.rentalmanagement.listing.repository.ListingRepository.class})
-    @Import({ReviewServiceImpl.class,ReportServiceImpl.class,ReportEvidenceService.class,ReviewController.class,
-        com.tamdaptit.rentalmanagement.review.service.ListingReviewService.class,
+    @Import({com.tamdaptit.rentalmanagement.notification.service.NotificationPublisher.class,ReviewServiceImpl.class,ReportServiceImpl.class,com.tamdaptit.rentalmanagement.report.service.impl.ReportEvidenceServiceImpl.class,ReviewController.class,
+        com.tamdaptit.rentalmanagement.review.service.impl.ListingReviewServiceImpl.class,
         com.tamdaptit.rentalmanagement.review.controller.ListingReviewController.class,
         ReportController.class,GlobalExceptionHandler.class,SecurityConfig.class,JwtAuthenticationFilter.class,
         JwtAuthenticationEntryPoint.class,ObjectMapperConfig.class,ImageValidator.class})

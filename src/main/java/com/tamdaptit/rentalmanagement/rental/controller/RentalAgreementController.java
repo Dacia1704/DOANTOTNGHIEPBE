@@ -1,7 +1,6 @@
 package com.tamdaptit.rentalmanagement.rental.controller;
 
 import com.tamdaptit.rentalmanagement.common.dto.*;
-import com.tamdaptit.rentalmanagement.common.exception.*;
 import com.tamdaptit.rentalmanagement.rental.dto.request.*;
 import com.tamdaptit.rentalmanagement.rental.dto.response.*;
 import com.tamdaptit.rentalmanagement.rental.service.*;
@@ -16,7 +15,7 @@ import java.security.Principal;
 @RestController @RequestMapping("/api") @RequiredArgsConstructor
 public class RentalAgreementController {
     private final RentalService rentals;
-    private final RentalPdfStorage storage;
+    private final RentalContractService contracts;
     @GetMapping("/rental-agreements/my") @PreAuthorize("hasRole('TENANT')")
     public ApiResponse<PageResponse<RentalAgreementResponse>> mine(Principal p,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="10") int size) {
         return ApiResponse.success(rentals.agreements(p.getName(),false,page,size));
@@ -31,15 +30,11 @@ public class RentalAgreementController {
     }
     @GetMapping("/rental-agreements/{id}/pdf") @PreAuthorize("hasAnyRole('TENANT','LANDLORD','ADMIN')")
     public ResponseEntity<byte[]> pdf(Authentication p,@PathVariable String id,@RequestParam(defaultValue="false") boolean download) {
-        var ref=rentals.pdf(p.getName(),id,RentalRequestController.isAdmin(p)); // read transaction ends before network I/O
-        try {
-            byte[] bytes=storage.download(ref.publicId());
-            if(!RentalContractPdfService.sha256(bytes).equals(ref.hash())) throw new AppException(ErrorCode.CONTRACT_CHANGED);
-            return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF).cacheControl(CacheControl.noStore())
-                .header("X-Content-Type-Options","nosniff")
-                .header(HttpHeaders.CONTENT_DISPOSITION,(download?"attachment":"inline")+"; filename=\""+ref.code()+".pdf\"")
-                .body(bytes);
-        } catch(AppException ex) { throw ex; } catch(Exception ex) { throw new AppException(ErrorCode.PDF_GENERATION_FAILED); }
+        var content=contracts.download(p.getName(),id,RentalRequestController.isAdmin(p));
+        return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF).cacheControl(CacheControl.noStore())
+            .header("X-Content-Type-Options","nosniff")
+            .header(HttpHeaders.CONTENT_DISPOSITION,(download?"attachment":"inline")+"; filename=\""+content.code()+".pdf\"")
+            .body(content.bytes());
     }
     @PostMapping("/rental-agreements/{id}/confirm") @PreAuthorize("hasRole('TENANT')")
     public ApiResponse<RentalAgreementResponse> confirm(Principal p,@PathVariable String id,@Valid @RequestBody RentalAgreementConfirmRequest body) {

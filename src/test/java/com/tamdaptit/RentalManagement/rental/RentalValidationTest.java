@@ -1,6 +1,6 @@
 package com.tamdaptit.rentalmanagement.rental;
 import com.tamdaptit.rentalmanagement.rental.dto.request.*;
-import com.tamdaptit.rentalmanagement.rental.service.RentalService;
+import com.tamdaptit.rentalmanagement.rental.service.impl.RentalServiceImpl;
 import jakarta.validation.Validation;
 import org.junit.jupiter.api.Test;
 import java.time.LocalDate;
@@ -13,9 +13,9 @@ class RentalValidationTest {
         assertThrows(tools.jackson.databind.DatabindException.class,()->json.readValue("{\"occupantCount\":1.5}",RentalRequestCreateRequest.class));
     }
     @Test void monthEndAndLeapYearAreClampedBeforeSubtractingOneDay() {
-        assertEquals(LocalDate.of(2027,2,27),RentalService.endDate(LocalDate.of(2027,1,31),1));
-        assertEquals(LocalDate.of(2028,2,28),RentalService.endDate(LocalDate.of(2028,1,31),1));
-        assertEquals(LocalDate.of(2027,2,27),RentalService.endDate(LocalDate.of(2026,2,28),12));
+        assertEquals(LocalDate.of(2027,2,27),RentalServiceImpl.endDate(LocalDate.of(2027,1,31),1));
+        assertEquals(LocalDate.of(2028,2,28),RentalServiceImpl.endDate(LocalDate.of(2028,1,31),1));
+        assertEquals(LocalDate.of(2027,2,27),RentalServiceImpl.endDate(LocalDate.of(2026,2,28),12));
     }
     @Test void privacyCitizenIdContactAndDurationAreValidated() {
         try(var factory=Validation.buildDefaultValidatorFactory()) {

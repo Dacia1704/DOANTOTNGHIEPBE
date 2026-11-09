@@ -28,6 +28,7 @@ public class AddressImporterImpl implements AddressImporter {
 
     @Override
     @Transactional
+    @org.springframework.cache.annotation.CacheEvict(cacheNames={"provinces","wards"}, allEntries=true)
     public AddressSyncResult apply(AddressSnapshot snapshot) {
         Map<String, Province> provinceMap = new HashMap<>();
         for (Province p : provinces.findAll()) {

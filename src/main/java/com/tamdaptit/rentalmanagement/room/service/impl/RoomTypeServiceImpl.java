@@ -16,6 +16,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.HashSet;
 import java.util.List;
@@ -31,6 +33,7 @@ public class RoomTypeServiceImpl implements RoomTypeService {
     private final RoomTypeMapper roomTypeMapper;
 
     @Override
+    @Cacheable("roomTypes")
     public PageResponse<RoomTypeResponse> getAll(int page, int size) {
         Page<RoomType> result = roomTypeRepository.findAll(pageRequest(page, size));
         return PageResponse.<RoomTypeResponse>builder()
@@ -43,6 +46,7 @@ public class RoomTypeServiceImpl implements RoomTypeService {
     }
 
     @Override
+    @Cacheable("roomTypes")
     public PageResponse<RoomTypeResponse> filter(String name, String parentId, int page, int size) {
         var pageable = pageRequest(page, size);
         Page<RoomType> result;
@@ -61,12 +65,14 @@ public class RoomTypeServiceImpl implements RoomTypeService {
     }
 
     @Override
+    @Cacheable("roomTypes")
     public RoomTypeResponse getById(String id) {
         return roomTypeMapper.toResponse(findRoomType(id));
     }
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames="roomTypes", allEntries=true)
     public RoomTypeResponse create(RoomTypeRequest request) {
         String name = request.name().trim();
         if (roomTypeRepository.existsByNameIgnoreCase(name)) {
@@ -88,6 +94,7 @@ public class RoomTypeServiceImpl implements RoomTypeService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames="roomTypes", allEntries=true)
     public RoomTypeResponse update(String id, RoomTypeRequest request) {
         RoomType roomType = findRoomType(id);
         String name = request.name().trim();
@@ -111,6 +118,7 @@ public class RoomTypeServiceImpl implements RoomTypeService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames="roomTypes", allEntries=true)
     public void delete(String id) {
         RoomType roomType = findRoomType(id);
         if (roomTypeRepository.existsByParent_Id(id)) {

@@ -71,7 +71,7 @@ class RentalWorkflowTest {
         jdbc.update("INSERT INTO property_types(id,name) VALUES ('pt-rental','Test thuê phòng')");
     }
     @BeforeEach void reset(){
-        for(String t:List.of("notifications","rental_events","rental_pdf_assets","rental_agreements","rental_requests","listings","rooms","properties"))jdbc.update("DELETE FROM "+t);
+        for(String t:List.of("notification_outbox","notifications","rental_events","rental_pdf_assets","rental_agreements","rental_requests","listings","rooms","properties"))jdbc.update("DELETE FROM "+t);
         clock.time=Instant.parse("2026-10-29T03:00:00Z");storage.bytes.clear();storage.fail=false;storage.uploads.set(0);
         jdbc.update("INSERT INTO properties(id,landlord_id,property_type_id,name,rental_mode,province_id,ward_id,address_line) VALUES ('prop','owner','pt-rental','Nhà trọ A','BY_ROOM','p','w','123 Đường A')");
         jdbc.update("INSERT INTO rooms(id,property_id,room_number,room_type_id,price,area_m2,max_occupants,default_deposit,electricity_price,water_price,service_fee) VALUES ('r','prop','A101','rt',3000000,25,2,1000000,3500,100000,50000),('r2','prop','A102','rt',3200000,30,3,1000000,3500,100000,50000)");
@@ -178,7 +178,7 @@ class RentalWorkflowTest {
         assertArrayEquals(pdf,storage.download(ref.publicId()));assertEquals("RENTED",scalar("SELECT rental_status FROM rooms WHERE id='r'"));
         context.getBean(RentalEvents.class).deliver();context.getBean(RentalEvents.class).deliver();
         assertEquals(0,jdbc.queryForObject("SELECT COUNT(*) FROM rental_events WHERE delivered_at IS NULL",Integer.class));
-        assertEquals(jdbc.queryForObject("SELECT COUNT(*) FROM rental_events",Integer.class),jdbc.queryForObject("SELECT COUNT(*) FROM notifications",Integer.class));
+        assertEquals(jdbc.queryForObject("SELECT COUNT(*) FROM rental_events",Integer.class),jdbc.queryForObject("SELECT COUNT(*) FROM notification_outbox",Integer.class));
     }
     @Test void confirmationVersusTimeoutAtExactBoundaryNeverActivates() throws Exception {
         var a=accept("a");worker.process(a.id());String hash=service.agreement("a",a.id(),false).pdfSha256();
@@ -259,7 +259,7 @@ class RentalWorkflowTest {
     }
     @Configuration(proxyBeanMethods=false) @EnableWebMvc @EnableWebSecurity @EnableMethodSecurity @EnableTransactionManagement
     @EnableJpaRepositories(basePackageClasses={RentalRequestRepository.class,RentalAgreementRepository.class,RoomRepository.class,UserRepository.class,ListingRepository.class,com.tamdaptit.rentalmanagement.property.repository.PropertyRepository.class})
-    @Import({RentalService.class,RentalAvailabilityService.class,RentalEvents.class,RentalPdfJobs.class,RentalPdfWorker.class,RentalContractPdfService.class,
+    @Import({com.tamdaptit.rentalmanagement.rental.service.impl.RentalContractServiceImpl.class,com.tamdaptit.rentalmanagement.notification.service.NotificationPublisher.class,com.tamdaptit.rentalmanagement.rental.service.impl.RentalServiceImpl.class,RentalAvailabilityService.class,RentalEvents.class,RentalPdfJobs.class,RentalPdfWorker.class,RentalContractPdfService.class,
         RentalRequestController.class,RentalAgreementController.class,GlobalExceptionHandler.class,
         com.tamdaptit.rentalmanagement.room.controller.RoomController.class,com.tamdaptit.rentalmanagement.room.service.impl.RoomServiceImpl.class})
     static class Config {

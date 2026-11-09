@@ -13,6 +13,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -25,6 +27,7 @@ public class AmenityServiceImpl implements AmenityService {
     private final RoomAmenityRepository roomAmenityRepository;
 
     @Override
+    @Cacheable("amenities")
     public PageResponse<Amenity> getAll(int page, int size) {
         Page<Amenity> result = amenityRepository.findAll(PageRequest.of(
                 Math.max(page, 0),
@@ -40,6 +43,7 @@ public class AmenityServiceImpl implements AmenityService {
     }
 
     @Override
+    @Cacheable("amenities")
     public PageResponse<Amenity> filter(String name, int page, int size) {
         var pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, 100), Sort.by(Sort.Direction.ASC, "name"));
         Page<Amenity> result = name == null || name.isBlank()
@@ -50,12 +54,14 @@ public class AmenityServiceImpl implements AmenityService {
     }
 
     @Override
+    @Cacheable("amenities")
     public Amenity getById(String id) {
         return findAmenity(id);
     }
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames="amenities", allEntries=true)
     public Amenity create(AmenityRequest request) {
         String name = request.name().trim();
         if (amenityRepository.existsByNameIgnoreCase(name)) {
@@ -71,6 +77,7 @@ public class AmenityServiceImpl implements AmenityService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames="amenities", allEntries=true)
     public Amenity update(String id, AmenityRequest request) {
         Amenity amenity = findAmenity(id);
         String name = request.name().trim();
@@ -94,6 +101,7 @@ public class AmenityServiceImpl implements AmenityService {
      */
     @Override
     @Transactional
+    @CacheEvict(cacheNames="amenities", allEntries=true)
     public void delete(String id) {
         Amenity amenity = findAmenity(id);
         if (roomAmenityRepository.existsByAmenity_Id(id) || propertyAmenities.existsByAmenity_Id(id)) {
