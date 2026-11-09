@@ -102,6 +102,8 @@ RentalAgreementResponse có thêm `tenantId`, `landlordId` bên cạnh `tenantNa
 
 FE: `/tro/:id` → form; `/yeu-cau-thue` của tenant; `/quan-ly-dat-phong` của landlord (tab yêu cầu/hợp đồng); `/hop-dong/:id` xem PDF, xác nhận/từ chối/bàn giao. Menu tài khoản có liên kết tới các trang. Khi giữ/thuê, dropdown sửa trạng thái phòng bị khóa, BE vẫn kiểm tra invariant.
 
+Cập nhật 09/11/2026: landlord đang hoạt động có thể dùng tenantId để xem danh sách và tổng hợp review về người thuê ngay từ hợp đồng nháp/chờ xác nhận, hoặc trước khi hai bên có hợp đồng. Các API `/api/tenants/{tenantId}/reviews` và `/summary` kiểm tra quyền theo vai trò, không yêu cầu quan hệ hợp đồng. Review bị ẩn không xuất hiện trong kết quả này.
+
 ## Kiểm thử
 
 Từ BE, với MySQL 8 local; URL chỉ chấp nhận localhost/127.0.0.1. Test tự tạo/xóa schema ngẫu nhiên, không dùng DB ứng dụng:

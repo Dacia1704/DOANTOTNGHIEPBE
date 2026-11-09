@@ -11,6 +11,9 @@ import java.util.Optional;
 
 @Repository
 public interface RoleRepository extends JpaRepository<Role, String> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from Role r where r.id=:id")
+    Optional<Role> lockPermissions(@Param("id") String id);
 
     Optional<Role> findByCode(RoleCode code);
 

@@ -38,7 +38,7 @@ public class ReportController {
         return ApiResponse.success(service.mine(actor.getName(),status,page,size));
     }
     @GetMapping("/reports/{id}")
-    @PreAuthorize("hasAnyRole('TENANT','ADMIN')")
+    @PreAuthorize("hasRole('TENANT') or hasAuthority('REPORT_READ')")
     public ApiResponse<ReportDetailResponse> detail(Principal actor,@PathVariable String id) {
         return ApiResponse.success(service.detail(actor.getName(),id));
     }
@@ -48,7 +48,7 @@ public class ReportController {
         return ApiResponse.success(evidences.upload(actor.getName(),id,file));
     }
     @GetMapping("/reports/{id}/evidences/{evidenceId}/content")
-    @PreAuthorize("hasAnyRole('TENANT','ADMIN')")
+    @PreAuthorize("hasRole('TENANT') or hasAuthority('REPORT_READ')")
     public ResponseEntity<byte[]> content(Principal actor,@PathVariable String id,@PathVariable String evidenceId) {
         var content=evidences.download(actor.getName(),id,evidenceId);
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(content.contentType()))
@@ -56,28 +56,28 @@ public class ReportController {
             .header("X-Content-Type-Options","nosniff").body(content.bytes());
     }
     @GetMapping("/admin/reports")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('REPORT_READ')")
     public ApiResponse<PageResponse<ReportResponse>> admin(Principal actor,@RequestParam(required=false) ReportStatus status,
         @RequestParam(required=false) ReportReason reasonCode,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="10") int size) {
         return ApiResponse.success(service.admin(actor.getName(),status,reasonCode,page,size));
     }
     @GetMapping("/admin/reports/summary")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('REPORT_READ')")
     public ApiResponse<Map<ReportStatus,Long>> summary(Principal actor) {
         return ApiResponse.success(service.summary(actor.getName()));
     }
     @PostMapping("/admin/reports/{id}/assign")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('REPORT_HANDLE')")
     public ApiResponse<ReportResponse> assign(Principal actor,@PathVariable String id) {
         return ApiResponse.success(service.assign(actor.getName(),id));
     }
     @PostMapping("/admin/reports/{id}/resolve")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('REPORT_HANDLE')")
     public ApiResponse<ReportResponse> resolve(Principal actor,@PathVariable String id,@Valid @RequestBody ReportResolutionRequest body) {
         return ApiResponse.success(service.close(actor.getName(),id,ReportStatus.RESOLVED,body));
     }
     @PostMapping("/admin/reports/{id}/reject")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('REPORT_HANDLE')")
     public ApiResponse<ReportResponse> reject(Principal actor,@PathVariable String id,@Valid @RequestBody ReportResolutionRequest body) {
         return ApiResponse.success(service.close(actor.getName(),id,ReportStatus.REJECTED,body));
     }
