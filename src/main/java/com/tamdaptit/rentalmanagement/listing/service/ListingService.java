@@ -6,8 +6,13 @@ import com.tamdaptit.rentalmanagement.common.dto.PageResponse;
 import com.tamdaptit.rentalmanagement.listing.dto.request.ListingRequest;
 import com.tamdaptit.rentalmanagement.listing.dto.request.ListingContentRequest;
 import com.tamdaptit.rentalmanagement.listing.dto.response.ListingResponse;
+import java.util.List;
+import com.tamdaptit.rentalmanagement.listing.dto.response.ListingPriceStatisticsResponse;
 
 public interface ListingService {
+    List<ListingResponse> searchPublishedMap(ListingSearchRequest request);
+    List<ListingPriceStatisticsResponse> priceStatistics(
+            String provinceId, String wardId);
     ListingResponse create(String landlordId, ListingRequest request);
     ListingResponse updateContent(String landlordId, String id, ListingContentRequest request);
     ListingResponse submit(String landlordId, String id);
