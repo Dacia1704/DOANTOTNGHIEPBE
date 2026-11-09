@@ -906,8 +906,10 @@ curl -X PUT "http://localhost:8080/api/users/me/avatar" \
 
 ## 6. Administrative Units (Tỉnh/Thành phố, Phường/Xã)
 
-Tất cả endpoint trong nhóm này yêu cầu header `Authorization: Bearer <access_token>`, kể cả GET.
+GET danh sách tỉnh/phường là public; thao tác ghi yêu cầu token và quyền tương ứng.
 `provinceId` và `id` là ID bản ghi trong hệ thống, khác với mã hành chính `code`.
+
+Response tỉnh và phường có `centroidLat`, `centroidLng` (number hoặc null), tương ứng các cột DB `centroid_lat`, `centroid_lng` trong V1 hiện tại. Hai giá trị là tọa độ đại diện WGS84 từ tinhthanhpho.com, không phải vị trí hiện tại của người dùng. Script setup demo đồng bộ sau V1 rồi seed V2 theo mã hành chính; xem README backend.
 
 ### 5.1 Lấy danh sách tỉnh/thành phố
 

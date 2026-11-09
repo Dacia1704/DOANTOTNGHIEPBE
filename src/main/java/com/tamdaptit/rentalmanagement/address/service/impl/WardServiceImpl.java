@@ -28,7 +28,8 @@ public class WardServiceImpl implements WardService {
     @Override
     public List<ProvinceResponse> provinces() {
         return provinces.findAllByOrderByCodeAsc().stream()
-                .map(p -> new ProvinceResponse(p.getId(), p.getCode(), p.getName())).toList();
+                .map(p -> new ProvinceResponse(p.getId(), p.getCode(), p.getName(),
+                        p.getCentroidLat(), p.getCentroidLng())).toList();
     }
 
     @Override

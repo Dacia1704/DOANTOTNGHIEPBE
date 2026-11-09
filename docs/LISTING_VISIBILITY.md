@@ -1,5 +1,7 @@
 # Phân biệt Room và bài đăng
 
+> Schema hi?n t?i ?? g?p v?o Flyway V1, seed d?ng V2. C?c t?n migration/s? b?ng v? k?t qu? ki?m ch?ng c? ng?y ? d??i ph?n ?nh l?ch s? tri?n khai; kh?ng ?p d?ng l?i migration c?. C?i ??t theo [README chung](../../AIService/README.md).
+
 ## Lượt đăng và ưu tiên (02/11/2026)
 
 Quy tắc này thay thế cách tính suất đồng thời trước đây: tạo tin thành công trừ ngay một lượt đăng; `POST /api/listings` nhận thêm `priorityLevel` tùy chọn (0–2, mặc định 0) để trừ lượt ưu tiên theo gói trong cùng transaction. Nếu không đủ lượt, toàn bộ việc tạo tin được rollback.

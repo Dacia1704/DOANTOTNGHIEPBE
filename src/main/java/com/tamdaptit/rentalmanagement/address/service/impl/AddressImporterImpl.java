@@ -56,32 +56,46 @@ public class AddressImporterImpl implements AddressImporter {
             Province province = provinceMap.get(data.code());
             if (province == null) {
                 province = provinces.save(
-                        Province.builder().code(data.code()).name(data.name()).build());
+                        Province.builder().code(data.code()).name(data.name())
+                                .centroidLat(data.centroidLat()).centroidLng(data.centroidLng()).build());
                 provinceMap.put(data.code(), province);
                 provincesCreated++;
             } else if (!province.getCode().equals(data.code())
-                    || !province.getName().equals(data.name())) {
+                    || !province.getName().equals(data.name())
+                    || coordinatesChanged(province.getCentroidLat(), province.getCentroidLng(),
+                            data.centroidLat(), data.centroidLng())) {
                 province.setCode(data.code());
                 province.setName(data.name());
+                if (data.centroidLat() != null) {
+                    province.setCentroidLat(data.centroidLat());
+                    province.setCentroidLng(data.centroidLng());
+                }
                 provincesUpdated++;
             }
 
             for (var child : data.wards()) {
                 Ward ward = wardMap.get(child.code());
                 if (ward == null) {
-                    wards.save(Ward.builder()
+                    ward = wards.save(Ward.builder()
                             .code(child.code())
                             .name(child.name())
                             .province(province)
+                            .centroidLat(child.centroidLat()).centroidLng(child.centroidLng())
                             .build());
                     wardMap.put(child.code(), ward);
                     wardsCreated++;
                 } else if (!ward.getCode().equals(child.code())
                         || !ward.getName().equals(child.name())
-                        || !ward.getProvince().getId().equals(province.getId())) {
+                        || !ward.getProvince().getId().equals(province.getId())
+                        || coordinatesChanged(ward.getCentroidLat(), ward.getCentroidLng(),
+                                child.centroidLat(), child.centroidLng())) {
                     ward.setCode(child.code());
                     ward.setName(child.name());
                     ward.setProvince(province);
+                    if (child.centroidLat() != null) {
+                        ward.setCentroidLat(child.centroidLat());
+                        ward.setCentroidLng(child.centroidLng());
+                    }
                     wardsUpdated++;
                 }
             }
@@ -90,6 +104,12 @@ public class AddressImporterImpl implements AddressImporter {
         // Khong xoa don vi bi go: du lieu lich su van duoc tham chieu boi tin dang va ho so.
         wards.flush();
         return new AddressSyncResult(provincesCreated, provincesUpdated, wardsCreated, wardsUpdated);
+    }
+
+    private boolean coordinatesChanged(java.math.BigDecimal oldLat, java.math.BigDecimal oldLng,
+                                       java.math.BigDecimal lat, java.math.BigDecimal lng) {
+        return lat != null && (oldLat == null || oldLng == null
+                || oldLat.compareTo(lat) != 0 || oldLng.compareTo(lng) != 0);
     }
 
     private String normalize(String code, int length) {

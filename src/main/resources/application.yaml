@@ -24,7 +24,7 @@ spring:
 
   jpa:
     hibernate:
-      # V1__baseline.sql là nguồn sự thật duy nhất cho schema.
+      # V1__fullsql.sql là nguồn sự thật duy nhất cho schema.
       # validate buộc ứng dụng không khởi động nếu entity lệch với migration.
       ddl-auto: validate
     open-in-view: false
@@ -92,6 +92,10 @@ logging:
     com.tamdaptit.rentalmanagement: DEBUG
 
 app:
+  address-sync:
+    enabled: ${ADDRESS_SYNC_ENABLED:false}
+    url: ${ADDRESS_SYNC_URL:https://www.tinhthanhpho.com/api/v1}
+    request-interval-ms: 650
   cloudinary:
     cloud-name: vhbnmvru
     api-key: "143753777698223"

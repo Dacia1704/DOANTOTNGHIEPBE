@@ -59,7 +59,7 @@ class RentalWorkflowTest {
     @BeforeAll static void start() throws Exception {
         schema="rental_test_"+UUID.randomUUID().toString().replace("-","");
         try(var c=DriverManager.getConnection(url(""),dbUser(),password());var s=c.createStatement()){s.execute("CREATE DATABASE `"+schema+"` CHARACTER SET utf8mb4");}
-        Flyway.configure().dataSource(url(schema),dbUser(),password()).load().migrate();
+        Flyway.configure().dataSource(url(schema),dbUser(),password()).target("1").load().migrate();
         context=new AnnotationConfigWebApplicationContext(); context.setServletContext(new MockServletContext());context.register(Config.class);context.refresh();
         jdbc=context.getBean(JdbcTemplate.class);service=context.getBean(RentalService.class);clock=context.getBean(TestClock.class);
         storage=context.getBean(FakeStorage.class);worker=context.getBean(RentalPdfWorker.class);

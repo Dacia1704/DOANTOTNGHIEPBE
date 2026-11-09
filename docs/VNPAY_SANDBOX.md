@@ -1,5 +1,7 @@
 # VNPay Sandbox
 
+> Schema hi?n t?i ?? g?p v?o Flyway V1, seed d?ng V2. C?c t?n migration/s? b?ng v? k?t qu? ki?m ch?ng c? ng?y ? d??i ph?n ?nh l?ch s? tri?n khai; kh?ng ?p d?ng l?i migration c?. C?i ??t theo [README chung](../../AIService/README.md).
+
 Backend đã có checkout, Return, IPN, QueryDr kiểm tra lại thanh toán, hóa đơn và đối soát khoản thu. Triển khai theo [tài liệu kết nối VNPay 2.1.0](https://sandbox.vnpayment.vn/apis/docs/thanh-toan-pay/pay.html), [hướng dẫn checksum](https://sandbox.vnpayment.vn/apis/docs/chuyen-doi-thuat-toan/changeTypeHash.html) và [đặc tả QueryDr](https://sandbox.vnpayment.vn/apis/docs/truy-van-hoan-tien/querydr%26refund.html).
 
 ## Cấu hình runtime

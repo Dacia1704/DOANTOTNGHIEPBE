@@ -1,5 +1,7 @@
 # Property và đơn vị cho thuê
 
+> Schema hi?n t?i ?? g?p v?o Flyway V1, seed d?ng V2. C?c t?n migration/s? b?ng v? k?t qu? ki?m ch?ng c? ng?y ? d??i ph?n ?nh l?ch s? tri?n khai; kh?ng ?p d?ng l?i migration c?. C?i ??t theo [README chung](../../AIService/README.md).
+
 API dùng `ApiResponse<T>` hiện tại. JWT bắt buộc; tạo thành công trả HTTP 200.
 
 ## Cơ sở cho thuê (LANDLORD)
@@ -7,7 +9,7 @@ API dùng `ApiResponse<T>` hiện tại. JWT bắt buộc; tạo thành công tr
 - `POST /api/properties`: JSON tạo Property, tiện ích chung, các Room và tiện ích riêng trong một transaction.
 - `GET /api/properties/mine?page=0&size=10`: danh sách cơ sở của tài khoản hiện tại; size 1–100.
 - `GET /api/properties/{id}`: chi tiết cơ sở và các Room; chỉ chủ cơ sở được xem (403 nếu không sở hữu, 404 nếu không tồn tại).
-- `PUT /api/properties/{id}/location`: chủ cơ sở thay thế địa chỉ và tọa độ; trả PropertyResponse. Body và kế hoạch FE: [GOOGLE_MAPS_INTEGRATION.md](GOOGLE_MAPS_INTEGRATION.md).
+- `PUT /api/properties/{id}/location`: chủ cơ sở thay thế địa chỉ và tọa độ; trả PropertyResponse. Body và kế hoạch FE: [../../DOANTOTNGHIEPFE/docs/maps.md](../../DOANTOTNGHIEPFE/docs/maps.md).
 
 ```json
 {
