@@ -28,7 +28,7 @@ class ChatFlowTest {
     private final ChatServiceImpl service = new ChatServiceImpl(conversations, participants, messages, users,
             listings, mock(SimpMessagingTemplate.class));
     private final Map<String, List<ChatConversationParticipant>> memberships = new HashMap<>();
-    private static final String FIXED_ADMIN = "admin.demo@trotot.example.test";
+    private static final String FIXED_ADMIN = "admin@gmail.com";
 
     static User user(String id, RoleCode code) {
         User user = User.builder().id(id).email(id + "@unit.test").fullName(id).build();
@@ -105,6 +105,37 @@ class ChatFlowTest {
         assertEquals(ErrorCode.SUPPORT_ADMIN_UNAVAILABLE, assertThrows(AppException.class,
                 () -> service.getOrCreateSupportConversation("client")).getErrorCode());
         verify(users, never()).findAllAdmins();
+        verify(conversations, never()).save(any());
+    }
+
+    @Test void configuredSupportAdminIsUsedForCreationAndInboxAuthorization() {
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "supportAdminEmail", "support@unit.test");
+        User client = user("client", RoleCode.TENANT), admin = user("support", RoleCode.ADMIN);
+        admin.setEmail("support@unit.test");
+        when(users.findByIdForUpdate("client")).thenReturn(Optional.of(client));
+        when(users.findByEmailWithRolesAndPermissions("support@unit.test")).thenReturn(Optional.of(admin));
+        var created = service.getOrCreateSupportConversation("client");
+        var thread = ChatConversation.builder().id(created.getId()).build();
+        when(conversations.findConversationsByUserId("support")).thenReturn(List.of(thread));
+        when(conversations.findConversationsByUserId("client")).thenReturn(List.of(thread));
+        assertEquals("support", created.getOtherUser().getId());
+        assertEquals(List.of(created.getId()), service.getMyConversations("support").stream().map(c -> c.getId()).toList());
+        assertEquals(List.of(created.getId()), service.getMyConversations("client").stream().map(c -> c.getId()).toList());
+        verify(users, never()).findByEmailWithRolesAndPermissions(FIXED_ADMIN);
+        verify(users, never()).findAllAdmins();
+    }
+
+    @Test void supportRecipientMustBeAnActiveAdmin() {
+        when(users.findByIdForUpdate("client")).thenReturn(Optional.of(user("client", RoleCode.LANDLORD)));
+        User admin = user("admin", RoleCode.ADMIN); admin.setEmail(FIXED_ADMIN);
+        admin.setStatus(com.tamdaptit.rentalmanagement.identity.entity.enums.UserStatus.INACTIVE);
+        when(users.findByEmailWithRolesAndPermissions(FIXED_ADMIN)).thenReturn(Optional.of(admin));
+        assertEquals(ErrorCode.SUPPORT_ADMIN_UNAVAILABLE, assertThrows(AppException.class,
+                () -> service.getOrCreateSupportConversation("client")).getErrorCode());
+        User tenant = user("not-admin", RoleCode.TENANT); tenant.setEmail(FIXED_ADMIN);
+        when(users.findByEmailWithRolesAndPermissions(FIXED_ADMIN)).thenReturn(Optional.of(tenant));
+        assertEquals(ErrorCode.SUPPORT_ADMIN_UNAVAILABLE, assertThrows(AppException.class,
+                () -> service.getOrCreateSupportConversation("client")).getErrorCode());
         verify(conversations, never()).save(any());
     }
 

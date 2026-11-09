@@ -98,6 +98,8 @@ logging:
     com.tamdaptit.rentalmanagement: DEBUG
 
 app:
+  chat:
+    support-admin-email: ${CHAT_SUPPORT_ADMIN_EMAIL:admin@gmail.com}
   cache:
     ttl: ${CACHE_TTL:30m}
   notifications:

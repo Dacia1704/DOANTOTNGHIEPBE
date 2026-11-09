@@ -24,6 +24,7 @@ import com.tamdaptit.rentalmanagement.listing.entity.Listing;
 import com.tamdaptit.rentalmanagement.listing.entity.enums.ListingStatus;
 import com.tamdaptit.rentalmanagement.listing.repository.ListingRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -43,8 +44,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ChatServiceImpl implements ChatService {
-    // Stable identity seeded by V2__seed_reference_and_demo_data.sql; never choose an arbitrary admin.
-    static final String SUPPORT_ADMIN_EMAIL = "admin.demo@trotot.example.test";
+    // Keep one explicit support recipient; the default matches the current V2 seed.
+    @Value("${app.chat.support-admin-email:admin@gmail.com}")
+    private String supportAdminEmail = "admin@gmail.com";
 
     private final ChatConversationRepository conversationRepository;
     private final ChatConversationParticipantRepository participantRepository;
@@ -117,7 +119,7 @@ public class ChatServiceImpl implements ChatService {
         }
         if (!isSupportClient(currentUser)) throw new AppException(ErrorCode.CHAT_NOT_ALLOWED);
 
-        User admin = userRepository.findByEmailWithRolesAndPermissions(SUPPORT_ADMIN_EMAIL)
+        User admin = userRepository.findByEmailWithRolesAndPermissions(supportAdminEmail.trim())
                 .filter(user -> user.getStatus() == UserStatus.ACTIVE && isSupportAdmin(user))
                 .orElseThrow(() -> new AppException(ErrorCode.SUPPORT_ADMIN_UNAVAILABLE));
 
@@ -349,7 +351,7 @@ public class ChatServiceImpl implements ChatService {
     }
 
     private boolean isSupportAdmin(User user) {
-        return SUPPORT_ADMIN_EMAIL.equalsIgnoreCase(user.getEmail()) && extractRoles(user).contains(RoleCode.ADMIN);
+        return supportAdminEmail.trim().equalsIgnoreCase(user.getEmail()) && extractRoles(user).contains(RoleCode.ADMIN);
     }
 
     private boolean isSupportClient(User user) {
