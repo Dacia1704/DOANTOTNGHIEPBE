@@ -178,7 +178,7 @@ public class ReviewServiceImpl implements ReviewService {
     private void tenantAccess(String actor,String tenantId) {
         var viewer=user(actor,null);
         if (!actor.equals(tenantId) && !hasRole(viewer,RoleCode.ADMIN)
-            && !(hasRole(viewer,RoleCode.LANDLORD) && agreements.hasConfirmedRelationship(tenantId,actor,CONFIRMED)))
+            && !hasRole(viewer,RoleCode.LANDLORD))
             throw new AppException(UNAUTHORIZED);
         if (!users.existsById(tenantId)) throw new AppException(USER_NOT_FOUND);
     }
@@ -201,7 +201,7 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Override
     public PageResponse<ReviewDetailResponse> admin(String actor,ReviewType type,Boolean hidden,String targetId,int page,int size) {
-        user(actor,RoleCode.ADMIN);
+        permission(actor,"REVIEW_READ");
         var pageable=pageable(page,size);
         return switch(type) {
             case ROOM -> page(rooms.findAll(filter(hidden,"room",targetId),pageable),this::detail);
@@ -213,7 +213,7 @@ public class ReviewServiceImpl implements ReviewService {
     @Override
     @Transactional
     public ReviewDetailResponse visibility(String actor,ReviewType type,String id,ReviewVisibilityRequest body) {
-        User admin=user(actor,RoleCode.ADMIN);
+        User admin=permission(actor,"REVIEW_MODERATE");
         if(body.hidden()==null) throw new AppException(INVALID_REQUEST);
         String reason=body.hidden()?required(body.reason(),500):null;
         var entry=locked(type,id);
@@ -256,6 +256,15 @@ public class ReviewServiceImpl implements ReviewService {
         User user=users.findByIdWithRolesAndPermissions(id).orElseThrow(()->new AppException(USER_NOT_FOUND));
         if(user.getStatus()!=UserStatus.ACTIVE || (role!=null && !hasRole(user,role))) throw new AppException(UNAUTHORIZED);
         return user;
+    }
+    private User permission(String actor,String code) {
+        var viewer=user(actor,null);
+        if(!hasPermission(viewer,code)) throw new AppException(UNAUTHORIZED);
+        return viewer;
+    }
+    private boolean hasPermission(User user,String code) {
+        return user.getUserRoles().stream().flatMap(ur->ur.getRole().getRolePermissions().stream())
+            .anyMatch(rp->code.equals(rp.getPermission().getCode()));
     }
     private boolean hasRole(User user,RoleCode role) {
         return user.getUserRoles().stream().anyMatch(ur->ur.getRole().getCode()==role);

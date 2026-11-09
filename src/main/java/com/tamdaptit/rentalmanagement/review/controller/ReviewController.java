@@ -98,14 +98,14 @@ public class ReviewController {
     }
 
     @GetMapping("/admin/reviews")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('REVIEW_READ')")
     public ApiResponse<PageResponse<ReviewDetailResponse>> admin(Principal actor,@RequestParam ReviewType type,
         @RequestParam(required=false) Boolean hidden,@RequestParam(required=false) String targetId,
         @RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="10") int size) {
         return ApiResponse.success(service.admin(actor.getName(),type,hidden,targetId,page,size));
     }
     @PatchMapping("/admin/reviews/{type}/{id}/visibility")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('REVIEW_MODERATE')")
     public ApiResponse<ReviewDetailResponse> visibility(Principal actor,@PathVariable ReviewType type,
         @PathVariable String id,@Valid @RequestBody ReviewVisibilityRequest body) {
         return ApiResponse.success(service.visibility(actor.getName(),type,id,body));

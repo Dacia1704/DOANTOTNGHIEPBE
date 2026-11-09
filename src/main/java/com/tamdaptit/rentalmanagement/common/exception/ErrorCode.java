@@ -6,6 +6,8 @@ import org.springframework.http.HttpStatus;
 
 @Getter
 public enum ErrorCode {
+    PERMISSION_PROTECTED(HttpStatus.CONFLICT, "Quyền hệ thống không được chỉnh sửa"),
+    PERMISSION_VERSION_CONFLICT(HttpStatus.CONFLICT, "Phân quyền đã thay đổi, vui lòng tải lại"),
     REVIEW_NOT_ELIGIBLE(HttpStatus.BAD_REQUEST, "Hợp đồng chưa đủ điều kiện đánh giá"),
     REVIEW_HIDDEN(HttpStatus.CONFLICT, "Đánh giá đã bị ẩn"),
     REPORT_ALREADY_OPEN(HttpStatus.CONFLICT, "Bạn đã có báo cáo đang xử lý cho đối tượng này"),

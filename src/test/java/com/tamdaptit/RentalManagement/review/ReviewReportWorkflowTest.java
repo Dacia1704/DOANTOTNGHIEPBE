@@ -207,18 +207,52 @@ class ReviewReportWorkflowTest {
         error(UNAUTHORIZED,()->reviews.reply("rr_m",ReviewType.ROOM,review.id(),new ReviewReplyRequest("Reply")));
         assertEquals("Reply",reviews.reply("rr_l",ReviewType.ROOM,review.id(),new ReviewReplyRequest("Reply")).landlordReply());
     }
-    @Test void relatedLandlordSeesOtherLandlordsTenantReviewsButNotHiddenOnes() {
+    @Test void landlordsSeeTenantReviewsWithoutContractsButNotHiddenOnes() {
         var first=reviews.create("rr_l",ReviewType.TENANT,review("rr_active",5));
         reviews.create("rr_m",ReviewType.TENANT,review("rr_history",1));
         assertEquals(2,reviews.tenant("rr_m","rr_t",0,10).getTotalElements());
         assertEquals(2,reviews.tenant("rr_t","rr_t",0,10).getTotalElements());
         assertEquals(2,reviews.tenant("rr_a","rr_t",0,10).getTotalElements());
-        error(UNAUTHORIZED,()->reviews.tenant("rr_n","rr_t",0,10));
+        assertEquals(2,reviews.tenant("rr_n","rr_t",0,10).getTotalElements());
+        assertEquals(2,reviews.tenantSummary("rr_n","rr_t").totalReviews());
         error(UNAUTHORIZED,()->reviews.tenantSummary("rr_u","rr_t"));
         reviews.visibility("rr_a",ReviewType.TENANT,first.id(),new ReviewVisibilityRequest(true,"Hidden"));
         assertEquals(1,reviews.tenant("rr_m","rr_t",0,10).getTotalElements());
         assertEquals(1,reviews.tenantSummary("rr_m","rr_t").totalReviews());
+        assertEquals(1,reviews.tenant("rr_n","rr_t",0,10).getTotalElements());
+        assertEquals(1,reviews.tenantSummary("rr_n","rr_t").totalReviews());
         assertEquals(2,reviews.admin("rr_a",ReviewType.TENANT,null,"rr_t",0,10).getTotalElements());
+    }
+    @Test void landlordCanReadTenantReviewsBeforeAndDuringUnconfirmedAgreement() throws Exception {
+        reviews.create("rr_l",ReviewType.TENANT,review("rr_active",4));
+        assertEquals(0,jdbc.queryForObject("SELECT COUNT(*) FROM rental_agreements WHERE landlord_id='rr_n' AND tenant_id='rr_t'",Integer.class));
+        mvc.perform(get("/api/tenants/rr_t/reviews").with(user("rr_n").roles("LANDLORD")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(1))
+            .andExpect(jsonPath("$.data.data[0].rating").value(4))
+            .andExpect(jsonPath("$.data.data[0].rentalAgreementId").doesNotExist())
+            .andExpect(jsonPath("$.data.data[0].hiddenReason").doesNotExist());
+        mvc.perform(get("/api/tenants/rr_t/reviews/summary").with(user("rr_n").roles("LANDLORD")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalReviews").value(1))
+            .andExpect(jsonPath("$.data.averageRating").value(4.0));
+
+        agreement("rr_pending","rr_r4","rr_t","rr_n","DRAFT");
+        jdbc.update("UPDATE rental_agreements SET landlord_confirmed_at=NULL,tenant_confirmed_at=NULL WHERE id='rr_pending'");
+        for(String state:List.of("DRAFT","PENDING_CONFIRMATION")) {
+            jdbc.update("UPDATE rental_agreements SET status=? WHERE id='rr_pending'",state);
+            assertEquals(1,reviews.tenant("rr_n","rr_t",0,10).getTotalElements());
+            assertEquals(1,reviews.tenantSummary("rr_n","rr_t").totalReviews());
+        }
+    }
+    @Test void tenantReviewAccessStillChecksActiveAccountAndTargetExistence() {
+        error(UNAUTHORIZED,()->reviews.tenant("rr_u","rr_t",0,10));
+        error(UNAUTHORIZED,()->reviews.tenantSummary("rr_u","rr_t"));
+        error(USER_NOT_FOUND,()->reviews.tenant("rr_n","missing-tenant",0,10));
+        error(USER_NOT_FOUND,()->reviews.tenantSummary("rr_n","missing-tenant"));
+        for(String state:List.of("BLOCKED","INACTIVE")) {
+            jdbc.update("UPDATE users SET status=? WHERE id='rr_n'",state);
+            error(UNAUTHORIZED,()->reviews.tenant("rr_n","rr_t",0,10));
+            error(UNAUTHORIZED,()->reviews.tenantSummary("rr_n","rr_t"));
+        }
     }
     @Test void publicQueriesRespectListingScopeLatestListingAndEmptySummary() {
         assertNull(reviews.listingSummary("rr_listing",null).averageRating());
@@ -395,10 +429,13 @@ class ReviewReportWorkflowTest {
         mvc.perform(get("/api/listings/rr_listing/reviews").param("target","ROOM").param("roomId","rr_r3"))
             .andExpect(status().isNotFound());
         mvc.perform(get("/api/landlords/rr_l/reviews")).andExpect(status().isOk());
-        for(String route:List.of("/api/reviews/mine?type=ROOM","/api/tenants/rr_t/reviews","/api/admin/reviews?type=ROOM","/api/reports/mine"))
+        for(String route:List.of("/api/reviews/mine?type=ROOM","/api/tenants/rr_t/reviews","/api/tenants/rr_t/reviews/summary","/api/admin/reviews?type=ROOM","/api/reports/mine"))
             mvc.perform(get(route)).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/admin/reports").with(user("rr_t").roles("TENANT"))).andExpect(status().isForbidden());
-        mvc.perform(get("/api/tenants/rr_t/reviews").with(user("rr_n").roles("LANDLORD"))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/tenants/rr_t/reviews").with(user("rr_n").roles("LANDLORD"))).andExpect(status().isOk());
+        mvc.perform(get("/api/tenants/rr_t/reviews/summary").with(user("rr_n").roles("LANDLORD"))).andExpect(status().isOk());
+        mvc.perform(get("/api/tenants/rr_t/reviews").with(user("rr_u").roles("TENANT"))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/tenants/rr_t/reviews/summary").with(user("rr_u").roles("TENANT"))).andExpect(status().isForbidden());
         mvc.perform(get("/api/listings/rr_listing/reviews?size=51")).andExpect(status().isBadRequest());
     }
     @Test void jsonRejectsFractionalRatingsUnknownAuthorityFieldsAndMutationRoutes() throws Exception {
@@ -495,7 +532,7 @@ class ReviewReportWorkflowTest {
         assertEquals("rr_t",reviewedTenant.targetId());assertEquals("Name rr_t",reviewedTenant.targetName());
         var hidden=reviews.visibility("rr_a",ReviewType.TENANT,tenant.id(),new ReviewVisibilityRequest(true,"Reason"));
         assertEquals("rr_t",hidden.targetId());assertEquals("Name rr_t",hidden.targetName());
-        mvc.perform(get("/api/admin/reviews?type=TENANT").with(user("rr_a").roles("ADMIN")))
+        mvc.perform(get("/api/admin/reviews?type=TENANT").with(user("rr_a").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ADMIN"),new org.springframework.security.core.authority.SimpleGrantedAuthority("USER_READ"),new org.springframework.security.core.authority.SimpleGrantedAuthority("USER_MANAGE"),new org.springframework.security.core.authority.SimpleGrantedAuthority("REVIEW_READ"),new org.springframework.security.core.authority.SimpleGrantedAuthority("REVIEW_MODERATE"),new org.springframework.security.core.authority.SimpleGrantedAuthority("REPORT_READ"),new org.springframework.security.core.authority.SimpleGrantedAuthority("REPORT_HANDLE"),new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_PERMISSION_READ"),new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_PERMISSION_MANAGE"))))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.data[0].targetId").value("rr_t"))
             .andExpect(jsonPath("$.data.data[0].targetName").value("Name rr_t"));
         mvc.perform(get("/api/listings/rr_listing/reviews")).andExpect(status().isOk())
@@ -513,11 +550,89 @@ class ReviewReportWorkflowTest {
         assertEquals("Test Listing",closed.targetName());assertEquals("Name rr_a",closed.handledByName());
         assertEquals("Name rr_a",reports.detail("rr_t",listing.id()).report().handledByName());
         assertTrue(reports.mine("rr_t",null,0,10).getData().stream().allMatch(r->r.targetName()!=null));
-        mvc.perform(get("/api/admin/reports?status=RESOLVED").with(user("rr_a").roles("ADMIN")))
+        mvc.perform(get("/api/admin/reports?status=RESOLVED").with(user("rr_a").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ADMIN"),new org.springframework.security.core.authority.SimpleGrantedAuthority("USER_READ"),new org.springframework.security.core.authority.SimpleGrantedAuthority("USER_MANAGE"),new org.springframework.security.core.authority.SimpleGrantedAuthority("REVIEW_READ"),new org.springframework.security.core.authority.SimpleGrantedAuthority("REVIEW_MODERATE"),new org.springframework.security.core.authority.SimpleGrantedAuthority("REPORT_READ"),new org.springframework.security.core.authority.SimpleGrantedAuthority("REPORT_HANDLE"),new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_PERMISSION_READ"),new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_PERMISSION_MANAGE"))))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.data[0].targetName").value("Test Listing"))
             .andExpect(jsonPath("$.data.data[0].handledByName").value("Name rr_a"));
         mvc.perform(get("/api/reports/"+listing.id()).with(user("rr_t").roles("TENANT")))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.report.handledByName").value("Name rr_a"));
+    }
+
+    @Test void permissionMatrixChangesEnforceRevocationWithExistingJwtAndAudit() throws Exception {
+        var access=context.getBean(com.tamdaptit.rentalmanagement.identity.service.RolePermissionService.class);
+        var matrix=access.matrix("rr_a");
+        assertEquals(8,matrix.permissions().size());assertEquals(3,matrix.roles().size());
+        var role=matrix.roles().stream().filter(r->r.code().equals("LANDLORD")).findFirst().orElseThrow();
+        var permission=matrix.permissions().stream().filter(p->p.code().equals("REVIEW_READ")).findFirst().orElseThrow();
+        String token=new TransactionTemplate(context.getBean(PlatformTransactionManager.class)).execute(status->
+            context.getBean(JwtTokenService.class).generateAccessToken(context.getBean(UserRepository.class)
+                .findByIdWithRolesAndPermissions("rr_n").orElseThrow()));
+        var grant=new com.tamdaptit.rentalmanagement.identity.service.RolePermissionService.Change(true,role.version());
+        try {
+            mvc.perform(get("/api/admin/reviews?type=ROOM").header("Authorization","Bearer "+token)).andExpect(status().isForbidden());
+            var enabled=access.change("rr_a",role.id(),permission.id(),grant);
+            mvc.perform(get("/api/admin/reviews?type=ROOM").header("Authorization","Bearer "+token)).andExpect(status().isOk());
+            mvc.perform(get("/api/users/me/authorities").header("Authorization","Bearer "+token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data",org.hamcrest.Matchers.hasItem("REVIEW_READ")));
+            error(PERMISSION_VERSION_CONFLICT,()->access.change("rr_a",role.id(),permission.id(),grant));
+            access.change("rr_a",role.id(),permission.id(),
+                new com.tamdaptit.rentalmanagement.identity.service.RolePermissionService.Change(false,enabled.version()));
+            mvc.perform(get("/api/admin/reviews?type=ROOM").header("Authorization","Bearer "+token)).andExpect(status().isForbidden());
+            assertEquals(2,jdbc.queryForObject("SELECT COUNT(*) FROM permission_audit WHERE role_id=? AND permission_id=?",Integer.class,role.id(),permission.id()));
+        } finally {
+            jdbc.update("DELETE FROM role_permissions WHERE role_id=? AND permission_id=?",role.id(),permission.id());
+            jdbc.update("DELETE FROM permission_audit");
+        }
+    }
+    @Test void permissionManagementProtectsCoreAndRequiresAuthorizedAdmin() throws Exception {
+        var access=context.getBean(com.tamdaptit.rentalmanagement.identity.service.RolePermissionService.class);
+        var matrix=access.matrix("rr_a");
+        var role=matrix.roles().stream().filter(r->r.code().equals("ADMIN")).findFirst().orElseThrow();
+        var core=matrix.permissions().stream().filter(p->p.code().equals("ROLE_PERMISSION_MANAGE")).findFirst().orElseThrow();
+        error(PERMISSION_PROTECTED,()->access.change("rr_a",role.id(),core.id(),
+            new com.tamdaptit.rentalmanagement.identity.service.RolePermissionService.Change(false,role.version())));
+        error(UNAUTHORIZED,()->access.matrix("rr_n"));
+        String token=new TransactionTemplate(context.getBean(PlatformTransactionManager.class)).execute(status->
+            context.getBean(JwtTokenService.class).generateAccessToken(context.getBean(UserRepository.class)
+                .findByIdWithRolesAndPermissions("rr_a").orElseThrow()));
+        mvc.perform(get("/api/admin/role-permissions").header("Authorization","Bearer "+token))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.permissions.length()").value(8));
+        mvc.perform(patch("/api/admin/roles/"+role.id()+"/permissions/"+core.id())
+            .header("Authorization","Bearer "+token).contentType(APPLICATION_JSON)
+            .content("{\"enabled\":false,\"expectedVersion\":"+role.version()+"}"))
+            .andExpect(status().isConflict());
+        mvc.perform(get("/api/admin/role-permissions/audit").header("Authorization","Bearer "+token))
+            .andExpect(status().isOk());
+        mvc.perform(get("/api/admin/role-permissions")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/admin/role-permissions").with(user("rr_t").roles("TENANT"))).andExpect(status().isForbidden());
+        assertTrue(access.audit("rr_a",0,10).isEmpty());
+    }
+
+    @Test void concurrentPermissionChangesHaveOneWinnerAndAuditFailureRollsBack() throws Exception {
+        var access=context.getBean(com.tamdaptit.rentalmanagement.identity.service.RolePermissionService.class);
+        var matrix=access.matrix("rr_a");
+        var role=matrix.roles().stream().filter(r->r.code().equals("LANDLORD")).findFirst().orElseThrow();
+        var permission=matrix.permissions().stream().filter(p->p.code().equals("REVIEW_MODERATE")).findFirst().orElseThrow();
+        var change=new com.tamdaptit.rentalmanagement.identity.service.RolePermissionService.Change(true,role.version());
+        Callable<Object> toggle=()->{
+            try {access.change("rr_a",role.id(),permission.id(),change);return "OK";}
+            catch(AppException ex){return ex.getErrorCode();}
+        };
+        try {
+            var result=parallel(toggle,toggle);
+            assertEquals(1,Collections.frequency(result,"OK"));
+            assertEquals(1,Collections.frequency(result,PERMISSION_VERSION_CONFLICT));
+        } finally {
+            jdbc.update("DELETE FROM role_permissions WHERE role_id=? AND permission_id=?",role.id(),permission.id());
+            jdbc.update("DELETE FROM permission_audit");
+        }
+        var current=access.matrix("rr_a").roles().stream().filter(r->r.id().equals(role.id())).findFirst().orElseThrow();
+        jdbc.execute("CREATE TRIGGER rbac_fail_audit BEFORE INSERT ON permission_audit FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Simulated audit failure'");
+        try {
+            assertThrows(org.springframework.dao.DataAccessException.class,()->access.change("rr_a",role.id(),permission.id(),
+                new com.tamdaptit.rentalmanagement.identity.service.RolePermissionService.Change(true,current.version())));
+            assertFalse(access.authorities("rr_n").contains("REVIEW_MODERATE"));
+            assertEquals(current.version(),access.matrix("rr_a").roles().stream().filter(r->r.id().equals(role.id())).findFirst().orElseThrow().version());
+        } finally {jdbc.execute("DROP TRIGGER rbac_fail_audit");}
     }
 
     static class FakeStorage implements ReportEvidenceStorage {
@@ -540,11 +655,13 @@ class ReviewReportWorkflowTest {
         com.tamdaptit.rentalmanagement.review.service.impl.ListingReviewServiceImpl.class,
         com.tamdaptit.rentalmanagement.review.controller.ListingReviewController.class,
         ReportController.class,GlobalExceptionHandler.class,SecurityConfig.class,JwtAuthenticationFilter.class,
-        JwtAuthenticationEntryPoint.class,ObjectMapperConfig.class,ImageValidator.class})
+        JwtAuthenticationEntryPoint.class,ObjectMapperConfig.class,ImageValidator.class,
+        com.tamdaptit.rentalmanagement.identity.service.RolePermissionService.class,
+        com.tamdaptit.rentalmanagement.identity.controller.RolePermissionController.class})
     static class Config {
         @Bean Clock clock(){return Clock.fixed(Instant.parse("2026-11-03T03:00:00Z"),ZoneId.of("Asia/Ho_Chi_Minh"));}
         @Bean FakeStorage storage(){return new FakeStorage();}
-        @Bean JwtTokenService jwt(){return org.mockito.Mockito.mock(JwtTokenService.class);}
+        @Bean JwtTokenService jwt(){return new com.tamdaptit.rentalmanagement.auth.service.impl.JwtTokenServiceImpl("x".repeat(64),"test",3600000,7200000);}
         @Bean ReviewMapper reviewsMapper(){return org.mapstruct.factory.Mappers.getMapper(ReviewMapper.class);}
         @Bean ReportMapper reportsMapper(){return org.mapstruct.factory.Mappers.getMapper(ReportMapper.class);}
         @Bean DataSource dataSource(){return new DriverManagerDataSource(url(schema),dbUser(),password());}

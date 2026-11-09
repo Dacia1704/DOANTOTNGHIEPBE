@@ -1471,3 +1471,16 @@ Migration V6 chuyển mỗi Boost cũ thành gói 1 suất cao, 0 suất thấp;
 Tác vụ chạy mỗi phút, từng chủ trọ trong transaction riêng: đồng bộ subscription ACTIVE/SCHEDULED, đơn và payment quá hạn, PENDING quá 7 ngày, PUBLISHED hết tháng, Boost hết hạn và giá trị ưu tiên lưu sẵn. Chạy lặp không thêm kỳ hoặc hóa đơn, không tự gia hạn và không xóa lịch sử.
 
 Quota và truy vấn hiển thị xét thời gian thực tế. Danh sách tin tính ưu tiên từ kỳ/Boost còn hạn ngay trong truy vấn sắp xếp; response tính cùng các điều kiện hiệu lực, không dùng riêng listings.priority_level để quyết định quyền. Vì vậy tác vụ chạy chậm không giữ chỗ PENDING hoặc hiển thị ưu tiên đã hết hạn. Cột priority_level được giữ để tương thích, cập nhật khi thao tác tin/Boost và đồng bộ nền.
+
+## 15. Xem đánh giá người thuê
+
+- GET `/api/tenants/{tenantId}/reviews?page=0&size=10`: danh sách review đang hiển thị về người thuê, trả `ApiResponse<PageResponse<ReviewResponse>>`.
+- GET `/api/tenants/{tenantId}/reviews/summary`: tổng hợp điểm từ các review đang hiển thị, trả `ApiResponse<ReviewSummaryResponse>`.
+
+Cả hai API yêu cầu Bearer access token của tài khoản đang hoạt động. LANDLORD được xem review của tenant mà không cần có hợp đồng giữa hai bên, kể cả trước khi lập hợp đồng hoặc khi hợp đồng còn DRAFT/PENDING_CONFIRMATION. FE lấy tenantId từ RentalAgreementResponse để gọi trực tiếp lúc xem hợp đồng. Chính tenant và ADMIN cũng được đọc; tenant khác không được xem thay người thuê này.
+
+Review bị ẩn không xuất hiện trong danh sách và không được tính vào tổng hợp. API không trả ID hợp đồng hoặc ghi chú kiểm duyệt. Chưa đăng nhập trả 401, sai quyền trả 403, không tìm thấy người thuê trả 404. Thay đổi quyền đọc này không thay đổi điều kiện tạo review hoặc báo cáo landlord theo hợp đồng.
+
+## 16. Quản trị phân quyền
+
+API ma trận role/permission, grant/revoke, audit và đồng bộ authority cho FE được mô tả tại [RBAC_API.md](RBAC_API.md).
