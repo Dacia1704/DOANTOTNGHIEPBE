@@ -1741,6 +1741,12 @@ Các response dùng ApiResponse/PageResponse hiện có; lỗi bổ sung `errorC
 - TENANT `GET /api/rental-agreements/my`, `POST /api/rental-agreements/{id}/confirm`, `POST .../{id}/decline`.
 - LANDLORD `GET /api/landlord/rental-agreements`, `POST .../{id}/checkout` với handoverConfirmed=true.
 
+Chi tiết `GET /api/rental-requests/{id}` trả thêm `roomDetails` gồm tiêu đề tin, tên chủ trọ, loại hình thuê, loại phòng/tầng/diện tích/sức chứa, `fullAddress`, `latitude`, `longitude`, `price`, `deposit`, `electricityPrice`, `waterPrice`, `serviceFee` và `priceSource`. `priceSource=AGREEMENT` lấy giá/phí đã chốt từ hợp đồng; `CURRENT_ROOM` lấy giá/phí hiện tại của phòng. Danh sách yêu cầu không tải `roomDetails`. API chi tiết vẫn áp dụng kiểm tra các bên tham gia/admin, xem được khi tin đăng đã ẩn; CCCD chỉ trả dạng che số. Frontend dùng dữ liệu này cho modal **Chi tiết yêu cầu thuê**, bao gồm bản đồ/chỉ đường và thông tin yêu cầu.
+
+Trang **Yêu cầu thuê phòng của tôi** dùng các tab trạng thái yêu cầu, sau **Đã hết hạn** là tab **Hợp đồng**. `GET /api/rental-requests/my` nhận thêm `status`, `q` (tối đa 100 ký tự), `sort=newest|oldest`, cùng `page/size`; `GET /api/rental-agreements/my` nhận `q`, `sort`, `page/size`. Lọc và sắp xếp thực hiện trên server, chỉ trong dữ liệu của người thuê đăng nhập. `GET /api/rental-requests/my/summary` trả `totalRequests`, bản đồ số lượng `statuses` và `totalAgreements` trên toàn bộ tài khoản, độc lập với trang/bộ lọc đang xem.
+
+Response yêu cầu và hợp đồng có thêm `card` gồm `thumbnailUrl`, `fullAddress`, `roomTypeName`, `areaM2`, `landlordName`, `price`, `listingTitle` để trình bày thẻ ngang. Giá trên thẻ yêu cầu đã có hợp đồng lấy từ hợp đồng; yêu cầu chưa có hợp đồng dùng giá hiện tại của phòng. Ảnh được tải theo lô theo cơ sở của trang kết quả. Không cần migration database cho thay đổi này.
+
 ```json
 {
   "listingId": "listing-uuid",

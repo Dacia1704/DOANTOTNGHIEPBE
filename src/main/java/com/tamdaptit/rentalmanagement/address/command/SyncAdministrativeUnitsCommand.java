@@ -28,9 +28,23 @@ public class SyncAdministrativeUnitsCommand implements ApplicationRunner {
     private String snapshotFile;
     @Value("${app.address-sync.require-schema-version:}")
     private String requireSchemaVersion;
+    @Value("${app.address-sync.skip-if-seeded:false}")
+    private boolean skipIfSeeded;
+    @Value("${app.address-sync.setup-state-file:}")
+    private String setupStateFile;
 
     @Override
     public void run(ApplicationArguments args) throws Exception {
+        boolean seedApplied = java.util.Arrays.stream(flyway.info().applied())
+                .anyMatch(migration -> migration.getVersion() != null
+                        && "2".equals(migration.getVersion().getVersion())
+                        && migration.getState() == org.flywaydb.core.api.MigrationState.SUCCESS);
+        if (skipIfSeeded && seedApplied) {
+            log.info("V2 demo seed is already applied; preserving existing data and seed files. Continuing with remaining migrations.");
+            writeSetupState(true);
+            System.exit(org.springframework.boot.SpringApplication.exit(context, () -> 0));
+            return;
+        }
         if (!requireSchemaVersion.isBlank()) {
             var current = flyway.info().current();
             if (current == null || !requireSchemaVersion.equals(current.getVersion().getVersion())) {
@@ -48,6 +62,14 @@ public class SyncAdministrativeUnitsCommand implements ApplicationRunner {
             log.info("Administrative snapshot exported to {}", output);
         }
         log.info("Administrative sync completed: {}", result);
+        writeSetupState(false);
         System.exit(org.springframework.boot.SpringApplication.exit(context, () -> 0));
+    }
+
+    private void writeSetupState(boolean seedApplied) throws Exception {
+        if (setupStateFile.isBlank()) return;
+        var output = Path.of(setupStateFile).toAbsolutePath();
+        Files.createDirectories(output.getParent());
+        Files.writeString(output, mapper.writeValueAsString(java.util.Map.of("seedApplied", seedApplied)));
     }
 }

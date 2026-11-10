@@ -17,8 +17,9 @@ public class RentalAgreementController {
     private final RentalService rentals;
     private final RentalContractService contracts;
     @GetMapping("/rental-agreements/my") @PreAuthorize("hasRole('TENANT')")
-    public ApiResponse<PageResponse<RentalAgreementResponse>> mine(Principal p,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="10") int size) {
-        return ApiResponse.success(rentals.agreements(p.getName(),false,page,size));
+    public ApiResponse<PageResponse<RentalAgreementResponse>> mine(Principal p,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="10") int size,
+            @RequestParam(defaultValue="") String q,@RequestParam(defaultValue="newest") String sort) {
+        return ApiResponse.success(rentals.myAgreements(p.getName(),page,size,q,sort));
     }
     @GetMapping("/landlord/rental-agreements") @PreAuthorize("hasRole('LANDLORD')")
     public ApiResponse<PageResponse<RentalAgreementResponse>> landlord(Principal p,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="10") int size) {
