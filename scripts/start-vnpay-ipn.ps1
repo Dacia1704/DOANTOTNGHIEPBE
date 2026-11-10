@@ -10,7 +10,7 @@ if (-not $CloudflaredPath) {
     $CloudflaredPath = Join-Path $vnPayRuntimeDirectory 'bin/cloudflared.exe'
 }
 if (-not (Test-Path -LiteralPath $CloudflaredPath)) {
-    throw "cloudflared is missing: $CloudflaredPath. See docs/VNPAY_SANDBOX.md."
+    throw "cloudflared is missing: $CloudflaredPath. See docs/OPERATIONS.md#vnpay."
 }
 $vnPayExpectedHash = 'd521b3bf68982165f0d06d76732f22d9a105ef057ff3ae4c0986f3a23190950f'
 if ((Get-FileHash -LiteralPath $CloudflaredPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $vnPayExpectedHash) {

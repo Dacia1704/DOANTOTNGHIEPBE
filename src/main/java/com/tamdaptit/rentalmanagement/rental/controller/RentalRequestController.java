@@ -22,9 +22,12 @@ public class RentalRequestController {
             .message("Đã gửi yêu cầu thuê phòng").data(rentals.create(p.getName(),body)).build());
     }
     @GetMapping("/rental-requests/my") @PreAuthorize("hasRole('TENANT')")
-    public ApiResponse<PageResponse<RentalRequestResponse>> mine(Principal p,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="10") int size) {
-        return ApiResponse.success(rentals.requests(p.getName(),false,page,size,null,null,null));
+    public ApiResponse<PageResponse<RentalRequestResponse>> mine(Principal p,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="10") int size,
+            @RequestParam(required=false) RentalRequestStatus status,@RequestParam(defaultValue="") String q,@RequestParam(defaultValue="newest") String sort) {
+        return ApiResponse.success(rentals.myRequests(p.getName(),page,size,status,q,sort));
     }
+    @GetMapping("/rental-requests/my/summary") @PreAuthorize("hasRole('TENANT')")
+    public ApiResponse<RentalSummaryResponse> summary(Principal p) { return ApiResponse.success(rentals.mySummary(p.getName())); }
     @GetMapping("/landlord/rental-requests") @PreAuthorize("hasRole('LANDLORD')")
     public ApiResponse<PageResponse<RentalRequestResponse>> landlord(Principal p,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="10") int size,
         @RequestParam(required=false) RentalRequestStatus status,@RequestParam(required=false) String propertyId,@RequestParam(required=false) String roomId) {

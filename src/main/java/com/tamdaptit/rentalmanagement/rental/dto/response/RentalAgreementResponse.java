@@ -6,4 +6,4 @@ public record RentalAgreementResponse(String id,String requestId,String agreemen
     BigDecimal deposit,BigDecimal electricityPrice,BigDecimal waterPrice,BigDecimal serviceFee,
     LocalDate startDate,LocalDate endDate,String status,String pdfStatus,String pdfSha256,
     LocalDateTime confirmationExpiresAt,LocalDateTime landlordConfirmedAt,LocalDateTime tenantConfirmedAt,
-    boolean canConfirm,boolean canDecline,boolean canDownloadPdf,boolean canCheckout,String cancelReason) {}
+    boolean canConfirm,boolean canDecline,boolean canDownloadPdf,boolean canCheckout,String cancelReason,RentalCardResponse card) {}

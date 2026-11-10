@@ -214,6 +214,13 @@ public class RentalServiceImpl implements RentalService {
     @Override
     public PageResponse<RentalRequestResponse> requests(String user,boolean owner,int page,int size,RentalRequestStatus status,String property,String room) {
         var p=requests.search(user,owner,status,property,room,pageable(page,size));
+        return requestPage(p);
+    }
+    @Override
+    public PageResponse<RentalRequestResponse> myRequests(String user,int page,int size,RentalRequestStatus status,String q,String sort) {
+        return requestPage(requests.searchMine(user,status,searchTerm(q),tenantPageable(page,size,sort)));
+    }
+    private PageResponse<RentalRequestResponse> requestPage(Page<RentalRequest> p) {
         var ids=p.getContent().stream().map(RentalRequest::getId).toList();
         var contracts=ids.isEmpty()?Map.<String,RentalAgreement>of():agreements.findAllByRentalRequest_IdIn(ids).stream()
             .collect(java.util.stream.Collectors.toMap(a->a.getRentalRequest().getId(),Function.identity()));
@@ -225,7 +232,36 @@ public class RentalServiceImpl implements RentalService {
     }
     @Override
     public PageResponse<RentalAgreementResponse> agreements(String user,boolean owner,int page,int size) {
-        return page(agreements.search(user,owner,pageable(page,size)),a->agreementResponse(a,user));
+        return agreementPage(agreements.search(user,owner,pageable(page,size)),user);
+    }
+    @Override
+    public PageResponse<RentalAgreementResponse> myAgreements(String user,int page,int size,String q,String sort) {
+        return agreementPage(agreements.searchMine(user,searchTerm(q),tenantPageable(page,size,sort)),user);
+    }
+    private PageResponse<RentalAgreementResponse> agreementPage(Page<RentalAgreement> p,String user) {
+        Map<String,String> thumbnails = new HashMap<>();
+        if (!p.isEmpty()) propertyImages.findAllByProperty_IdInOrderBySortOrderAsc(p.getContent().stream()
+                .map(a->a.getRoom().getProperty().getId()).distinct().toList())
+                .forEach(image->thumbnails.putIfAbsent(image.getProperty().getId(),image.getUrl()));
+        return page(p,a->agreementResponse(a,user,thumbnails.get(a.getRoom().getProperty().getId())));
+    }
+    @Override
+    public RentalSummaryResponse mySummary(String user) {
+        Map<String,Long> statuses = new LinkedHashMap<>();
+        for (var status : RentalRequestStatus.values()) statuses.put(status.name(),0L);
+        requests.countStatuses(user).forEach(row->statuses.put(row.getStatus().name(),row.getTotal()));
+        return new RentalSummaryResponse(statuses.values().stream().mapToLong(Long::longValue).sum(),statuses,agreements.countByTenant_Id(user));
+    }
+    private String searchTerm(String q) {
+        if (q == null) return "";
+        if (q.length()>100) throw new AppException(INVALID_REQUEST,"Từ khóa tối đa 100 ký tự");
+        return q.trim();
+    }
+    private Pageable tenantPageable(int p,int s,String sort) {
+        var defaults = pageable(p,s);
+        if ("newest".equals(sort)) return defaults;
+        if ("oldest".equals(sort)) return PageRequest.of(p,s,Sort.by("createdAt").ascending().and(Sort.by("id")));
+        throw new AppException(INVALID_REQUEST,"Thứ tự sắp xếp không hợp lệ");
     }
     private <T,R> PageResponse<R> page(Page<T> p,Function<T,R> mapper) {
         return PageResponse.<R>builder().currentPage(p.getNumber()).pageSize(p.getSize()).totalElements(p.getTotalElements())
@@ -236,7 +272,9 @@ public class RentalServiceImpl implements RentalService {
         return PageRequest.of(p,s,Sort.by("createdAt").descending().and(Sort.by("id")));
     }
     private RentalRequestResponse requestResponse(RentalRequest r,boolean detail,RentalAgreement a) {
-        return requestResponse(r,detail,a,null);
+        String thumbnail = detail ? propertyImages.findAllByProperty_IdInOrderBySortOrderAsc(
+                List.of(r.getListing().getProperty().getId())).stream().findFirst().map(image -> image.getUrl()).orElse(null) : null;
+        return requestResponse(r,detail,a,thumbnail);
     }
     private RentalRequestResponse requestResponse(RentalRequest r,boolean detail,RentalAgreement a,String thumbnail) {
         return new RentalRequestResponse(r.getId(),r.getListing().getId(),r.getRoom()==null?null:r.getRoom().getId(),
@@ -245,9 +283,36 @@ public class RentalServiceImpl implements RentalService {
             detail&&r.getTenantCitizenId()!=null?"********"+r.getTenantCitizenId().substring(r.getTenantCitizenId().length()-4):null,
             detail?r.getTenantPermanentAddress():null,r.getProposedMoveInDate(),r.getProposedMoveInDate()!=null&&r.getDurationMonths()!=null?endDate(r.getProposedMoveInDate(),r.getDurationMonths()):null,
             r.getDurationMonths(),r.getOccupantCount(),detail?r.getMessage():null,r.getStatus().name(),r.getResolutionReason(),
-            r.getCreatedAt(),r.getExpiresAt(),a==null?null:a.getId(),a==null?null:a.getPdfStatus().name(),thumbnail);
+            r.getCreatedAt(),r.getExpiresAt(),a==null?null:a.getId(),a==null?null:a.getPdfStatus().name(),thumbnail,
+            detail ? requestRoomResponse(r,a) : null,
+            rentalCard(r.getListing().getProperty(),r.getRoom(),r.getLandlord().getFullName(),
+                a!=null?a.getPrice():r.getRoom()==null?null:r.getRoom().getPrice(),r.getListing().getTitle(),thumbnail));
+    }
+    private RentalCardResponse rentalCard(com.tamdaptit.rentalmanagement.property.entity.Property p,Room room,String landlord,BigDecimal price,String title,String thumbnail) {
+        String address=java.util.stream.Stream.of(p.getAddressLine(),p.getWard()==null?null:p.getWard().getName(),
+                p.getProvince()==null?null:p.getProvince().getName()).filter(Objects::nonNull)
+                .filter(value->!value.isBlank()).collect(java.util.stream.Collectors.joining(", "));
+        return new RentalCardResponse(thumbnail,address,room==null?null:room.getRoomType().getName(),
+                room==null?null:room.getAreaM2(),landlord,price,title);
+    }
+    private RentalRequestRoomResponse requestRoomResponse(RentalRequest r,RentalAgreement a) {
+        var p = r.getListing().getProperty(); var room = r.getRoom();
+        String address = java.util.stream.Stream.of(p.getAddressLine(), p.getWard()==null?null:p.getWard().getName(),
+                p.getProvince()==null?null:p.getProvince().getName()).filter(Objects::nonNull)
+                .filter(value -> !value.isBlank()).collect(java.util.stream.Collectors.joining(", "));
+        return new RentalRequestRoomResponse(r.getListing().getTitle(), r.getLandlord().getFullName(), p.getRentalMode().name(),
+                room==null?null:room.getRoomType().getName(), room==null?null:room.getFloorNumber(),
+                room==null?null:room.getAreaM2(), room==null?null:room.getMaxOccupants(), address, p.getLatitude(), p.getLongitude(),
+                a!=null?a.getPrice():room==null?null:room.getPrice(),
+                a!=null?a.getDeposit():room==null?null:room.getDefaultDeposit(),
+                a!=null?a.getElectricityPrice():room==null?null:room.getElectricityPrice(),
+                a!=null?a.getWaterPrice():room==null?null:room.getWaterPrice(),
+                a!=null?a.getServiceFee():room==null?null:room.getServiceFee(), a!=null?"AGREEMENT":"CURRENT_ROOM");
     }
     private RentalAgreementResponse agreementResponse(RentalAgreement a,String user) {
+        return agreementResponse(a,user,null);
+    }
+    private RentalAgreementResponse agreementResponse(RentalAgreement a,String user,String thumbnail) {
         var s=readSnapshot(a.getContractSnapshot());
         boolean pending=a.getStatus()==PENDING_CONFIRMATION && a.getConfirmationExpiresAt()!=null && a.getConfirmationExpiresAt().isAfter(now());
         boolean tenant=a.getTenant().getId().equals(user),ready=a.getPdfStatus()==ContractPdfStatus.READY;
@@ -257,7 +322,8 @@ public class RentalServiceImpl implements RentalService {
             a.getLandlord().getId(),s.getOrDefault("landlordName",a.getLandlord().getFullName()),
             a.getPrice(),a.getDeposit(),a.getElectricityPrice(),a.getWaterPrice(),a.getServiceFee(),a.getStartDate(),a.getEndDate(),a.getStatus().name(),
             a.getPdfStatus().name(),ready?a.getPdfSha256():null,a.getConfirmationExpiresAt(),a.getLandlordConfirmedAt(),a.getTenantConfirmedAt(),
-            tenant&&pending&&ready,tenant&&pending,ready,a.getLandlord().getId().equals(user)&&a.getStatus()==ACTIVE,a.getCancelReason());
+            tenant&&pending&&ready,tenant&&pending,ready,a.getLandlord().getId().equals(user)&&a.getStatus()==ACTIVE,a.getCancelReason(),
+            rentalCard(a.getRoom().getProperty(),a.getRoom(),s.getOrDefault("landlordName",a.getLandlord().getFullName()),a.getPrice(),null,thumbnail));
     }
     private String snapshot(RentalAgreement a,RentalRequest r) {
         Map<String,String> s=new LinkedHashMap<>(); var p=a.getRoom().getProperty(); var room=a.getRoom(); var l=a.getLandlord();

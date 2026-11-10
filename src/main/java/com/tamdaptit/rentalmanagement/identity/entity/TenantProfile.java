@@ -69,6 +69,9 @@ public class TenantProfile {
     @Column(name = "anchor_label", length = 255)
     private String anchorLabel;
 
+    @Column(name = "anchor_place_id", length = 36)
+    private String anchorPlaceId;
+
     @Column(name = "anchor_latitude", precision = 10, scale = 8)
     private BigDecimal anchorLatitude;
 
