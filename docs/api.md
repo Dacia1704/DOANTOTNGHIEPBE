@@ -1,5 +1,7 @@
 # API Documentation - Rental Management
 
+Nguồn API chung cho BE và FE. Chỉ cập nhật contract tại file này. [Mục lục tài liệu](../README.md).
+
 Base URL:
 - Local: http://localhost:8080
 - API prefix: /api
@@ -670,7 +672,7 @@ curl -X POST "http://localhost:8080/api/rooms" \
 
 `RoomResponse` gồm: `id`, `propertyId`, `roomNumber`, `floorNumber`, `landlordId`, `roomTypeId`, `roomTypeName`, `price`, `electricityPrice`, `waterPrice`, `serviceFee`, `defaultDeposit`, `areaM2`, `maxOccupants`, `provinceId`, `provinceName`, `wardId`, `wardName`, `addressLine`, `latitude`, `longitude`, `rentalStatus`, `amenities`, `images`, `createdAt`, `updatedAt`. Tạo phòng nhận multipart gồm phần JSON `room` và field file `files` tùy chọn; endpoint tải ảnh riêng vẫn dùng được sau khi tạo.
 
-Các trường chủ trọ và địa chỉ trong response được lấy qua `Room.property`; request Room không nhận địa chỉ riêng. Tạo cơ sở và phòng lần đầu dùng `POST /api/properties` (xem [Property API](PROPERTY_API.md)).
+Các trường chủ trọ và địa chỉ trong response được lấy qua `Room.property`; request Room không nhận địa chỉ riêng. Tạo cơ sở và phòng lần đầu dùng `POST /api/properties` (xem [Property API](#property-api)).
 
 ---
 
@@ -679,7 +681,7 @@ Các trường chủ trọ và địa chỉ trong response được lấy qua `R
 Tất cả endpoint trong nhóm này yêu cầu header `Authorization: Bearer <access_token>`.
 Các API `/me` lấy ID người dùng từ access token.
 
-### 4.1 Lấy hồ sơ cá nhân
+### 5.1 Lấy hồ sơ cá nhân
 
 - Method: GET
 - URL: /api/users/me
@@ -709,7 +711,7 @@ Các API `/me` lấy ID người dùng từ access token.
 
 Đây là cấu trúc `UserResponse` được dùng cho các API trả về một người dùng bên dưới. Các thông tin chưa có có thể là `null`.
 
-### 4.2 Cập nhật hồ sơ cá nhân
+### 5.2 Cập nhật hồ sơ cá nhân
 
 - Method: PUT hoặc PATCH
 - URL: /api/users/me
@@ -733,7 +735,7 @@ Các API `/me` lấy ID người dùng từ access token.
 - Response: HTTP 200, `code: 200`, `message: "Success"`, `data` là `UserResponse` sau cập nhật.
 - Lỗi: 400 khi dữ liệu không hợp lệ hoặc trùng số điện thoại/CCCD; 404 nếu không tìm thấy người dùng.
 
-### 4.3 Đổi mật khẩu
+### 5.3 Đổi mật khẩu
 
 - Method: PUT
 - URL: /api/users/me/password
@@ -764,7 +766,7 @@ Các API `/me` lấy ID người dùng từ access token.
 
 - Lỗi: 400 khi mật khẩu hiện tại sai, xác nhận không khớp, mật khẩu mới trùng mật khẩu cũ hoặc vượt giới hạn.
 
-### 4.4 Tải lên hoặc thay thế avatar
+### 5.4 Tải lên hoặc thay thế avatar
 
 - Method: PUT hoặc POST
 - URL: /api/users/me/avatar
@@ -782,14 +784,14 @@ curl -X PUT "http://localhost:8080/api/users/me/avatar" \
 - Response: HTTP 200, `code: 200`, `message: "Success"`, `data` là `UserResponse` với `avatarUrl` mới.
 - Lỗi: 400 nếu thiếu file/ảnh không hợp lệ; 413 nếu vượt giới hạn multipart của server; 502 nếu upload thất bại; 503 nếu chưa cấu hình Cloudinary.
 
-### 4.5 Xóa avatar
+### 5.5 Xóa avatar
 
 - Method: DELETE
 - URL: /api/users/me/avatar
 - Không có request body.
 - Response: HTTP 200, `code: 200`, `message: "Success"`, `data` là `UserResponse` với `avatarUrl` được đặt về `null`.
 
-### 4.6 Lấy danh sách người dùng
+### 5.6 Lấy danh sách người dùng
 
 - Method: GET
 - URL: /api/users
@@ -819,7 +821,7 @@ curl -X PUT "http://localhost:8080/api/users/me/avatar" \
 
 - Lỗi: 400 khi tham số tìm kiếm, phân trang hoặc trạng thái không hợp lệ.
 
-### 4.7 Lấy người dùng theo ID
+### 5.7 Lấy người dùng theo ID
 
 - Method: GET
 - URL: /api/users/{id}
@@ -828,7 +830,7 @@ curl -X PUT "http://localhost:8080/api/users/me/avatar" \
 - Response: HTTP 200, `code: 200`, `message: "Success"`, `data` là `UserResponse` như mục 4.1.
 - Lỗi: 404 nếu không tìm thấy người dùng.
 
-### 4.8 Tạo người dùng
+### 5.8 Tạo người dùng
 
 - Method: POST
 - URL: /api/users
@@ -856,7 +858,7 @@ curl -X PUT "http://localhost:8080/api/users/me/avatar" \
 - Response: **HTTP 201**, `code: 201`, `message: "Created"`, `data` là `UserResponse` vừa tạo.
 - Lỗi: 400 nếu dữ liệu không hợp lệ hoặc trùng email/số điện thoại/CCCD; 404 nếu vai trò không tồn tại.
 
-### 4.9 Cập nhật người dùng
+### 5.9 Cập nhật người dùng
 
 - Method: PUT hoặc PATCH
 - URL: /api/users/{id}
@@ -884,7 +886,7 @@ curl -X PUT "http://localhost:8080/api/users/me/avatar" \
 - Response: HTTP 200, `code: 200`, `message: "Success"`, `data` là `UserResponse` sau cập nhật.
 - Lỗi: 400 nếu dữ liệu không hợp lệ/trùng thông tin; 404 nếu không tìm thấy; 409 nếu vô hiệu hóa tài khoản ADMIN.
 
-### 4.10 Xóa người dùng
+### 5.10 Xóa người dùng
 
 - Method: DELETE
 - URL: /api/users/{id}
@@ -909,9 +911,9 @@ curl -X PUT "http://localhost:8080/api/users/me/avatar" \
 GET danh sách tỉnh/phường là public; thao tác ghi yêu cầu token và quyền tương ứng.
 `provinceId` và `id` là ID bản ghi trong hệ thống, khác với mã hành chính `code`.
 
-Response tỉnh và phường có `centroidLat`, `centroidLng` (number hoặc null), tương ứng các cột DB `centroid_lat`, `centroid_lng` trong V1 hiện tại. Hai giá trị là tọa độ đại diện WGS84 từ tinhthanhpho.com, không phải vị trí hiện tại của người dùng. Script setup demo đồng bộ sau V1 rồi seed V2 theo mã hành chính; xem README backend.
+Response tỉnh và phường có`centroidLat`, `centroidLng` (number hoặc null), tương ứng các cột DB `centroid_lat`, `centroid_lng` trong V1 hiện tại. Hai giá trị là tọa độ đại diện WGS84 từ tinhthanhpho.com, không phải vị trí hiện tại của người dùng. Script setup demo đồng bộ sau V1 rồi seed V2 theo mã hành chính; xem README backend.
 
-### 5.1 Lấy danh sách tỉnh/thành phố
+### 6.1 Lấy danh sách tỉnh/thành phố
 
 - Method: GET
 - URL: /api/provinces
@@ -932,7 +934,7 @@ Response tỉnh và phường có `centroidLat`, `centroidLng` (number hoặc nu
 }
 ```
 
-### 5.2 Lấy danh sách phường/xã
+### 6.2 Lấy danh sách phường/xã
 
 - Method: GET
 - URL: /api/wards
@@ -970,7 +972,7 @@ Response tỉnh và phường có `centroidLat`, `centroidLng` (number hoặc nu
 
 - Lỗi: 400 nếu phân trang hoặc từ khóa không hợp lệ; 404 nếu `provinceId` được cung cấp nhưng không tồn tại.
 
-### 5.3 Lấy phường/xã theo ID
+### 6.3 Lấy phường/xã theo ID
 
 - Method: GET
 - URL: /api/wards/{id}
@@ -994,7 +996,7 @@ Response tỉnh và phường có `centroidLat`, `centroidLng` (number hoặc nu
 - Đây là cấu trúc `WardResponse` dùng cho API tạo/cập nhật bên dưới.
 - Lỗi: 404 nếu phường/xã không tồn tại.
 
-### 5.4 Tạo phường/xã
+### 6.4 Tạo phường/xã
 
 - Method: POST
 - URL: /api/wards
@@ -1017,7 +1019,7 @@ Response tỉnh và phường có `centroidLat`, `centroidLng` (number hoặc nu
 - Response: **HTTP 201**, `code: 201`, `message: "Created"`, `data` là `WardResponse` vừa tạo.
 - Lỗi: 400 nếu validation thất bại; 404 nếu tỉnh/thành phố không tồn tại; 409 nếu mã bị trùng.
 
-### 5.5 Cập nhật phường/xã
+### 6.5 Cập nhật phường/xã
 
 - Method: PUT
 - URL: /api/wards/{id}
@@ -1037,7 +1039,7 @@ Response tỉnh và phường có `centroidLat`, `centroidLng` (number hoặc nu
 - Response: HTTP 200, `code: 200`, `message: "Success"`, `data` là `WardResponse` sau cập nhật.
 - Lỗi: 400 nếu validation thất bại; 404 nếu phường/xã hoặc tỉnh/thành phố không tồn tại; 409 nếu mã trùng bản ghi khác.
 
-### 5.6 Xóa phường/xã
+### 6.6 Xóa phường/xã
 
 - Method: DELETE
 - URL: /api/wards/{id}
@@ -1073,7 +1075,7 @@ Các API dưới đây cần quyền thích hợp:
 
 ---
 
-## 8. Error response mẫu
+## Error response mẫu
 
 Các lỗi được xử lý bởi `GlobalExceptionHandler` trả về `ApiResponse`, với HTTP status tương ứng trường `code`. Trường `data` bị bỏ khi không có dữ liệu. Ví dụ lỗi validation (HTTP 400):
 ```json
@@ -1346,11 +1348,12 @@ Khoản thu quá hạn, thu trùng hoặc không còn đủ điều kiện vẫn
 ### 11.3. Theo dõi kết quả
 
 - GET `/api/payments?page=0&size=10`: LANDLORD xem lịch sử của mình.
+- GET `/api/payments/all?page=0&size=10`: ADMIN xem toàn bộ giao dịch của mọi chủ trọ, gồm tất cả trạng thái; mới nhất trước. Không thay đổi phạm vi lịch sử của LANDLORD.
 - GET `/api/payments/{id}`: LANDLORD sở hữu hoặc ADMIN xem trạng thái đã ghi nhận trong hệ thống.
 - GET `/api/payments/{id}/invoice`: cùng quyền trên, trả id, invoiceNo, taxAmount, totalAmount, buyerName, issuedAt; chưa có hóa đơn trả 404.
 - GET `/api/payments/review?page=0&size=10`: ADMIN xem các khoản thu cần đối soát. MVP chưa có API hoàn tiền hoặc hủy SCHEDULED.
 
-Sau Return, frontend dùng ID payment đã nhận từ checkout để gọi API trạng thái. Nếu IPN chưa tới, có thể chủ động kiểm tra lại bằng QueryDr ở mục 11.4. Kết quả trên URL trình duyệt không tự thay đổi trạng thái. Hướng dẫn cấu hình và kiểm tra trực tiếp: `VNPAY_SANDBOX.md`.
+Sau Return, frontend dùng ID payment đã nhận từ checkout để gọi API trạng thái. Nếu IPN chưa tới, có thể chủ động kiểm tra lại bằng QueryDr ở mục 11.4. Kết quả trên URL trình duyệt không tự thay đổi trạng thái. Hướng dẫn cấu hình và kiểm tra trực tiếp: [vận hành VNPay](OPERATIONS.md#vnpay).
 
 ### 11.4. Kiểm tra lại thanh toán qua QueryDr
 
@@ -1366,7 +1369,7 @@ Response ApiResponse.data gồm payment (cùng cấu trúc mục 11.1), provider
 - Lỗi mạng, provider không tìm thấy giao dịch (91), từ chối truy vấn hoặc phản hồi sai chữ ký/terminal/tham chiếu/số tiền/loại giao dịch: trả 502, không tự ghi nhận thành công. Không tự tạo lại thanh toán khi gặp lỗi truy vấn.
 - Lời gọi mạng nằm ngoài transaction database; khi có phản hồi hợp lệ, backend mới khóa chủ trọ và đọc lại trạng thái mới nhất để áp dụng.
 
-Migration V5 lưu payments.vnp_create_date để QueryDr dùng đúng vnp_CreateDate ban đầu. Gọi lại checkout của payment đang chờ giữ nguyên mốc này. Payment cũ được backfill từ created_at; nếu URL cũ từng được tạo lại với mốc khác hoặc thời điểm persist chênh giây, đây chỉ là mốc gần đúng và VNPay có thể trả 91. Khi đó cần đối chiếu mốc vnp_CreateDate của URL checkout cũ, không sửa trạng thái thành công thủ công.
+Schema lưu payments.vnp_create_date để QueryDr dùng đúng vnp_CreateDate ban đầu. Gọi lại checkout của payment đang chờ giữ nguyên mốc này. Payment cũ được backfill từ created_at; nếu URL cũ từng được tạo lại với mốc khác hoặc thời điểm persist chênh giây, đây chỉ là mốc gần đúng và VNPay có thể trả 91. Khi đó cần đối chiếu mốc vnp_CreateDate của URL checkout cũ, không sửa trạng thái thành công thủ công.
 
 ## 12. Tin đăng, quota và slot ưu tiên
 
@@ -1375,17 +1378,21 @@ Migration V5 lưu payments.vnp_create_date để QueryDr dùng đúng vnp_Create
 POST `/api/listings`, quyền LANDLORD, tạo và gửi PENDING ngay:
 
 ```json
-{"roomId":"uuid-phong","title":"Phòng cho thuê","description":"Nội dung tin"}
+{"propertyId":"uuid-co-so","title":"Phòng cho thuê","description":"Nội dung tin","priorityLevel":0,"boostSubscriptionId":"uuid-goi-boost-da-mua","boostPriorityLevel":2}
 ```
 
-Phòng phải thuộc chủ trọ và AVAILABLE. Title bắt buộc, tối đa 255 ký tự; description tối đa 20.000 ký tự. Server tạo slug và các mốc thời gian; không nhận trạng thái/ưu tiên/ngày đăng từ client.
+Cơ sở phải thuộc chủ trọ và có phòng/căn AVAILABLE. Title bắt buộc, tối đa 255 ký tự; description tối đa 20.000 ký tự. Server tạo slug, trạng thái và các mốc thời gian.
 
-- Quota là giới hạn đồng thời, chỉ tính PENDING có pendingExpiresAt > now và PUBLISHED có expiresAt > now.
-- Kiểm tra gói, quota và tin cùng phòng khi tạo, gửi lại và duyệt; bản ghi chủ trọ được khóa để chống thao tác đồng thời vượt quota.
+- `priorityLevel` tùy chọn 0–2: chọn ưu tiên gói dịch vụ, mặc định 0.
+- `boostSubscriptionId` và `boostPriorityLevel` (1 hoặc 2) cùng có hoặc cùng bỏ. Khi dùng Boost, `priorityLevel` phải là 0 hoặc bỏ. Boost phải thuộc chủ trọ, ACTIVE, còn hạn và còn lượt tương ứng. Không mua gói mới trong request tạo tin.
+- Tạo tin và trừ một lượt đăng cùng lượt ưu tiên đã chọn trong một transaction. Bất kỳ bước nào thất bại đều rollback, không để lại tin hoặc trừ lượt một phần.
+
+- Quota là lượt đã sử dụng của kỳ, bao gồm tin ẩn/hết hạn. Chỉ admin từ chối ngay lần duyệt đầu mới hoàn đúng các lượt đã trừ về nguồn gói tương ứng. Sau khi ẩn, hết hạn, đã duyệt hoặc gửi duyệt lại, từ chối không hoàn lượt.
+- Kiểm tra gói, quota và tin cùng cơ sở khi tạo, gửi lại và duyệt; bản ghi chủ trọ được khóa để chống thao tác đồng thời vượt quota.
 - PENDING giữ chỗ 7 ngày; duyệt tại quota đầy không đếm trùng chính tin đang duyệt. Quá hạn chờ thì admin không duyệt trực tiếp được.
-- PUT `/api/listings/{id}` với body `{"title":"Nội dung mới","description":"..."}`: chủ tin sửa nội dung khi tin không còn giữ quota (đã ẩn, từ chối hoặc quá hạn). Tin PENDING/PUBLISHED đang hiệu lực phải ẩn trước khi sửa; sửa không tự xuất bản hay tự kéo dài hạn.
-- POST `/api/listings/{id}/submit`: chủ tin gửi duyệt lại khi tin không còn giữ quota; kiểm tra quyền/quota và bắt đầu cửa sổ PENDING 7 ngày mới.
-- POST `/api/listings/{id}/hide`: chủ tin ẩn tin, giải phóng quota và slot theo gói; không xóa lịch sử hoặc kéo dài Boost.
+- PUT `/api/listings/{id}` với body `{"title":"Nội dung mới","description":"..."}`: chủ tin sửa nội dung khi tin không còn hiệu lực chờ duyệt/hiển thị (đã ẩn, từ chối hoặc quá hạn). Tin PENDING/PUBLISHED đang hiệu lực phải ẩn trước khi sửa; sửa không tự xuất bản hay tự kéo dài hạn.
+- POST `/api/listings/{id}/submit`: chủ tin gửi duyệt lại khi tin không còn hiệu lực chờ duyệt/hiển thị; kiểm tra quyền/quota và bắt đầu cửa sổ PENDING 7 ngày mới.
+- POST `/api/listings/{id}/hide`: chủ tin ẩn tin và ngừng lựa chọn ưu tiên/Boost, giữ lượt đã dùng; không hoàn lượt hoặc kéo dài Boost.
 
 ### 12.2. Duyệt và hiển thị
 
@@ -1396,9 +1403,23 @@ Phòng phải thuộc chủ trọ và AVAILABLE. Title bắt buộc, tối đa 2
 - GET `/api/listings/{id}`: công khai, chỉ chi tiết PUBLISHED còn hạn, các trường hợp khác trả 404.
 - GET `/api/listings/mine?page=0&size=10`: LANDLORD xem tin của mình ở mọi trạng thái; endpoint này vẫn yêu cầu xác thực.
 
-ListingResponse gồm id, roomId, landlordId, title, slug, description, status, rejectionReason, priorityLevel, packagePriorityLevel, submittedAt, pendingExpiresAt, publishedAt, expiresAt, createdAt. packagePriorityLevel chỉ trả lựa chọn còn hiệu lực của kỳ hiện tại; priorityLevel là mức hiển thị thực tế, có tính Boost và mức mặc định Business.
+ListingResponse gồm id, propertyId, property, propertyName, rentalMode, landlordId, landlordName, title, slug, description, status, rejectionReason, priorityLevel, packagePriorityLevel, submittedAt, pendingExpiresAt, publishedAt, expiresAt, createdAt. Bổ sung `initialReview` (tin còn ở lần duyệt đầu) và `boostAllocation` (`{listingId,boostSubscriptionId,level}` hoặc null). Boost đã chọn xuất hiện cả khi PENDING còn hạn; priorityLevel vẫn là 0 đến khi được duyệt. packagePriorityLevel trả lựa chọn còn hiệu lực của kỳ hiện tại. `property` chứa địa chỉ, latitude, longitude và các phòng của cơ sở.
 
 Hết gói/hạ quota không xóa hoặc ẩn tin cũ trước expiresAt. Tin quá hạn không xuất hiện dù tác vụ nền chưa chuyển trạng thái. Đăng lại luôn PENDING, phải được duyệt lại để bắt đầu tháng hiển thị mới.
+
+### 12.2.1. Tìm tin theo vị trí bản đồ
+
+GET `/api/listings` nhận thêm các bộ tham số tùy chọn:
+
+- `latitude`, `longitude`, `radiusKm`: gửi đủ cả ba, bán kính > 0, đơn vị km; tính khoảng cách đường chim bay bằng Haversine.
+- `south`, `north`, `west`, `east`: gửi đủ bốn cạnh của khung bản đồ; `south <= north`. `west > east` nghĩa là khung đi qua kinh tuyến 180°.
+- Vĩ độ trong [-90,90], kinh độ trong [-180,180]. Thiếu bộ tham số, sai phạm vi hoặc sai kiểu số trả 400.
+- Có thể kết hợp cả hai bộ và các bộ lọc phòng hiện có; kết quả phải thỏa tất cả điều kiện. Tin thiếu một trong hai tọa độ bị loại khi lọc vị trí, vẫn được trả trong tìm kiếm thông thường.
+- Phân trang `page`/`size` (1–100), tổng số kết quả, điều kiện công khai, loại trùng cơ sở và thứ tự ưu tiên được giữ nguyên; không sắp xếp theo khoảng cách.
+- Ví dụ bán kính: `/api/listings?latitude=10.762622&longitude=106.660172&radiusKm=3&minPrice=2000000&size=20`.
+- Ví dụ khung: `/api/listings?south=10.7&north=10.9&west=106.6&east=106.8&size=50`.
+
+Tọa độ để FE đặt ghim nằm tại `data.data[].property.latitude` và `property.longitude`; chi tiết tin tại `data.property`. API danh sách admin/chờ duyệt cũng trả cùng cấu trúc vị trí. Backend không gọi Google API. Xem [giao diện bản đồ](../../DOANTOTNGHIEPFE/docs/UI.md#ban-do).
 
 ### 12.3. Chọn slot ưu tiên
 
@@ -1440,8 +1461,8 @@ Thanh toán trong 15 phút bằng POST `/api/payments/vnpay/checkout`, body `{"t
 GET `/api/boost-subscriptions/active` trả mảng các gói đang hiệu lực. Mỗi phần tử gồm:
 
 - `subscription`: thông tin gói đã mua theo response ở trên.
-- `usedHighPrioritySlots`, `usedLowPrioritySlots`: số suất đang dùng.
-- `remainingHighPrioritySlots`, `remainingLowPrioritySlots`: số suất còn trống.
+- `usedHighPrioritySlots`, `usedLowPrioritySlots`: lượt đã dùng, kể cả phân bổ đã bỏ hoặc tin ẩn/hết hạn.
+- `remainingHighPrioritySlots`, `remainingLowPrioritySlots`: lượt còn lại.
 - `allocations`: danh sách `{listingId, boostSubscriptionId, level}`.
 
 Tổng quyền khả dụng là tổng số suất của các gói còn hiệu lực. Mỗi phân bổ thuộc một gói cụ thể; không tự chuyển phân bổ sang gói khác khi hết hạn.
@@ -1454,15 +1475,15 @@ PUT `/api/boost-subscriptions/allocations/{listingId}`:
 {"boostSubscriptionId":"uuid-goi-da-mua","level":2}
 ```
 
-- `level` chỉ nhận 1 (thấp) hoặc 2 (cao), bắt buộc. Tin phải thuộc chủ trọ, PUBLISHED và còn hạn.
+- `level` chỉ nhận 1 (thấp) hoặc 2 (cao), bắt buộc. Tin phải thuộc chủ trọ, PENDING còn hạn chờ duyệt hoặc PUBLISHED còn hạn hiển thị.
 - Gói đích phải ACTIVE và còn thời hạn; giới hạn lấy từ snapshot số suất tương ứng.
 - Mỗi tin chỉ giữ một phân bổ Boost. Gọi lại cùng body không tốn thêm suất. Đổi level hoặc boostSubscriptionId thay thế phân bổ cũ trong một transaction; nếu gói đích hết suất, phân bổ cũ được giữ nguyên.
 - Khóa chủ trọ ngăn các request đồng thời vượt suất. Các suất cao/thấp không hoán đổi với nhau và không reset theo lượt sử dụng.
 - Response `{listingId, boostSubscriptionId, level}` là mức Boost được gán, có thể khác mức hiển thị cuối cùng.
 
-DELETE `/api/boost-subscriptions/allocations/{listingId}` bỏ phân bổ và giải phóng suất. Lặp lại với tin thuộc chủ trọ đã không còn phân bổ vẫn thành công. Response theo ApiResponse, data null.
+DELETE `/api/boost-subscriptions/allocations/{listingId}` bỏ phân bổ, giữ lượt đã dùng. Lặp lại với tin thuộc chủ trọ đã không còn phân bổ vẫn thành công. Response theo ApiResponse, data null.
 
-Mức hiển thị cuối cùng = max(mức từ gói dịch vụ, mức Boost đang được gán). Boost không trừ suất gói dịch vụ, không thay đổi publishedAt/expiresAt hoặc số tin được phép đăng. Tin được ẩn sẽ giải phóng suất ngay; tin/gói hết hạn không còn hiệu lực ngay trong truy vấn, và phân bổ được dọn khi đồng bộ hoặc thao tác/xem gói Boost.
+Mức hiển thị cuối cùng = max(mức từ gói dịch vụ, mức Boost đang được gán). Boost không trừ lượt ưu tiên gói dịch vụ, không thay đổi publishedAt/expiresAt hoặc số tin được phép đăng. Ẩn tin, hết hạn, bỏ/đổi Boost không hoàn lượt. Chỉ từ chối ở lần duyệt đầu mới hoàn lượt; không ảnh hưởng giá, thanh toán, hạn gói hoặc những tin khác.
 
 Lỗi: 400 khi dữ liệu/mức ưu tiên/trạng thái tin không hợp lệ hoặc gói hết hiệu lực; 401 khi chưa xác thực; 403 khi sai vai trò; 404 khi tin/gói đã mua không thuộc chủ trọ hoặc không tồn tại; 409 `BOOST_SLOTS_EXCEEDED` khi hết suất đúng mức. Cấu hình cả hai số suất bằng 0 trả 400 `INVALID_BOOST_PACKAGE`.
 
@@ -1483,6 +1504,331 @@ Cả hai API yêu cầu Bearer access token của tài khoản đang hoạt đ�
 
 Review bị ẩn không xuất hiện trong danh sách và không được tính vào tổng hợp. API không trả ID hợp đồng hoặc ghi chú kiểm duyệt. Chưa đăng nhập trả 401, sai quyền trả 403, không tìm thấy người thuê trả 404. Thay đổi quyền đọc này không thay đổi điều kiện tạo review hoặc báo cáo landlord theo hợp đồng.
 
-## 16. Quản trị phân quyền
+<a id="review"></a>
 
-API ma trận role/permission, grant/revoke, audit và đồng bộ authority cho FE được mô tả tại [RBAC_API.md](RBAC_API.md).
+## 16. Review
+
+- Tenant tạo đánh giá `ROOM` và `LANDLORD`; landlord tạo đánh giá `TENANT`.
+- Mỗi hợp đồng chỉ có một đánh giá cho mỗi loại. Hai đánh giá của tenant được gửi độc lập; thành công một phần phải được giữ lại.
+- Hợp đồng phải có trạng thái `ACTIVE`, `EXPIRED` hoặc `TERMINATED`, hai bên đã xác nhận, ngày bắt đầu không nằm trong tương lai. Không tự đánh giá mình.
+- Luôn lấy quyền tạo từ `GET /api/rental-agreements/{id}/review-eligibility`: từng loại trả `canCreate`, `reviewId`, `reason`. Không chỉ suy ra từ status ở FE.
+- Điểm là số nguyên 1–5; nhận xét không bắt buộc, tối đa 2.000 ký tự. Payload tạo chỉ gồm `rentalAgreementId`, `rating`, `comment`; BE suy ra đối tượng từ hợp đồng.
+- Chưa có API sửa/xóa đánh giá của tác giả. Đánh giá bị ẩn vẫn tồn tại và không cho gửi lại.
+- Landlord có thể gửi hoặc cập nhật phản hồi tối đa 2.000 ký tự cho review phòng/chủ trọ thuộc hợp đồng của mình. Review bị ẩn không được phản hồi. Không có phản hồi cho review người thuê.
+- Review phòng và chủ trọ được xem công khai theo các điều kiện của BE. Review người thuê chỉ cho chính người thuê, admin hoặc landlord đang hoạt động; quyền đọc không yêu cầu quan hệ hợp đồng. Điều kiện tạo review vẫn dựa trên hợp đồng.
+- API công khai loại bỏ review bị ẩn, không trả ID tác giả, hợp đồng hay thông tin kiểm duyệt. Không dùng tên/avatar để suy ra quyền.
+- Review của listing không chọn phòng được BE tổng hợp theo toàn bộ cơ sở; chọn phòng dùng API riêng theo `roomId`. Không cộng hai tập này với nhau.
+- Summary không có review trả `averageRating = null`: hiển thị “Chưa có đánh giá”, không trình bày thành điểm 0/5.
+
+Tất cả đường dẫn có tiền tố `/api`.
+
+- `GET /rental-agreements/{id}/review-eligibility`.
+- `POST /reviews/rooms`, `/reviews/landlords`, `/reviews/tenants`.
+- `GET /reviews/mine?type=ROOM|LANDLORD|TENANT&page=0&size=10`.
+- `GET /listings/{listingId}/reviews` và `/reviews/summary`.
+- `GET /listings/{listingId}/rooms/{roomId}/reviews` và `/reviews/summary`.
+- `GET /landlords/{id}/reviews` và `/reviews/summary`.
+- `GET /tenants/{id}/reviews` và `/reviews/summary` với quyền tương ứng.
+- `PUT /reviews/rooms/{id}/reply`, `/reviews/landlords/{id}/reply`, body `{reply}`.
+- `GET /admin/reviews?type=...&hidden=...&targetId=...&page=0&size=10`; bỏ `hidden` để lấy tất cả.
+- `PATCH /admin/reviews/{type}/{id}/visibility`, body `{hidden, reason}`. `type` tại đây là enum viết hoa.
+
+- `GET /api/landlord/reviews?type=ROOM|LANDLORD&page=0&size=10`: LANDLORD xem review nhận được, trả `PageResponse<ReceivedReviewResponse>` với ngữ cảnh và `canReply`.
+- Danh sách admin yêu cầu `REVIEW_READ`; ẩn/khôi phục yêu cầu `REVIEW_MODERATE`.
+- Review public dùng `ReviewResponse`, danh sách của tác giả/admin dùng `ReviewDetailResponse`; không suy quyền từ tên/avatar. Page bắt đầu từ 0, size tối đa 50.
+
+## Public listing reviews
+
+`GET /api/listings/{id}/reviews?target=ROOM&roomId={roomId}&page=0&size=4`
+is a compatibility response adapter for the listing UI. It delegates all access,
+visibility, pagination and rating calculations to the canonical `ReviewService`.
+The `target` parameter selects this adapter. Without `target`, the same route
+returns the standard review page from `ReviewController`, documented in `api.md`.
+
+It returns visible reviews for the selected room. Omitting `roomId` includes rooms
+in the listing's property. `target=LANDLORD` returns reviews for that property's
+landlord across their properties, independent of the selected room.
+
+The normal API envelope contains `summary` and `reviews`:
+
+- Summary: average rating, total visible reviews, reply percentage and 1–5 star
+  distribution across all matching reviews, independent of pagination.
+- Reviews: the normal page response, newest first with ID as a stable tie breaker.
+  Items include author display name, score, comment, landlord reply, date and a
+  flag for a matching rental agreement that satisfies the canonical confirmed-stay
+  eligibility rule. No contact,
+  identity or contract identifiers are included.
+
+Hidden reviews are excluded from both the list and summary. Hidden, expired or
+missing listings return 404. Selecting a room outside the listing's property
+returns 404. Page sizes follow the canonical API limit of 50.
+
+An empty summary has null average/reply percentage and zero counts. The UI must
+not replace these with demo ratings. Existing reviews have an overall score,
+not separate cleanliness/location/amenity scores or chat response metrics.
+
+Review creation, replies and moderation use the canonical endpoints documented
+in `api.md`; the adapter does not duplicate their business logic.
+
+<a id="report"></a>
+
+## 17. Report
+
+- Chỉ tenant được tạo, xem danh sách báo cáo của mình và bổ sung minh chứng. Quyền `REPORT_READ` cho phép đọc hồ sơ/ảnh theo kiểm tra BE; `REPORT_HANDLE` cho phép nhận và kết thúc. Landlord không được cấp quyền xem mặc định.
+- Đối tượng gồm `LISTING`, `LANDLORD`. Báo cáo tin đăng yêu cầu tin còn công khai hợp lệ; báo cáo chủ trọ yêu cầu quan hệ hợp đồng đã xác nhận trong các trạng thái được BE chấp nhận. Điều kiện này không kiểm tra ngày bắt đầu như review.
+- Một tenant không được tạo báo cáo mới cho cùng đối tượng khi đã có báo cáo `PENDING` hoặc `PROCESSING`. Không tự báo cáo mình.
+- Lý do lấy từ `GET /api/reports/reasons?targetType=...`; FE dịch nhãn sang tiếng Việt. `INVALID_PRICE` chỉ áp dụng tin đăng.
+- Mã lý do hiện có: `SCAM` (Lừa đảo), `MISLEADING_INFORMATION` (Thông tin sai lệch), `INVALID_PRICE` (Giá không chính xác), `UNSAFE_CONDITION` (Điều kiện không an toàn), `INAPPROPRIATE_CONTENT` (Nội dung không phù hợp), `OTHER` (Khác).
+- Mô tả tối đa 5.000 ký tự; chọn “Khác” phải có nội dung sau khi trim.
+- Luồng trạng thái: `PENDING` → `PROCESSING` → `RESOLVED` hoặc `REJECTED`. Chỉ admin đã nhận xử lý mới được kết thúc; ghi chú kết quả bắt buộc, tối đa 5.000 ký tự.
+- Tối đa 5 ảnh JPEG/PNG, mỗi ảnh tối đa 5 MiB, chiều rộng và chiều cao không quá 4.096 px. BE kiểm tra nội dung ảnh thực.
+- Tạo report trước bằng JSON, sau đó upload từng ảnh qua multipart field `file`. Chỉ bổ sung ảnh khi báo cáo còn `PENDING`; hiện chưa có API xóa ảnh, sửa/hủy hoặc mở lại báo cáo.
+- Nội dung minh chứng là dữ liệu riêng tư: tải bằng HttpClient có Bearer token dưới dạng Blob, tạo object URL để hiển thị và thu hồi khi đóng/chuyển trang. Không gắn trực tiếp URL API vào `<img>` vì interceptor không chạy cho request ảnh của trình duyệt.
+- API resolve/reject chỉ ghi nhận kết quả báo cáo và thông báo cho tenant; không tự ẩn tin, khóa tài khoản hay ẩn review.
+
+Tất cả đường dẫn có tiền tố `/api`.
+
+- `GET /reports/reasons?targetType=LISTING|LANDLORD`.
+- `POST /reports`, body `{targetType, targetId, reasonCode, description}`.
+- `GET /reports/mine?status=...&page=0&size=10`.
+- `GET /reports/{id}` cho tác giả hoặc admin.
+- `POST /reports/{id}/evidences`, multipart `file`; `GET /reports/{id}/evidences/{evidenceId}/content`, response Blob.
+- `GET /admin/reports?status=...&reasonCode=...&page=0&size=10`.
+- `GET /admin/reports/summary`.
+- `POST /admin/reports/{id}/assign` nhận xử lý cho chính admin đang đăng nhập, không phải chọn người khác.
+- `POST /admin/reports/{id}/resolve` hoặc `/reject`, body `{resolutionNote}`.
+
+Report detail trả `{report, evidences}`; nội dung ảnh trả Blob qua API có token. Các API quản trị đọc/summary yêu cầu `REPORT_READ`, assign/resolve/reject yêu cầu `REPORT_HANDLE` và kiểm tra người nhận xử lý.
+
+
+<a id="property-api"></a>
+
+## 18. Property và PropertyType
+
+
+
+API dùng `ApiResponse<T>` hiện tại. JWT bắt buộc; tạo thành công trả HTTP 200.
+
+### Cơ sở cho thuê (LANDLORD)
+
+- `POST /api/properties`: JSON tạo Property, tiện ích chung, các Room và tiện ích riêng trong một transaction.
+- `GET /api/properties/mine?page=0&size=10`: danh sách cơ sở của tài khoản hiện tại; size 1–100.
+- `GET /api/properties/{id}`: chi tiết cơ sở và các Room; chỉ chủ cơ sở được xem (403 nếu không sở hữu, 404 nếu không tồn tại).
+- `PUT /api/properties/{id}/location`: chủ cơ sở thay thế địa chỉ và tọa độ; trả PropertyResponse. Body và kế hoạch FE: [../../DOANTOTNGHIEPFE/docs/UI.md#ban-do](../../DOANTOTNGHIEPFE/docs/UI.md#ban-do).
+
+```json
+{
+  "name": "Nhà trọ ABC",
+  "propertyTypeId": "property-type-id",
+  "rentalMode": "BY_ROOM",
+  "totalFloors": 3,
+  "provinceId": "province-id",
+  "wardId": "ward-id",
+  "addressLine": "123 Nguyễn Trãi",
+  "latitude": 10.762622,
+  "longitude": 106.660172,
+  "amenityIds": ["camera-id", "parking-id"],
+  "defaultRoom": {
+    "roomTypeId": "room-type-id",
+    "price": 3000000,
+    "electricityPrice": 3500,
+    "waterPrice": 100000,
+    "serviceFee": 100000,
+    "defaultDeposit": 3000000,
+    "areaM2": 25,
+    "maxOccupants": 2
+  },
+  "floors": [
+    {"floorNumber": 1, "rooms": [
+      {"roomNumber": "A101", "amenityIds": ["air-conditioner-id"]},
+      {"roomNumber": "A102", "price": 3500000, "areaM2": 30}
+    ]}
+  ]
+}
+```
+
+`landlordId` lấy từ Principal. `floors` và mỗi danh sách `rooms` phải có phần tử. `floorNumber` có thể null, khi có phải >= 0; không sinh số phòng từ tầng. `totalFloors` tùy chọn, >= 0. `latitude`/`longitude` tùy chọn nhưng phải cùng có giá trị hoặc cùng null, trong khoảng [-90,90]/[-180,180]. Tọa độ 0 hợp lệ. Ward phải thuộc Province.
+
+`defaultRoom` có thể bỏ qua khi mỗi Room có đủ dữ liệu. Mỗi trường null của Room dùng giá trị mặc định tương ứng; số 0 là override thực sự đối với phí. Kết quả phải có roomType, price > 0, areaM2 > 0, maxOccupants > 0; các phí không âm. Default chỉ là input, không lưu vào Property. `amenityIds` của Property và Room độc lập, không kế thừa; ID trùng được loại bỏ.
+
+`WHOLE` gửi cùng cấu trúc nhưng đúng một Room, ví dụ `roomNumber: "HOUSE"`; `BY_ROOM` có ít nhất một Room. Số phòng bắt buộc, tối đa 30 ký tự, trim và không trùng trong Property. Lỗi validation/count/default là 400, trùng số phòng 409, master data không tồn tại 404. Một Room lỗi khiến toàn bộ request rollback.
+
+Response Property có `id`, `landlordId`, `name`, `propertyTypeId`, `propertyTypeName`, `rentalMode`, `totalFloors`, thông tin địa chỉ/tọa độ, `amenities`, `images`, `rooms`, `createdAt`, `updatedAt`. Mỗi Room dùng RoomResponse hiện tại và bổ sung `propertyId`, `roomNumber`, `floorNumber`; địa chỉ lấy từ Property. `images` Property hiện có entity/repository phục vụ lưu dữ liệu, chưa thêm API upload ảnh chung trong phạm vi này.
+
+### Danh mục PropertyType
+
+- `GET /api/property-types?page=0&size=10`, `GET /api/property-types/{id}`: tài khoản đã đăng nhập.
+- `POST /api/property-types`, `PUT /api/property-types/{id}`, `DELETE /api/property-types/{id}`: ADMIN.
+- Body tạo/sửa: `{"name":"Nhà trọ","description":"Mô tả"}`. Tên bắt buộc, tối đa 100 ký tự, duy nhất không phân biệt hoa thường. Trùng tên hoặc xóa loại đang dùng trả 409.
+- Response có id, name, description, createdAt, updatedAt. Không có cây cha/con; RoomType vẫn giữ cây hiện tại cho loại đơn vị cho thuê.
+
+### 18.1. Cập nhật vị trí cơ sở
+
+PUT `/api/properties/{id}/location`, JWT LANDLORD sở hữu cơ sở:
+
+```json
+{
+  "provinceId": "province-id",
+  "wardId": "ward-id",
+  "addressLine": "123 Nguyễn Trãi",
+  "latitude": 10.762622,
+  "longitude": 106.660172
+}
+```
+
+Thay thế địa chỉ và tọa độ trong một transaction; trả `ApiResponse<PropertyResponse>`, HTTP 200. Tỉnh/phường/địa chỉ bắt buộc và phường phải thuộc tỉnh. Hai tọa độ phải cùng có giá trị hoặc cùng null; gửi/bỏ cả hai để null sẽ xóa ghim. Vĩ độ [-90,90], kinh độ [-180,180]; 0 hợp lệ. Quy tắc cặp tọa độ cũng áp dụng khi POST tạo cơ sở. Sai dữ liệu trả 400, sai quyền/sở hữu 403, không tìm thấy cơ sở/tỉnh/phường 404. Vị trí dùng chung cho tất cả phòng và tin của cơ sở; cập nhật không đổi trạng thái duyệt tin. Xem [giao diện bản đồ](../../DOANTOTNGHIEPFE/docs/UI.md#ban-do).
+
+<a id="rbac"></a>
+
+## 19. Quản trị phân quyền
+
+
+Bản đầu giữ ADMIN, LANDLORD, TENANT. Ma trận quản lý 8 quyền đã được backend thực thi: USER_READ, USER_MANAGE, REVIEW_READ, REVIEW_MODERATE, REPORT_READ, REPORT_HANDLE, ROLE_PERMISSION_READ, ROLE_PERMISSION_MANAGE.
+
+Các quyền cũ ngoài danh sách này chưa đưa vào ma trận, tránh hiển thị checkbox chưa có tác dụng trên endpoint. Các module nghiệp vụ khác vẫn áp dụng phân quyền hiện tại.
+
+### Đọc ma trận
+
+GET /api/admin/role-permissions, cần ADMIN và ROLE_PERMISSION_READ.
+
+ApiResponse.data có:
+
+- permissions: các dòng {id,code,name,module}.
+- roles: các cột {id,code,name,version,permissionIds,lockedPermissionIds}.
+
+FE dựng checkbox từ permissionIds; disable các ô thuộc lockedPermissionIds. Số quyền mỗi cột là permissionIds.length. Tìm kiếm theo code/name có thể làm ngay trên dữ liệu này.
+
+Hai quyền ROLE_PERMISSION_* khóa ở mọi vai trò: chỉ ADMIN có sẵn theo migration. USER_MANAGE chỉ chỉnh được trên ADMIN để không cấp đường tạo/sửa tài khoản quản trị cho người dùng nghiệp vụ.
+
+### Bật/tắt
+
+PATCH /api/admin/roles/{roleId}/permissions/{permissionId}, cần ADMIN và ROLE_PERMISSION_MANAGE.
+
+Body: {"enabled":true,"expectedVersion":0}. expectedVersion lấy từ cột role của lần đọc gần nhất.
+
+Response data: {roleId,permissionId,enabled,version}. Lưu version mới sau mỗi lần cập nhật và tuần tự hóa thao tác cùng một role; khi 409 PERMISSION_VERSION_CONFLICT thì tải lại ma trận. API khóa role trong transaction, đối chiếu phiên bản mới nhất, cập nhật quan hệ và ghi audit atomically. Gửi trạng thái hiện có không tạo audit thừa.
+
+409 PERMISSION_PROTECTED nếu chỉnh ô bị khóa hoặc permission chưa được quản lý. Sai quyền 403, ID không tồn tại 404. Không có API tạo role hoặc permission tùy ý.
+
+### Quyền có tác dụng ở đâu
+
+- USER_READ: danh sách/chi tiết người dùng quản trị.
+- USER_MANAGE: tạo/sửa/xóa tài khoản quản trị, vẫn yêu cầu vai trò ADMIN và giữ các bảo vệ tài khoản ADMIN hiện có.
+- REVIEW_READ: danh sách quản trị review.
+- REVIEW_MODERATE: ẩn/hiện review.
+- REPORT_READ: danh sách, thống kê, chi tiết report và đọc bằng chứng của hồ sơ khác.
+- REPORT_HANDLE: nhận và đóng report, vẫn kiểm tra đúng người được giao xử lý và trạng thái. Muốn xem hồ sơ xử lý cần cấp thêm REPORT_READ.
+
+Các kiểm tra sở hữu, hợp đồng, tác giả review và tài khoản ACTIVE tiếp tục áp dụng. API đọc review người thuê của landlord và API báo cáo của chính tenant vẫn theo nghiệp vụ hiện có.
+
+### Đồng bộ FE và audit
+
+GET /api/users/me/authorities: tài khoản đăng nhập nhận danh sách authority hiện tại từ database, gồm ROLE_* và permission code. JWT filter vốn đã nạp quyền từ database mỗi request, nên grant/revoke không chờ JWT hết hạn. FE nên đọc lại danh sách khi tải trang/quay lại ứng dụng hoặc sau thao tác phân quyền; không dùng scope cũ trong token làm nguồn duy nhất để dựng menu.
+
+GET /api/admin/role-permissions/audit?page=0&size=20: ADMIN có ROLE_PERMISSION_READ. Trả ApiResponse.data là mảng tối đa size bản ghi, mới nhất trước, gồm actor_id/actor_name, role_id/role_code, permission_id/permission_code, old_enabled, new_enabled, role_version, created_at. page từ 0, size 1–50. Chưa có API sửa/xóa audit.
+
+
+<a id="rental-api"></a>
+
+## 20. Đặt phòng và hợp đồng
+
+Các response dùng ApiResponse/PageResponse hiện có; lỗi bổ sung `errorCode` mà vẫn giữ code/message.
+
+- Public `GET /api/listings/{id}/bookable-rooms`: RoomResponse kèm bookingAvailability.
+- TENANT `POST /api/rental-requests`, `GET /api/rental-requests/my`, `POST /api/rental-requests/{id}/cancel`.
+- LANDLORD `GET /api/landlord/rental-requests` (status/propertyId/roomId/page/size), `POST .../{id}/accept`, `POST .../{id}/reject` (reason optional).
+- Party/admin `GET /api/rental-requests/{id}`, `GET /api/rental-agreements/{id}`, `GET /api/rental-agreements/{id}/pdf?download=true`.
+- TENANT `GET /api/rental-agreements/my`, `POST /api/rental-agreements/{id}/confirm`, `POST .../{id}/decline`.
+- LANDLORD `GET /api/landlord/rental-agreements`, `POST .../{id}/checkout` với handoverConfirmed=true.
+
+```json
+{
+  "listingId": "listing-uuid",
+  "roomId": "room-uuid",
+  "tenantFullName": "Tên người thuê",
+  "tenantPhone": "0912345678",
+  "tenantEmail": "tenant@example.test",
+  "tenantCitizenId": "012345678901",
+  "tenantPermanentAddress": "Địa chỉ thường trú",
+  "proposedMoveInDate": "2026-11-15",
+  "durationMonths": 12,
+  "occupantCount": 2,
+  "message": "Lời nhắn",
+  "acceptedPrivacyNotice": true
+}
+```
+
+Giá, landlord, endDate và trạng thái không nhận từ client. Accept trả RentalAgreementResponse với id/requestId/status/pdfStatus/confirmationExpiresAt; FE dùng id để mở `/hop-dong/{id}`. Confirm gửi `{ "accepted": true, "expectedPdfSha256": "hash-64-hex-cua-PDF-da-tai" }`.
+
+RentalAgreementResponse có thêm `tenantId`, `landlordId` bên cạnh `tenantName`, `landlordName` trong mọi response tạo/xem/danh sách/xác nhận/checkout. Hai ID lấy từ quan hệ hợp đồng, không suy từ tên hiển thị hoặc chủ sở hữu hiện tại của Property. FE dùng tenantId để mở `GET /api/tenants/{tenantId}/reviews`, landlordId để tạo report LANDLORD qua `POST /api/reports`; quyền xem/báo cáo vẫn được backend kiểm tra. Chủ trọ xem review nhận được qua `GET /api/landlord/reviews?type=ROOM|LANDLORD`, xem [contract Review/Report](api.md#review).
+
+
+
+<a id="listing-contact"></a>
+
+## 21. Liên hệ chủ trọ
+
+`POST /api/listings/{id}/reveal-phone` is available to guests and signed-in users.
+The response uses the normal API envelope with `data: { "phone": "..." }`.
+The phone comes from the property's landlord account and is not added to public
+listing responses. Hidden, expired and missing listings return 404.
+
+If the landlord has no phone, the endpoint returns `data: { "phone": null }`.
+A successful reveal increments `listings.contact_count` atomically, except when
+the authenticated viewer owns the listing. Missing phones and failed requests
+do not increment the counter. No database migration is needed.
+
+The detail page requests the number only after clicking the reveal button. It
+blocks duplicate clicks while loading and keeps the result when changing rooms
+within the same listing. Once revealed, the number is a `tel:` link, so calling
+does not send another reveal request. Navigating to another listing clears it.
+
+This is a total contact counter, including historical contact data. It does not
+yet represent unique visitors or a phone conversion rate. Future conversion
+reporting should define the view denominator, time window, event type and
+visitor deduplication before using the counter in a ratio.
+
+<a id="notifications"></a>
+
+## 22. Thông báo
+
+Tất cả endpoint yêu cầu access token. Backend lấy user từ JWT, không nhận user ID từ client. Response dùng `ApiResponse<T>` hiện có.
+
+- `GET /api/notifications?page=0&size=20&unreadOnly=false`: `PageResponse<NotificationResponse>`, mới nhất trước, thứ tự ổn định theo thời gian và ID. `size` từ 1 đến 100.
+- `GET /api/notifications/unread-count`: `data` là số thông báo chưa đọc.
+- `PUT /api/notifications/{id}/read`: đánh dấu đã đọc; gọi lại được; ID không thuộc tài khoản trả 404.
+- `PUT /api/notifications/read-all`: đánh dấu toàn bộ thông báo của tài khoản hiện tại đã đọc.
+
+Một mục inbox có dạng:
+
+```json
+{
+  "id": "event-uuid",
+  "type": "RENTAL_AGREEMENT",
+  "title": "Cập nhật thuê phòng",
+  "body": "Hợp đồng PDF đã sẵn sàng. Vui lòng xem và xác nhận trước hạn.",
+  "referenceType": "RENTAL_AGREEMENT",
+  "referenceId": "agreement-uuid",
+  "read": false,
+  "createdAt": "2026-11-08T10:00:00"
+}
+```
+
+Thời gian không kèm offset dùng múi giờ Việt Nam, khớp dữ liệu thuê phòng hiện có. FE hiển thị giờ Việt Nam. Swagger liệt kê API tại `/swagger-ui/index.html`.
+
+<a id="chat"></a>
+
+## 23. Chat
+
+Các endpoint `/api/chat` yêu cầu access token và kiểm tra thành viên hội thoại:
+
+| Method | Đường dẫn | Kết quả |
+| --- | --- | --- |
+| POST | `/conversations/listing/{listingId}` | Lấy hoặc tạo hội thoại từ tin PUBLISHED còn hạn; chủ trọ lấy qua Listing → Property |
+| POST | `/conversations/support` | Tenant/landlord mở hỗ trợ với tài khoản admin cố định trong seed |
+| GET | `/conversations` | `ApiResponse<List<ChatConversationResponse>>` của tài khoản hiện tại |
+| GET | `/conversations/{id}` | Chi tiết hội thoại của thành viên |
+| GET | `/conversations/{id}/messages?page=0&size=20` | `PageResponse<ChatMessageResponse>` |
+| PUT | `/conversations/{id}/read` | Đánh dấu đã đọc |
+
+STOMP kết nối `/ws`, CONNECT mang `Authorization: Bearer <access_token>`, gửi tới `/app/chat.send`, nhận tại `/user/queue/messages` và lỗi tại `/user/queue/errors`. Payload gửi gồm `conversationId`, `content`, `messageType` (mặc định TEXT); sender lấy từ principal, không nhận senderId/receiverId từ client. Database lưu tin trước khi phát realtime sau commit. Không có API tìm người hoặc tạo direct chat tùy ý trong controller hiện tại.
