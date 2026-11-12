@@ -5,12 +5,14 @@ import com.tamdaptit.rentalmanagement.common.dto.ApiResponse;
 import com.tamdaptit.rentalmanagement.common.dto.PageResponse;
 import com.tamdaptit.rentalmanagement.listing.dto.request.*;
 import com.tamdaptit.rentalmanagement.listing.dto.response.ListingResponse;
+import com.tamdaptit.rentalmanagement.listing.dto.response.ListingPriceStatisticsResponse;
 import com.tamdaptit.rentalmanagement.listing.service.ListingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.security.Principal;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/listings")
@@ -27,6 +29,17 @@ public class ListingController {
     @GetMapping("/{id}")
     public ApiResponse<ListingResponse> publishedById(@PathVariable String id) {
         return ApiResponse.success(service.getPublishedById(id));
+    }
+
+    @GetMapping("/map")
+    public ApiResponse<List<ListingResponse>> map(@Valid @ModelAttribute ListingSearchRequest request) {
+        return ApiResponse.success(service.searchPublishedMap(request));
+    }
+
+    @GetMapping("/price-statistics")
+    public ApiResponse<List<ListingPriceStatisticsResponse>> priceStatistics(
+            @RequestParam(required = false) String provinceId, @RequestParam(required = false) String wardId) {
+        return ApiResponse.success(service.priceStatistics(provinceId, wardId));
     }
 
     @GetMapping("/mine")

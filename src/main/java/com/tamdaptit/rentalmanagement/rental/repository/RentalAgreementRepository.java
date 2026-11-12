@@ -31,9 +31,20 @@ public interface RentalAgreementRepository extends JpaRepository<RentalAgreement
     @Query("select a.room.id as roomId, a.status as status from RentalAgreement a where a.room.id in :ids and a.status in :states")
     List<Occupancy> occupancy(@Param("ids") Collection<String> ids,@Param("states") Collection<RentalAgreementStatus> states);
     interface Occupancy { String getRoomId(); RentalAgreementStatus getStatus(); }
-    @EntityGraph(attributePaths={"room","room.property","tenant","landlord"})
+    @EntityGraph(attributePaths={"room","room.roomType","room.property","room.property.ward","room.property.province","tenant","landlord","rentalRequest"})
     @Query("select a from RentalAgreement a where (:owner=true and a.landlord.id=:user or :owner=false and a.tenant.id=:user)")
     Page<RentalAgreement> search(@Param("user") String user,@Param("owner") boolean owner,Pageable pageable);
+    @EntityGraph(attributePaths={"room","room.roomType","room.property","room.property.ward","room.property.province","tenant","landlord","rentalRequest"})
+    @Query("""
+        select a from RentalAgreement a where a.tenant.id=:user
+        and (:q='' or locate(lower(:q),lower(a.room.property.name))>0
+          or locate(lower(:q),lower(a.room.roomNumber))>0 or locate(lower(:q),lower(a.landlord.fullName))>0
+          or locate(lower(:q),lower(a.room.property.addressLine))>0
+          or locate(lower(:q),lower(a.room.property.ward.name))>0
+          or locate(lower(:q),lower(a.room.property.province.name))>0)
+        """)
+    Page<RentalAgreement> searchMine(String user,String q,Pageable pageable);
+    long countByTenant_Id(String user);
     @Query("select a.id from RentalAgreement a where a.status=com.tamdaptit.rentalmanagement.rental.entity.enums.RentalAgreementStatus.PENDING_CONFIRMATION and a.confirmationExpiresAt<=:now order by a.confirmationExpiresAt")
     List<String> expired(@Param("now") LocalDateTime now,Pageable limit);
     @Query("""

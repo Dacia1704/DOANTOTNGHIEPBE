@@ -77,13 +77,14 @@ class ReviewReportWorkflowTest {
         try(var c=DriverManager.getConnection(url(""),dbUser(),password());var s=c.createStatement()){
             s.execute("CREATE DATABASE `"+schema+"` CHARACTER SET utf8mb4");
         }
-        Flyway.configure().dataSource(url(schema),dbUser(),password()).load().migrate();
+        Flyway.configure().dataSource(url(schema),dbUser(),password()).target("1").load().migrate();
         context=new AnnotationConfigWebApplicationContext();
         context.setServletContext(new MockServletContext());context.register(Config.class);context.refresh();
         jdbc=context.getBean(JdbcTemplate.class);reviews=context.getBean(ReviewService.class);
         reports=context.getBean(ReportService.class);evidences=context.getBean(ReportEvidenceService.class);
         storage=context.getBean(FakeStorage.class);
         mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+        jdbc.update("INSERT INTO roles(id,code,name) VALUES('rr_admin_role','ADMIN','Admin'),('rr_tenant_role','TENANT','Tenant'),('rr_landlord_role','LANDLORD','Landlord')");
         for(String id:List.of("rr_t","rr_u","rr_l","rr_m","rr_n","rr_a","rr_b")) {
             jdbc.update("INSERT INTO users(id,email,password,full_name) VALUES(?,?,?,?)",id,id+"@review.test","test","Name "+id);
             String role=id.equals("rr_a")||id.equals("rr_b")?"ADMIN":id.equals("rr_t")||id.equals("rr_u")?"TENANT":"LANDLORD";

@@ -6,6 +6,7 @@ import com.tamdaptit.rentalmanagement.rental.dto.request.RentalAgreementConfirmR
 import com.tamdaptit.rentalmanagement.rental.dto.request.RentalCheckoutRequest;
 import com.tamdaptit.rentalmanagement.rental.dto.response.RentalRequestResponse;
 import com.tamdaptit.rentalmanagement.rental.dto.response.RentalAgreementResponse;
+import com.tamdaptit.rentalmanagement.rental.dto.response.RentalSummaryResponse;
 import com.tamdaptit.rentalmanagement.rental.entity.enums.RentalRequestStatus;
 import java.util.Map;
 
@@ -24,6 +25,9 @@ public interface RentalService {
     PageResponse<RentalRequestResponse> requests(String user, boolean owner, int page, int size,
             RentalRequestStatus status, String property, String room);
     PageResponse<RentalAgreementResponse> agreements(String user, boolean owner, int page, int size);
+    PageResponse<RentalRequestResponse> myRequests(String user,int page,int size,RentalRequestStatus status,String q,String sort);
+    PageResponse<RentalAgreementResponse> myAgreements(String user,int page,int size,String q,String sort);
+    RentalSummaryResponse mySummary(String user);
     Map<String, String> readSnapshot(String snapshot);
 
     record PdfReference(String publicId, String hash, String code) {}

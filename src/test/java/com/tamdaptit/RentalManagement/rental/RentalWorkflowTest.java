@@ -59,7 +59,12 @@ class RentalWorkflowTest {
     @BeforeAll static void start() throws Exception {
         schema="rental_test_"+UUID.randomUUID().toString().replace("-","");
         try(var c=DriverManager.getConnection(url(""),dbUser(),password());var s=c.createStatement()){s.execute("CREATE DATABASE `"+schema+"` CHARACTER SET utf8mb4");}
-        Flyway.configure().dataSource(url(schema),dbUser(),password()).load().migrate();
+        Flyway.configure().dataSource(url(schema),dbUser(),password()).target("1").load().migrate();
+        try (var c=DriverManager.getConnection(url(schema),dbUser(),password())) {
+            for (String migration : List.of("V6__notification_delivery.sql", "V7__role_permission_management.sql", "V8__nearby_places.sql"))
+                org.springframework.jdbc.datasource.init.ScriptUtils.executeSqlScript(c,
+                        new org.springframework.core.io.ClassPathResource("db/migration/"+migration));
+        }
         context=new AnnotationConfigWebApplicationContext(); context.setServletContext(new MockServletContext());context.register(Config.class);context.refresh();
         jdbc=context.getBean(JdbcTemplate.class);service=context.getBean(RentalService.class);clock=context.getBean(TestClock.class);
         storage=context.getBean(FakeStorage.class);worker=context.getBean(RentalPdfWorker.class);
@@ -83,6 +88,56 @@ class RentalWorkflowTest {
     }
     RentalRequestCreateRequest body(String room){return new RentalRequestCreateRequest("l",room,"Nguyễn Văn A","0912345678","tenant@example.test","012345678901","Hà Nội, Việt Nam",LocalDate.of(2026,11,15),12,2,"Tôi muốn thuê",true);}
     RentalRequestResponse create(String tenant){return service.create(tenant,body("r"));}
+    @Test void tenantFeedFiltersAcrossPagesCountsOnlyOwnDataAndReturnsCardInformation() throws Exception {
+        var first=create("a");
+        var second=service.create("a",body("r2"));
+        create("b");
+        jdbc.update("UPDATE rental_requests SET created_at='2026-10-27 10:00:00' WHERE id=?",first.id());
+        jdbc.update("UPDATE rental_requests SET created_at='2026-10-28 10:00:00' WHERE id=?",second.id());
+        service.cancelRequest("a",second.id(),false,"Người thuê hủy yêu cầu");
+        service.accept("owner",first.id());
+        var summary=service.mySummary("a");
+        assertEquals(2,summary.totalRequests()); assertEquals(1,summary.totalAgreements());
+        assertEquals(1L,summary.statuses().get("ACCEPTED")); assertEquals(1L,summary.statuses().get("CANCELLED"));
+        assertEquals(0L,summary.statuses().get("PENDING"));
+        assertEquals(1,service.mySummary("b").totalRequests());
+        var filtered=service.myRequests("a",0,1,com.tamdaptit.rentalmanagement.rental.entity.enums.RentalRequestStatus.CANCELLED,"Phường A","newest");
+        assertEquals(1,filtered.getTotalElements()); assertEquals(second.id(),filtered.getData().getFirst().id());
+        assertEquals("123 Đường A, Phường A, Hà Nội",filtered.getData().getFirst().card().fullAddress());
+        assertEquals("Chủ Trọ",filtered.getData().getFirst().card().landlordName());
+        assertNull(filtered.getData().getFirst().tenantPhone()); assertNull(filtered.getData().getFirst().roomDetails());
+        assertEquals(first.id(),service.myRequests("a",0,1,null,"","oldest").getData().getFirst().id());
+        assertEquals(0,service.myRequests("a",0,10,null,"%","newest").getTotalElements());
+        var contracts=service.myAgreements("a",0,10,"Nhà trọ A","newest");
+        assertEquals(1,contracts.getTotalElements()); assertNotNull(contracts.getData().getFirst().card());
+        assertEquals(0,service.myAgreements("b",0,10,"","newest").getTotalElements());
+        mvc.perform(get("/api/rental-requests/my").param("status","CANCELLED").param("q","A102").with(user("a").roles("TENANT")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.data[0].card.price").value(3200000));
+        mvc.perform(get("/api/rental-requests/my/summary").with(user("a").roles("TENANT")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalRequests").value(2));
+        assertThrows(AppException.class,()->service.myRequests("a",0,10,null,"","unsupported"));
+    }
+    @Test void requestDetailsRemainPrivateForHiddenListingsAndUseAgreedPrices() {
+        var request=create("a");
+        jdbc.update("UPDATE properties SET latitude=21.01,longitude=105.84 WHERE id='prop'");
+        jdbc.update("UPDATE listings SET status='HIDDEN' WHERE id='l'");
+        var detail=service.request("a",request.id(),false);
+        assertEquals("123 Đường A, Phường A, Hà Nội",detail.roomDetails().fullAddress());
+        assertEquals(0,new java.math.BigDecimal("21.01").compareTo(detail.roomDetails().latitude()));
+        assertEquals("CURRENT_ROOM",detail.roomDetails().priceSource());
+        assertEquals(0,new java.math.BigDecimal("3000000").compareTo(detail.roomDetails().price()));
+        assertEquals("********8901",detail.maskedCitizenId());
+        assertEquals(ErrorCode.NOT_AGREEMENT_PARTY,assertThrows(AppException.class,
+                ()->service.request("other",request.id(),false)).getErrorCode());
+        assertNull(service.requests("a",false,0,10,null,null,null).getData().getFirst().roomDetails());
+        jdbc.update("UPDATE listings SET status='PUBLISHED' WHERE id='l'");
+        service.accept("owner",request.id());
+        jdbc.update("UPDATE rooms SET price=9900000 WHERE id='r'");
+        var accepted=service.request("a",request.id(),false);
+        assertEquals("AGREEMENT",accepted.roomDetails().priceSource());
+        assertEquals(0,new java.math.BigDecimal("3000000").compareTo(accepted.roomDetails().price()));
+    }
     RentalAgreementResponse accept(String tenant){return service.accept("owner",create(tenant).id());}
     String scalar(String sql){return jdbc.queryForObject(sql,String.class);}
     void parallel(Callable<?> first,Callable<?> second) throws Exception {

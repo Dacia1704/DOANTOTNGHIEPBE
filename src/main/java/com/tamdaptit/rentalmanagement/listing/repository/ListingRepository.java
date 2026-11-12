@@ -3,6 +3,7 @@ package com.tamdaptit.rentalmanagement.listing.repository;
 import java.math.BigDecimal;
 import com.tamdaptit.rentalmanagement.room.entity.enums.RoomRentalStatus;
 import com.tamdaptit.rentalmanagement.listing.entity.Listing;
+import com.tamdaptit.rentalmanagement.listing.dto.response.ListingPriceStatisticsResponse;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -21,6 +22,24 @@ import java.util.List;
 import java.util.Optional;
 @Repository
 public interface ListingRepository extends JpaRepository<Listing, String> {
+    String PRICE_STATISTICS_FROM = """
+            from Room r join r.property p join p.province province join p.ward ward
+            where r.price > 0 and r.rentalStatus = 'AVAILABLE'
+            and exists (select l.id from Listing l where l.property = p and
+            """ + ListingRepository.PUBLIC_CONDITION + ") ";
+
+    @Query("select new com.tamdaptit.rentalmanagement.listing.dto.response.ListingPriceStatisticsResponse("
+            + "province.id, province.name, avg(r.price), count(r.id)) " + PRICE_STATISTICS_FROM
+            + "group by province.id, province.name order by count(r.id) desc, province.name")
+    List<ListingPriceStatisticsResponse> priceStatisticsByProvince(
+            @Param("time") LocalDateTime time);
+
+    @Query("select new com.tamdaptit.rentalmanagement.listing.dto.response.ListingPriceStatisticsResponse("
+            + "ward.id, ward.name, avg(r.price), count(r.id)) " + PRICE_STATISTICS_FROM
+            + "and province.id = :provinceId and (:wardId is null or ward.id = :wardId) "
+            + "group by ward.id, ward.name order by count(r.id) desc, ward.name")
+    List<ListingPriceStatisticsResponse> priceStatisticsByWard(
+            @Param("time") LocalDateTime time, @Param("provinceId") String provinceId, @Param("wardId") String wardId);
     @Query("""
             select l from Listing l join fetch l.property p join fetch p.landlord
             where l.id = :id and l.status = 'PUBLISHED' and l.expiresAt > :time

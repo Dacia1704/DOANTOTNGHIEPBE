@@ -1039,3 +1039,96 @@ CREATE TABLE listing_search_history (
 
     INDEX IX_lsh_user_created (user_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+-- Consolidated schema evolution (fresh database only).
+ALTER TABLE room_reviews
+    MODIFY is_hidden TINYINT(1) NOT NULL DEFAULT 0,
+    ADD hidden_at DATETIME NULL,
+    ADD hidden_reason VARCHAR(500) NULL,
+    ADD INDEX ix_room_review_visible (room_id, is_hidden, created_at, id);
+
+ALTER TABLE landlord_reviews
+    MODIFY is_hidden TINYINT(1) NOT NULL DEFAULT 0,
+    ADD hidden_at DATETIME NULL,
+    ADD hidden_reason VARCHAR(500) NULL,
+    ADD INDEX ix_landlord_review_visible (landlord_id, is_hidden, created_at, id);
+
+ALTER TABLE tenant_reviews
+    MODIFY is_hidden TINYINT(1) NOT NULL DEFAULT 0,
+    ADD hidden_at DATETIME NULL,
+    ADD hidden_reason VARCHAR(500) NULL,
+    ADD INDEX ix_tenant_review_visible (tenant_id, is_hidden, created_at, id);
+
+ALTER TABLE reports
+    ADD CONSTRAINT chk_report_target CHECK (listing_id IS NOT NULL OR landlord_id IS NOT NULL),
+    ADD INDEX ix_report_status_created (status, created_at, id),
+    ADD INDEX ix_report_tenant_created (tenant_id, created_at, id),
+    ADD INDEX ix_report_tenant_listing_status (tenant_id, listing_id, status),
+    ADD INDEX ix_report_tenant_landlord_status (tenant_id, landlord_id, status);
+
+ALTER TABLE room_reviews DROP FOREIGN KEY fk_rrev_agreement,
+    ADD CONSTRAINT fk_rrev_agreement_history FOREIGN KEY (rental_agreement_id) REFERENCES rental_agreements(id) ON DELETE RESTRICT;
+
+ALTER TABLE landlord_reviews DROP FOREIGN KEY fk_lrev_agreement,
+    ADD CONSTRAINT fk_lrev_agreement_history FOREIGN KEY (rental_agreement_id) REFERENCES rental_agreements(id) ON DELETE RESTRICT;
+
+ALTER TABLE tenant_reviews DROP FOREIGN KEY fk_trev_agreement,
+    ADD CONSTRAINT fk_trev_agreement_history FOREIGN KEY (rental_agreement_id) REFERENCES rental_agreements(id) ON DELETE RESTRICT;
+
+ALTER TABLE room_reviews DROP FOREIGN KEY fk_rrev_room,
+    ADD CONSTRAINT fk_rrev_room_history FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE RESTRICT;
+
+ALTER TABLE reports DROP FOREIGN KEY fk_rep_listing,
+    ADD CONSTRAINT fk_rep_listing_history FOREIGN KEY (listing_id) REFERENCES listings(id) ON DELETE RESTRICT;
+
+
+-- Consolidated schema evolution (fresh database only).
+ALTER TABLE listings
+    ADD COLUMN posting_quota_period_id varchar(36) NULL,
+    ADD COLUMN posting_quota_consumed boolean NOT NULL DEFAULT FALSE,
+    ADD COLUMN priority_quota_period_id varchar(36) NULL,
+    ADD COLUMN consumed_priority_levels int NOT NULL DEFAULT 0,
+    ADD KEY ix_listing_posting_quota (posting_quota_period_id, posting_quota_consumed),
+    ADD KEY ix_listing_priority_quota (priority_quota_period_id, consumed_priority_levels),
+    ADD CONSTRAINT fk_listing_posting_quota_period FOREIGN KEY (posting_quota_period_id)
+        REFERENCES service_subscription_periods(id) ON DELETE RESTRICT,
+    ADD CONSTRAINT fk_listing_consumed_priority_period FOREIGN KEY (priority_quota_period_id)
+        REFERENCES service_subscription_periods(id) ON DELETE RESTRICT,
+    ADD CONSTRAINT chk_listing_consumed_priority CHECK (
+        (consumed_priority_levels = 0 AND priority_quota_period_id IS NULL)
+        OR (consumed_priority_levels BETWEEN 1 AND 3 AND priority_quota_period_id IS NOT NULL));
+
+ALTER TABLE boost_allocations
+    ADD COLUMN active boolean NOT NULL DEFAULT TRUE,
+    ADD UNIQUE KEY uq_boost_allocation_consumption (listing_id, boost_subscription_id, priority_level);
+
+ALTER TABLE boost_allocations DROP INDEX uq_boost_allocation_listing;
+
+ALTER TABLE boost_allocations
+    ADD COLUMN active_listing_id varchar(36) GENERATED ALWAYS AS (CASE WHEN active THEN listing_id ELSE NULL END) VIRTUAL,
+    ADD UNIQUE KEY uq_boost_allocation_active_listing (active_listing_id);
+
+
+-- Consolidated schema evolution (fresh database only).
+ALTER TABLE listings ADD COLUMN initial_review boolean NOT NULL DEFAULT FALSE;
+
+
+-- Consolidated schema evolution (fresh database only).
+ALTER TABLE provinces
+    ADD COLUMN centroid_lat DECIMAL(10,8) NULL,
+    ADD COLUMN centroid_lng DECIMAL(11,8) NULL,
+    ADD CONSTRAINT ck_province_centroid CHECK (
+        (centroid_lat IS NULL AND centroid_lng IS NULL) OR
+        (centroid_lat IS NOT NULL AND centroid_lng IS NOT NULL
+         AND centroid_lat BETWEEN -90 AND 90 AND centroid_lng BETWEEN -180 AND 180)
+    );
+
+ALTER TABLE wards
+    ADD COLUMN centroid_lat DECIMAL(10,8) NULL,
+    ADD COLUMN centroid_lng DECIMAL(11,8) NULL,
+    ADD CONSTRAINT ck_ward_centroid CHECK (
+        (centroid_lat IS NULL AND centroid_lng IS NULL) OR
+        (centroid_lat IS NOT NULL AND centroid_lng IS NOT NULL
+         AND centroid_lat BETWEEN -90 AND 90 AND centroid_lng BETWEEN -180 AND 180)
+    );

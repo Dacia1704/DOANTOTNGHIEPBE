@@ -1,11 +1,13 @@
-# Rental Management backend
+# RentalManagement — backend
 
-Java 21 / Spring Boot / MySQL 8. Run infrastructure with the existing Docker configuration, then start the backend with `./mvnw.cmd spring-boot:run`. Flyway applies versioned migrations; Hibernate uses `ddl-auto=validate`.
+Java/Spring Boot backend cho hệ thống cho thuê trọ. Khởi chạy cả FE/BE/AI, cấu hình môi trường và seed: [hướng dẫn hệ thống](../AIService/README.md).
 
-- [Đặt phòng và hợp đồng PDF: flow, API, cấu hình, migration, kiểm thử](docs/RENTAL_BOOKING.md)
-- [Property/Room API](docs/PROPERTY_API.md)
-- [Redis cache và thông báo RabbitMQ: BE, FE, cấu hình, API và kiểm thử](docs/REDIS_RABBITMQ_NOTIFICATIONS.md)
-- [Quy ước controller/service và đối chiếu bảng với entity](docs/BE_ARCHITECTURE_AND_DATABASE.md)
-- [Dữ liệu demo V2](docs/SEED_V15.md)
+| Tài liệu | Nội dung |
+| --- | --- |
+| [API chung BE/FE](docs/api.md) | Request/response, phân quyền, Property, Listing, gói/Boost, thuê/PDF, review/report, chat và thông báo |
+| [Nghiệp vụ và dữ liệu](docs/BUSINESS.md) | Quan hệ domain, lượt đăng, snapshot gói, transaction/khóa, worker PDF |
+| [Vận hành và kiểm thử](docs/OPERATIONS.md) | Migration hiện tại, VNPay/IPN, Redis/RabbitMQ và integration tests |
+| [Quy tắc phát triển](docs/RULE.md) | Controller/service, database và phạm vi thay đổi |
+| [Giao diện FE](../DOANTOTNGHIEPFE/docs/UI.md) | Màn hình, bản đồ, contract PDF và smoke test |
 
-Frontend Angular lives in `../DOANTOTNGHIEPFE`. Do not use the listing/boost payment module for room booking.
+API chỉ duy trì tại docs/api.md của backend; frontend liên kết tới đây. Cập nhật nội dung vào tài liệu theo chủ đề, không tạo thêm báo cáo task/kế hoạch đã triển khai trong src.
