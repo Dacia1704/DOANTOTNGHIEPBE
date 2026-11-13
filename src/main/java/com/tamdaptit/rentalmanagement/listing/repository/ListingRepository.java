@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 @Repository
 public interface ListingRepository extends JpaRepository<Listing, String> {
+    List<Listing> findAllByProperty_Landlord_IdOrderByCreatedAtDesc(String landlordId);
     String PRICE_STATISTICS_FROM = """
             from Room r join r.property p join p.province province join p.ward ward
             where r.price > 0 and r.rentalStatus = 'AVAILABLE'
@@ -42,7 +43,7 @@ public interface ListingRepository extends JpaRepository<Listing, String> {
             @Param("time") LocalDateTime time, @Param("provinceId") String provinceId, @Param("wardId") String wardId);
     @Query("""
             select l from Listing l join fetch l.property p join fetch p.landlord
-            where l.id = :id and l.status = 'PUBLISHED' and l.expiresAt > :time
+            where l.id = :id and l.status = 'PUBLISHED' and l.property.landlord.status = 'ACTIVE' and l.expiresAt > :time
             """)
     Optional<Listing> findPublishedContact(@Param("id") String id, @Param("time") LocalDateTime time);
 
@@ -56,7 +57,7 @@ public interface ListingRepository extends JpaRepository<Listing, String> {
     @Query("select count(l)>0 from Listing l where l.property.landlord.id=:landlordId and " + PUBLIC_CONDITION)
     boolean hasPublicListing(@Param("landlordId") String landlordId, @Param("time") LocalDateTime time);
     String EFFECTIVE_PRIORITY = """
-            case when exists (select a.id from BoostAllocation a join a.subscription b
+            case when l.prioritySuppressed = true then 0 when exists (select a.id from BoostAllocation a join a.subscription b
                 where a.listing = l and a.active = true and a.priorityLevel = 2 and b.status = 'ACTIVE' and b.startAt <= :time and b.endAt > :time) then 2
             when exists (select p.id from ServiceSubscriptionPeriod p where p.subscription.landlord = l.property.landlord
                 and p.subscription.status in ('ACTIVE','SCHEDULED') and p.startAt <= :time and p.endAt > :time
@@ -81,7 +82,7 @@ public interface ListingRepository extends JpaRepository<Listing, String> {
     List<Listing> findByProperty_Landlord_Id(String landlordId);
 
     String PUBLIC_CONDITION = """
-            l.status = 'PUBLISHED' and l.expiresAt > :time
+            l.status = 'PUBLISHED' and l.property.landlord.status = 'ACTIVE' and l.expiresAt > :time
             and not exists (select newer.id from Listing newer where newer.property = l.property
                 and newer.status = 'PUBLISHED' and newer.expiresAt > :time
                 and (newer.publishedAt > l.publishedAt or (newer.publishedAt = l.publishedAt and newer.id > l.id)))

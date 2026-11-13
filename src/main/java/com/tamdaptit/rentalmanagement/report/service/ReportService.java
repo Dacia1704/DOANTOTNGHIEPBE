@@ -5,6 +5,7 @@ import com.tamdaptit.rentalmanagement.report.dto.response.*;
 import com.tamdaptit.rentalmanagement.report.entity.enums.*;
 import java.util.*;
 public interface ReportService {
+    ReportListingResponse listingDetail(String actor,String reportId,String listingId);
     List<ReportReason> reasons(ReportTargetType type);
     ReportResponse create(String actor,ReportCreateRequest body);
     PageResponse<ReportResponse> mine(String actor,ReportStatus status,int page,int size);
@@ -14,4 +15,5 @@ public interface ReportService {
     ReportResponse assign(String actor,String id);
     ReportResponse close(String actor,String id,ReportStatus outcome,ReportResolutionRequest body);
     void checkUpload(String actor,String id);
+    ReportSanctionOptionsResponse sanctionOptions(String actor,String id);
 }

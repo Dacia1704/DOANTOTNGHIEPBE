@@ -1584,21 +1584,26 @@ in `api.md`; the adapter does not duplicate their business logic.
 - Tối đa 5 ảnh JPEG/PNG, mỗi ảnh tối đa 5 MiB, chiều rộng và chiều cao không quá 4.096 px. BE kiểm tra nội dung ảnh thực.
 - Tạo report trước bằng JSON, sau đó upload từng ảnh qua multipart field `file`. Chỉ bổ sung ảnh khi báo cáo còn `PENDING`; hiện chưa có API xóa ảnh, sửa/hủy hoặc mở lại báo cáo.
 - Nội dung minh chứng là dữ liệu riêng tư: tải bằng HttpClient có Bearer token dưới dạng Blob, tạo object URL để hiển thị và thu hồi khi đóng/chuyển trang. Không gắn trực tiếp URL API vào `<img>` vì interceptor không chạy cho request ảnh của trình duyệt.
-- API resolve/reject chỉ ghi nhận kết quả báo cáo và thông báo cho tenant; không tự ẩn tin, khóa tài khoản hay ẩn review.
+- Phê duyệt (`RESOLVED`) tăng số báo cáo được xác nhận của chủ trọ: lần 1 gửi cảnh báo; lần 2 ẩn tin bị báo cáo và đưa ưu tiên các tin còn lại của chủ trọ về 0; từ lần 3 khóa tài khoản. Từ chối không tăng số lần. Xem [chi tiết xử lý vi phạm](REPORT_SANCTIONS.md).
 
 Tất cả đường dẫn có tiền tố `/api`.
 
 - `GET /reports/reasons?targetType=LISTING|LANDLORD`.
-- `POST /reports`, body `{targetType, targetId, reasonCode, description}`.
+- `POST /reports`, body `{targetType, targetId, reasonCode, description, originListingId?, rentalAgreementId?}`. Với `LANDLORD`, gửi ID hợp đồng để BE lấy tin gốc qua yêu cầu thuê; hoặc gửi ID tin gốc đã biết. Tin gốc có thể đã ẩn/hết hạn, phải thuộc chủ trọ được báo cáo. Nếu gửi cả hai, ngữ cảnh phải khớp. Hợp đồng phải thuộc tenant đang đăng nhập, đúng chủ trọ và đã xác nhận.
 - `GET /reports/mine?status=...&page=0&size=10`.
 - `GET /reports/{id}` cho tác giả hoặc admin.
 - `POST /reports/{id}/evidences`, multipart `file`; `GET /reports/{id}/evidences/{evidenceId}/content`, response Blob.
 - `GET /admin/reports?status=...&reasonCode=...&page=0&size=10`.
 - `GET /admin/reports/summary`.
 - `POST /admin/reports/{id}/assign` nhận xử lý cho chính admin đang đăng nhập, không phải chọn người khác.
-- `POST /admin/reports/{id}/resolve` hoặc `/reject`, body `{resolutionNote}`.
+- `GET /admin/reports/{id}/sanction-options`: mức xử lý kế tiếp và danh sách tin thuộc chủ trọ bị báo cáo; yêu cầu `REPORT_READ`, `REPORT_HANDLE` và đúng người nhận xử lý.
+- `GET /admin/reports/{id}/listings/{listingId}`: đọc chi tiết tin trong phạm vi báo cáo, bao gồm tin ẩn/hết hạn; yêu cầu `REPORT_READ`. Trả `ReportListingResponse`, không dùng API tin công khai. Tin ngoài phạm vi trả 404.
+- `POST /admin/reports/{id}/resolve`, body `{resolutionNote, relatedListingId?}`. Ở mức 2, BE dùng tin gốc đã lưu, không cho đổi sang tin khác. Báo cáo `LANDLORD` cũ thiếu tin gốc mới bắt buộc chọn `relatedListingId` thuộc chủ trọ đó.
+- `POST /admin/reports/{id}/reject`, body `{resolutionNote}`.
 
-Report detail trả `{report, evidences}`; nội dung ảnh trả Blob qua API có token. Các API quản trị đọc/summary yêu cầu `REPORT_READ`, assign/resolve/reject yêu cầu `REPORT_HANDLE` và kiểm tra người nhận xử lý.
+Report response bổ sung `warningLevel` (0–3), `sanctionAction` (`NONE`, `WARNING`, `HIDE_LISTING_AND_SUPPRESS_PRIORITY`, `BLOCK_ACCOUNT`) và `sanctionedListingId` (tin thực tế bị xử lý ở mức 2).
+
+Report response có thêm `originListingId` (nullable), độc lập `targetType`/`targetId`. Report detail trả `{report, evidences, originListing, sanctionedListing}`; hai trường tin là `ReportListingResponse` hoặc null, gồm `id`, `title`, `description`, `status`, `publishedAt`, `expiresAt`, `propertyId`, `propertyName`, `addressLine`, `wardName`, `provinceName`, `landlordId`. Đây là dữ liệu hiện tại của tin, không phải snapshot nội dung tại thời điểm báo cáo. Tác giả được xem chi tiết tin gắn trong báo cáo của mình; API đọc tin bất kỳ trong phạm vi báo cáo chỉ dành cho người có `REPORT_READ`. Nội dung ảnh trả Blob qua API có token. Các API quản trị đọc/summary yêu cầu `REPORT_READ`, assign/resolve/reject yêu cầu `REPORT_HANDLE` và kiểm tra người nhận xử lý.
 
 
 <a id="property-api"></a>
