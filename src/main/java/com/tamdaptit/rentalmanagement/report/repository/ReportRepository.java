@@ -9,6 +9,8 @@ import org.springframework.data.repository.query.Param;
 import java.util.*;
 
 public interface ReportRepository extends JpaRepository<Report,String>, JpaSpecificationExecutor<Report> {
+    @Query("select r.landlord.id from Report r where r.id=:id")
+    Optional<String> landlordId(@Param("id") String id);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from Report r where r.id=:id")
     Optional<Report> lock(@Param("id") String id);
@@ -17,7 +19,7 @@ public interface ReportRepository extends JpaRepository<Report,String>, JpaSpeci
     boolean existsByTenant_IdAndLandlord_IdAndListingIsNullAndStatusIn(String tenantId,String landlordId,Collection<ReportStatus> statuses);
 
     @Override
-    @EntityGraph(attributePaths={"tenant","landlord","listing","handledBy"})
+    @EntityGraph(attributePaths={"tenant","landlord","listing","originListing","handledBy"})
     Page<Report> findAll(Specification<Report> spec,Pageable pageable);
 
     @Query("select r.status as status,count(r) as total from Report r group by r.status")

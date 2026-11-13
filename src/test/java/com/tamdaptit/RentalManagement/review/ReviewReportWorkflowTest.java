@@ -78,6 +78,19 @@ class ReviewReportWorkflowTest {
             s.execute("CREATE DATABASE `"+schema+"` CHARACTER SET utf8mb4");
         }
         Flyway.configure().dataSource(url(schema),dbUser(),password()).target("1").load().migrate();
+        // Keep demo data out of the fixture, but apply every schema migration after V2.
+        try(var connection=DriverManager.getConnection(url(schema),dbUser(),password())) {
+            org.springframework.jdbc.datasource.init.ScriptUtils.executeSqlScript(connection,
+                new org.springframework.core.io.ClassPathResource("db/migration/V6__notification_delivery.sql"));
+            org.springframework.jdbc.datasource.init.ScriptUtils.executeSqlScript(connection,
+                new org.springframework.core.io.ClassPathResource("db/migration/V7__role_permission_management.sql"));
+            org.springframework.jdbc.datasource.init.ScriptUtils.executeSqlScript(connection,
+                new org.springframework.core.io.ClassPathResource("db/migration/V8__nearby_places.sql"));
+            org.springframework.jdbc.datasource.init.ScriptUtils.executeSqlScript(connection,
+                new org.springframework.core.io.ClassPathResource("db/migration/V9__report_sanctions.sql"));
+            org.springframework.jdbc.datasource.init.ScriptUtils.executeSqlScript(connection,
+                new org.springframework.core.io.ClassPathResource("db/migration/V10__report_origin_listing.sql"));
+        }
         context=new AnnotationConfigWebApplicationContext();
         context.setServletContext(new MockServletContext());context.register(Config.class);context.refresh();
         jdbc=context.getBean(JdbcTemplate.class);reviews=context.getBean(ReviewService.class);
@@ -85,6 +98,10 @@ class ReviewReportWorkflowTest {
         storage=context.getBean(FakeStorage.class);
         mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
         jdbc.update("INSERT INTO roles(id,code,name) VALUES('rr_admin_role','ADMIN','Admin'),('rr_tenant_role','TENANT','Tenant'),('rr_landlord_role','LANDLORD','Landlord')");
+        for(String code:List.of("USER_READ","USER_MANAGE","REVIEW_READ","REVIEW_MODERATE","REPORT_READ","REPORT_HANDLE","ROLE_PERMISSION_READ","ROLE_PERMISSION_MANAGE")) {
+            jdbc.update("INSERT INTO permissions(id,code,name) SELECT ?,?,? WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE code=?)",UUID.randomUUID().toString(),code,code,code);
+            jdbc.update("INSERT INTO role_permissions(id,role_id,permission_id) SELECT UUID(),'rr_admin_role',id FROM permissions WHERE code=?",code);
+        }
         for(String id:List.of("rr_t","rr_u","rr_l","rr_m","rr_n","rr_a","rr_b")) {
             jdbc.update("INSERT INTO users(id,email,password,full_name) VALUES(?,?,?,?)",id,id+"@review.test","test","Name "+id);
             String role=id.equals("rr_a")||id.equals("rr_b")?"ADMIN":id.equals("rr_t")||id.equals("rr_u")?"TENANT":"LANDLORD";
@@ -101,7 +118,7 @@ class ReviewReportWorkflowTest {
             "notification_outbox","notifications","rental_events","rental_pdf_assets","rental_agreements","rental_requests","listings","rooms","properties")) {
             jdbc.update("DELETE FROM "+table);
         }
-        jdbc.update("UPDATE users SET status='ACTIVE' WHERE id LIKE 'rr_%'");
+        jdbc.update("UPDATE users SET status='ACTIVE',confirmed_report_count=0,auth_version=0 WHERE id LIKE 'rr_%'");
         storage.assets.clear();storage.fail=false;storage.onUpload=()->{};
         jdbc.update("""
             INSERT INTO properties(id,landlord_id,property_type_id,name,rental_mode,province_id,ward_id,address_line)
@@ -634,6 +651,136 @@ class ReviewReportWorkflowTest {
             assertFalse(access.authorities("rr_n").contains("REVIEW_MODERATE"));
             assertEquals(current.version(),access.matrix("rr_a").roles().stream().filter(r->r.id().equals(role.id())).findFirst().orElseThrow().version());
         } finally {jdbc.execute("DROP TRIGGER rbac_fail_audit");}
+    }
+
+    @Test void approvedReportsWarnThenHideReportedListingAndSuppressOwnersListingsThenBlockOwner() throws Exception {
+        String first=listingReport();
+        String second=reports.create("rr_u",report(ReportTargetType.LISTING,"rr_listing")).id();
+        String third=reports.create("rr_t",report(ReportTargetType.LANDLORD,"rr_l")).id();
+        jdbc.update("INSERT INTO listings(id,property_id,title,status,published_at,expires_at,priority_level) VALUES('rr_spare','rr_p1','Spare','PUBLISHED','2026-09-01','2028-01-01',1)");
+        jdbc.update("UPDATE listings SET priority_level=2 WHERE id='rr_listing2'");
+        reports.assign("rr_a",first);
+        var warned=reports.close("rr_a",first,ReportStatus.RESOLVED,new ReportResolutionRequest("Confirmed"));
+        assertEquals(1,warned.warningLevel());assertEquals("WARNING",warned.sanctionAction());
+        assertEquals("PUBLISHED",jdbc.queryForObject("SELECT status FROM listings WHERE id='rr_listing'",String.class));
+        assertEquals(1,jdbc.queryForObject("SELECT priority_level FROM listings WHERE id='rr_spare'",Integer.class));
+        reports.assign("rr_a",second);
+        var hidden=reports.close("rr_a",second,ReportStatus.RESOLVED,new ReportResolutionRequest("Confirmed again"));
+        assertEquals(2,hidden.warningLevel());assertEquals("rr_listing",hidden.sanctionedListingId());
+        assertEquals("HIDDEN",jdbc.queryForObject("SELECT status FROM listings WHERE id='rr_listing'",String.class));
+        assertEquals(1,jdbc.queryForObject("SELECT priority_suppressed FROM listings WHERE id='rr_listing'",Integer.class));
+        assertEquals(0,jdbc.queryForObject("SELECT priority_level FROM listings WHERE id='rr_listing'",Integer.class));
+        assertEquals("PUBLISHED",jdbc.queryForObject("SELECT status FROM listings WHERE id='rr_spare'",String.class));
+        assertEquals(0,jdbc.queryForObject("SELECT priority_level FROM listings WHERE id='rr_spare'",Integer.class));
+        assertEquals(1,jdbc.queryForObject("SELECT priority_suppressed FROM listings WHERE id='rr_spare'",Integer.class));
+        assertEquals("PUBLISHED",jdbc.queryForObject("SELECT status FROM listings WHERE id='rr_listing2'",String.class));
+        assertEquals(2,jdbc.queryForObject("SELECT priority_level FROM listings WHERE id='rr_listing2'",Integer.class));
+        assertEquals(0,jdbc.queryForObject("SELECT priority_suppressed FROM listings WHERE id='rr_listing2'",Integer.class));
+        reports.assign("rr_a",third);
+        String token=new TransactionTemplate(context.getBean(PlatformTransactionManager.class)).execute(status->
+            context.getBean(JwtTokenService.class).generateAccessToken(context.getBean(UserRepository.class)
+                .findByIdWithRolesAndPermissions("rr_l").orElseThrow()));
+        var blocked=reports.close("rr_a",third,ReportStatus.RESOLVED,new ReportResolutionRequest("Third violation"));
+        assertEquals(3,blocked.warningLevel());assertEquals("BLOCK_ACCOUNT",blocked.sanctionAction());
+        assertEquals("BLOCKED",jdbc.queryForObject("SELECT status FROM users WHERE id='rr_l'",String.class));
+        assertEquals(3,jdbc.queryForObject("SELECT confirmed_report_count FROM users WHERE id='rr_l'",Integer.class));
+        mvc.perform(get("/api/users/me/authorities").header("Authorization","Bearer "+token)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/listings/rr_spare/reviews")).andExpect(status().isNotFound());
+        error(REPORT_INVALID_TRANSITION,()->reports.close("rr_a",third,ReportStatus.RESOLVED,new ReportResolutionRequest("Retry")));
+        assertEquals(3,jdbc.queryForObject("SELECT confirmed_report_count FROM users WHERE id='rr_l'",Integer.class));
+    }
+    @Test void rejectingReportDoesNotPunishAndFailedSanctionRollsBack() {
+        String rejected=listingReport();
+        reports.assign("rr_a",rejected);
+        var result=reports.close("rr_a",rejected,ReportStatus.REJECTED,new ReportResolutionRequest("Insufficient evidence"));
+        assertEquals(0,result.warningLevel());assertEquals("NONE",result.sanctionAction());
+        String id=listingReport();reports.assign("rr_a",id);
+        jdbc.update("UPDATE listings SET priority_level=1 WHERE id='rr_listing'");
+        jdbc.update("UPDATE users SET confirmed_report_count=1 WHERE id='rr_l'");
+        var options=reports.sanctionOptions("rr_a",id);
+        assertEquals(2,options.nextWarningLevel());
+        assertEquals(List.of("rr_listing"),options.listings().stream().map(l->l.id()).toList());
+        error(REPORT_NOT_ASSIGNED_TO_YOU,()->reports.sanctionOptions("rr_b",id));
+        jdbc.execute("CREATE TRIGGER rr_fail_sanction BEFORE INSERT ON notification_outbox FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Simulated sanction notification failure'");
+        try {
+            assertThrows(org.springframework.dao.DataAccessException.class,()->reports.close("rr_a",id,ReportStatus.RESOLVED,new ReportResolutionRequest("Confirmed")));
+            assertEquals(1,jdbc.queryForObject("SELECT confirmed_report_count FROM users WHERE id='rr_l'",Integer.class));
+            assertEquals("PUBLISHED",jdbc.queryForObject("SELECT status FROM listings WHERE id='rr_listing'",String.class));
+            assertEquals(1,jdbc.queryForObject("SELECT priority_level FROM listings WHERE id='rr_listing'",Integer.class));
+            assertEquals(0,jdbc.queryForObject("SELECT priority_suppressed FROM listings WHERE id='rr_listing'",Integer.class));
+            assertEquals("PROCESSING",reports.detail("rr_t",id).report().status().name());
+        } finally {jdbc.execute("DROP TRIGGER rr_fail_sanction");}
+    }
+    @Test void concurrentApprovedReportsForOneOwnerReceiveDistinctLevels() throws Exception {
+        String first=listingReport();
+        String second=reports.create("rr_u",report(ReportTargetType.LISTING,"rr_listing")).id();
+        reports.assign("rr_a",first);reports.assign("rr_b",second);
+        var results=parallel(
+            ()->reports.close("rr_a",first,ReportStatus.RESOLVED,new ReportResolutionRequest("First")).warningLevel(),
+            ()->reports.close("rr_b",second,ReportStatus.RESOLVED,new ReportResolutionRequest("Second")).warningLevel());
+        assertEquals(Set.of(1,2),new HashSet<>(results));
+        assertEquals(2,jdbc.queryForObject("SELECT confirmed_report_count FROM users WHERE id='rr_l'",Integer.class));
+    }
+
+    @Test void secondLandlordReportRequiresAListingOwnedByTheReportedLandlord() {
+        String id=reports.create("rr_t",report(ReportTargetType.LANDLORD,"rr_l")).id();
+        reports.assign("rr_a",id);
+        jdbc.update("UPDATE users SET confirmed_report_count=1 WHERE id='rr_l'");
+        error(REPORT_RELATED_LISTING_REQUIRED,()->reports.close("rr_a",id,ReportStatus.RESOLVED,new ReportResolutionRequest("Confirmed")));
+        error(INVALID_REQUEST,()->reports.close("rr_a",id,ReportStatus.RESOLVED,new ReportResolutionRequest("Wrong owner","rr_listing2")));
+        assertEquals(1,jdbc.queryForObject("SELECT confirmed_report_count FROM users WHERE id='rr_l'",Integer.class));
+        assertEquals("PUBLISHED",jdbc.queryForObject("SELECT status FROM listings WHERE id='rr_listing2'",String.class));
+        var closed=reports.close("rr_a",id,ReportStatus.RESOLVED,new ReportResolutionRequest("Confirmed","rr_listing"));
+        assertEquals(2,closed.warningLevel());assertEquals("rr_listing",closed.sanctionedListingId());
+    }
+
+    @Test void landlordReportKeepsOriginWithoutChangingItsTargetAndHidesItAtLevelTwo() {
+        jdbc.update("UPDATE listings SET status='HIDDEN',expires_at='2026-01-01' WHERE id='rr_listing'");
+        var created=reports.create("rr_t",new ReportCreateRequest(ReportTargetType.LANDLORD,"rr_l",ReportReason.SCAM,
+            "Context","rr_listing",null));
+        assertEquals(ReportTargetType.LANDLORD,created.targetType());
+        assertEquals("rr_l",created.targetId());assertEquals("rr_listing",created.originListingId());
+        var detail=reports.detail("rr_t",created.id());
+        assertEquals("Test Listing",detail.originListing().title());
+        assertEquals("HIDDEN",detail.originListing().status().name());
+        assertEquals("Test Address",detail.originListing().addressLine());
+        reports.assign("rr_a",created.id());
+        jdbc.update("UPDATE users SET confirmed_report_count=1 WHERE id='rr_l'");
+        error(INVALID_REQUEST,()->reports.close("rr_a",created.id(),ReportStatus.RESOLVED,new ReportResolutionRequest("Wrong tin","rr_listing2")));
+        var closed=reports.close("rr_a",created.id(),ReportStatus.RESOLVED,new ReportResolutionRequest("Confirmed"));
+        assertEquals("rr_listing",closed.sanctionedListingId());
+        assertEquals("rr_listing",reports.detail("rr_a",created.id()).sanctionedListing().id());
+    }
+
+    @Test void landlordReportDerivesOriginFromTheExactConfirmedAgreement() {
+        jdbc.update("INSERT INTO rental_requests(id,listing_id,tenant_id,landlord_id,status) VALUES('rr_context','rr_listing','rr_t','rr_l','ACCEPTED')");
+        jdbc.update("UPDATE rental_agreements SET rental_request_id='rr_context' WHERE id='rr_active'");
+        jdbc.update("UPDATE listings SET status='EXPIRED',expires_at='2026-01-01' WHERE id='rr_listing'");
+        error(INVALID_REQUEST,()->reports.create("rr_u",new ReportCreateRequest(ReportTargetType.LANDLORD,"rr_l",ReportReason.SCAM,"Other tenant",null,"rr_active")));
+        error(INVALID_REQUEST,()->reports.create("rr_t",new ReportCreateRequest(ReportTargetType.LANDLORD,"rr_l",ReportReason.SCAM,"Wrong origin","rr_listing2","rr_active")));
+        var created=reports.create("rr_t",new ReportCreateRequest(ReportTargetType.LANDLORD,"rr_l",ReportReason.SCAM,"From agreement",null,"rr_active"));
+        assertEquals("rr_listing",created.originListingId());
+        assertEquals("EXPIRED",reports.detail("rr_a",created.id()).originListing().status().name());
+    }
+
+    @Test void originCannotPointToAnotherOwnersListingAndLegacyReportsRemainUnambiguous() {
+        error(INVALID_REQUEST,()->reports.create("rr_t",new ReportCreateRequest(ReportTargetType.LANDLORD,"rr_l",ReportReason.SCAM,"Wrong owner","rr_listing2",null)));
+        var legacy=reports.create("rr_t",report(ReportTargetType.LANDLORD,"rr_l"));
+        assertNull(legacy.originListingId());assertNull(reports.detail("rr_a",legacy.id()).originListing());
+        assertEquals(ReportTargetType.LANDLORD,legacy.targetType());
+    }
+
+    @Test void adminCanInspectHiddenAndExpiredListingsOnlyWithinReportScope() throws Exception {
+        String id=listingReport();
+        jdbc.update("UPDATE listings SET status='HIDDEN',expires_at='2026-01-01' WHERE id='rr_listing'");
+        var reader=user("rr_a").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("REPORT_READ"));
+        mvc.perform(get("/api/admin/reports/"+id+"/listings/rr_listing").with(reader))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.id").value("rr_listing"))
+            .andExpect(jsonPath("$.data.status").value("HIDDEN"));
+        mvc.perform(get("/api/admin/reports/"+id+"/listings/rr_listing2").with(reader)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/admin/reports/"+id+"/listings/rr_listing").with(user("rr_t").roles("TENANT"))).andExpect(status().isForbidden());
+        jdbc.update("UPDATE listings SET status='EXPIRED' WHERE id='rr_listing'");
+        assertEquals("EXPIRED",reports.listingDetail("rr_a",id,"rr_listing").status().name());
     }
 
     static class FakeStorage implements ReportEvidenceStorage {

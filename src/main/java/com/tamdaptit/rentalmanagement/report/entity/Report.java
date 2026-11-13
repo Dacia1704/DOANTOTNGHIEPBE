@@ -34,6 +34,13 @@ import java.time.LocalDateTime;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class Report {
+    @Column(name="warning_level", nullable=false)
+    private int warningLevel;
+    @Column(name="sanction_action", nullable=false, length=40)
+    @Builder.Default
+    private String sanctionAction = "NONE";
+    @Column(name="sanctioned_listing_id", length=36)
+    private String sanctionedListingId;
 
     @Id
     @UuidGenerator
@@ -51,6 +58,10 @@ public class Report {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "listing_id")
     private Listing listing;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "origin_listing_id")
+    private Listing originListing;
 
     @Column(name = "reason_code", nullable = false, length = 100)
     private String reasonCode;

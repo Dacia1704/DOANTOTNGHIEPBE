@@ -6,6 +6,8 @@ import org.springframework.http.HttpStatus;
 
 @Getter
 public enum ErrorCode {
+    REPORT_RELATED_LISTING_REQUIRED(HttpStatus.BAD_REQUEST, "Cần chọn tin đăng liên quan của chủ trọ để áp dụng cảnh cáo lần 2"),
+    LISTING_PRIORITY_SUPPRESSED(HttpStatus.CONFLICT, "Tin đăng đang bị hạn chế ưu tiên do vi phạm"),
     PERMISSION_PROTECTED(HttpStatus.CONFLICT, "Quyền hệ thống không được chỉnh sửa"),
     PERMISSION_VERSION_CONFLICT(HttpStatus.CONFLICT, "Phân quyền đã thay đổi, vui lòng tải lại"),
     REVIEW_NOT_ELIGIBLE(HttpStatus.BAD_REQUEST, "Hợp đồng chưa đủ điều kiện đánh giá"),

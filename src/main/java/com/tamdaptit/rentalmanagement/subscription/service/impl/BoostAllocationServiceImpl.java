@@ -68,6 +68,7 @@ public class BoostAllocationServiceImpl implements BoostAllocationService {
             throw new AppException(ErrorCode.INVALID_REQUEST);
         var listing = listings.findByIdAndProperty_Landlord_Id(listingId, landlordId)
                 .orElseThrow(() -> new AppException(ErrorCode.LISTING_NOT_FOUND));
+        if (Boolean.TRUE.equals(listing.getPrioritySuppressed())) throw new AppException(ErrorCode.LISTING_PRIORITY_SUPPRESSED);
         boolean published = listing.getStatus() == ListingStatus.PUBLISHED && listing.getExpiresAt() != null
                 && time.isBefore(listing.getExpiresAt());
         boolean pending = listing.getStatus() == ListingStatus.PENDING && listing.getPendingExpiresAt() != null

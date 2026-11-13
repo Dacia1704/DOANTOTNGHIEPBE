@@ -360,7 +360,7 @@ public class RentalServiceImpl implements RentalService {
     private void requireConfirmable(RentalAgreement a) { if(a.getStatus()!=PENDING_CONFIRMATION) throw new AppException(INVALID_AGREEMENT_STATUS); if(a.getConfirmationExpiresAt()==null||!a.getConfirmationExpiresAt().isAfter(now())) throw new AppException(CONTRACT_CONFIRMATION_EXPIRED); }
     private Listing validListing(String id,Room room) {
         var l=listings.findById(id).orElseThrow(()->new AppException(LISTING_NOT_FOUND));
-        if(l.getStatus()!=ListingStatus.PUBLISHED || l.getExpiresAt()==null || !l.getExpiresAt().isAfter(now())) throw new AppException(LISTING_NOT_FOUND);
+        if(l.getProperty().getLandlord().getStatus()!=com.tamdaptit.rentalmanagement.identity.entity.enums.UserStatus.ACTIVE || l.getStatus()!=ListingStatus.PUBLISHED || l.getExpiresAt()==null || !l.getExpiresAt().isAfter(now())) throw new AppException(LISTING_NOT_FOUND);
         if(!l.getProperty().getId().equals(room.getProperty().getId())) throw new AppException(INVALID_REQUEST,"Phòng không thuộc cơ sở của tin đăng");
         if(l.getProperty().getRentalMode()==PropertyRentalMode.WHOLE && rooms.countByProperty_Id(l.getProperty().getId())!=1)
             throw new AppException(INVALID_REQUEST,"Cơ sở nguyên căn chưa có mapping một phòng đại diện hợp lệ");
