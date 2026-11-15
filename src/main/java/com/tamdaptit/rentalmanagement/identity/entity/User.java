@@ -33,6 +33,8 @@ import java.util.Set;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class User {
+    @Column(name="confirmed_report_count", nullable=false)
+    private int confirmedReportCount;
 
     @Id
     @UuidGenerator

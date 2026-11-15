@@ -6,7 +6,7 @@ Ngày 15/11/2026, các bộ kiểm thử tự động và helper kiểm thử đ
 
 ## Database và migration hiện tại
 
-Luồng dựng mới hiện dùng V1 schema lõi, V2 seed nghiệp vụ, V6 thông báo, V7 phân quyền, V8 địa điểm lân cận, V9 schema cộng đồng và V10 seed cộng đồng. `scripts/setup-demo.ps1` sinh V2/V10 trước khi áp dụng phần migration còn lại; mặc định có 600 bài cộng đồng, tăng bằng `-CommunityPosts` khi tạo database mới. Không sửa migration đã áp dụng hoặc chạy repair để che lỗi checksum. Hướng dẫn dựng lại cả hai DB ở mục 2.2 của [README chung](../../AIService/README.md).
+Luồng dựng mới hiện dùng V1 schema lõi, V2 seed nghiệp vụ, V6 thông báo, V7 phân quyền, V8 địa điểm lân cận, V9/V10 xử lý báo cáo, V11 schema cộng đồng và V12 seed cộng đồng. `scripts/setup-demo.ps1` sinh V2/V12 trước khi áp dụng phần migration còn lại; mặc định có 600 bài cộng đồng, tăng bằng `-CommunityPosts` khi tạo database mới. Không sửa migration đã áp dụng hoặc chạy repair để che lỗi checksum. Hướng dẫn dựng lại cả hai DB ở mục 2.2 của [README chung](../../AIService/README.md).
 
 Cài đặt toàn hệ thống, biến môi trường và seed theo [README chung](../../AIService/README.md). Không reset hoặc seed lại database đang dùng để chạy thử tính năng. Source là cơ sở đối chiếu bảng/cột, không dùng số bảng trong báo cáo cũ làm tiêu chí xóa bảng.
 

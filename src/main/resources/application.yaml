@@ -1,7 +1,7 @@
 # ===========================================
 # Local Development Configuration
 # Backend chạy trực tiếp (IDE / mvnw), kết nối tới infra trong Docker
-# ===========================================
+# ==========================================
 
 server:
   port: 8080
@@ -98,6 +98,8 @@ logging:
     com.tamdaptit.rentalmanagement: DEBUG
 
 app:
+  chat:
+    support-admin-email: ${CHAT_SUPPORT_ADMIN_EMAIL:admin@gmail.com}
   address-sync:
     enabled: ${ADDRESS_SYNC_ENABLED:false}
     url: ${ADDRESS_SYNC_URL:https://www.tinhthanhpho.com/api/v1}

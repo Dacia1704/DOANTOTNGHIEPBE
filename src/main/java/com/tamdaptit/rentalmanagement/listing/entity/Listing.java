@@ -35,6 +35,9 @@ import java.time.LocalDateTime;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class Listing {
+    @Column(name="priority_suppressed", nullable=false)
+    @Builder.Default
+    private Boolean prioritySuppressed = false;
 
     @Id
     @UuidGenerator

@@ -161,6 +161,7 @@ public class ListingServiceImpl implements ListingService {
     }
 
     private void selectPackagePriority(Listing listing, CurrentSubscriptionResponse current, int level) {
+        if (level > 0 && Boolean.TRUE.equals(listing.getPrioritySuppressed())) throw new AppException(ErrorCode.LISTING_PRIORITY_SUPPRESSED);
         if (level < 0 || level > 2) throw new AppException(ErrorCode.INVALID_REQUEST);
         if (level == 0 || (level == 1 && current.rights().defaultPriorityLevel() == 1)) {
             clearSelection(listing);
@@ -189,7 +190,7 @@ public class ListingServiceImpl implements ListingService {
     }
 
     private boolean published(Listing listing, LocalDateTime time) {
-        return listing.getStatus() == ListingStatus.PUBLISHED && listing.getExpiresAt() != null
+        return listing.getProperty().getLandlord().getStatus() == UserStatus.ACTIVE && listing.getStatus() == ListingStatus.PUBLISHED && listing.getExpiresAt() != null
                 && time.isBefore(listing.getExpiresAt());
     }
 
@@ -489,8 +490,8 @@ public class ListingServiceImpl implements ListingService {
                 .collect(java.util.stream.Collectors.groupingBy(i -> i.getProperty().getId()));
         return listings.stream().map(listing -> {
             var period = currentPeriods.get(listing.getProperty().getLandlord().getId());
-            int selected = selected(listing, period, time);
-            int priority = !published(listing, time) ? 0 : Math.max(activeBoosts.getOrDefault(listing.getId(), 0),
+            int selected = Boolean.TRUE.equals(listing.getPrioritySuppressed()) ? 0 : selected(listing, period, time);
+            int priority = !published(listing, time) || Boolean.TRUE.equals(listing.getPrioritySuppressed()) ? 0 : Math.max(activeBoosts.getOrDefault(listing.getId(), 0),
                     Math.max(selected, period == null ? 0 : period.getDefaultPriorityLevelSnapshot()));
             String propertyId = listing.getProperty().getId();
             var roomResponses = roomsByProperty.getOrDefault(propertyId, List.of()).stream()

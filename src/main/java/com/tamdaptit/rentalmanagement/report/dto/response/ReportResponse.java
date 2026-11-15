@@ -4,4 +4,5 @@ import java.time.LocalDateTime;
 public record ReportResponse(String id, ReportTargetType targetType, String targetId, String landlordId,
     String reasonCode, String description, ReportStatus status, String handledBy, String resolutionNote,
     LocalDateTime resolvedAt, LocalDateTime createdAt, LocalDateTime updatedAt,
-    String targetName, String handledByName) {}
+    String targetName, String handledByName, int warningLevel, String sanctionAction, String sanctionedListingId,
+    String originListingId) {}

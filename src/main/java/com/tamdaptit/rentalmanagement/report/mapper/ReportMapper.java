@@ -11,6 +11,7 @@ public interface ReportMapper {
     @Mapping(target="handledBy", source="handledBy.id")
     @Mapping(target="targetName", expression="java(report.getListing()==null ? report.getLandlord().getFullName() : report.getListing().getTitle())")
     @Mapping(target="handledByName", source="handledBy.fullName")
+    @Mapping(target="originListingId", expression="java(report.getOriginListing()!=null ? report.getOriginListing().getId() : report.getListing()!=null ? report.getListing().getId() : null)")
     ReportResponse toResponse(Report report);
 
     @Mapping(target="contentUrl", expression="java(\"/api/reports/\" + evidence.getReport().getId() + \"/evidences/\" + evidence.getId() + \"/content\")")

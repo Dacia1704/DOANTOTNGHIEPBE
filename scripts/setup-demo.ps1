@@ -36,14 +36,14 @@ try {
     Invoke-SetupNative -Command '.\mvnw.cmd' -CommandArguments @('clean', 'spring-boot:run', $jvmArgs, "-Dspring-boot.run.arguments=$syncArgs", '-q')
     $setupState = Get-Content -LiteralPath 'target/setup-demo-state.json' -Raw | ConvertFrom-Json
     if ($setupState.seedApplied) {
-        Write-Host 'V2 is already applied. Keeping existing data and V2/V10 seed files; checking remaining migrations.'
+        Write-Host 'V2 is already applied. Keeping existing data and V2/V12 seed files; checking remaining migrations.'
     } else {
         Invoke-SetupNative -Command $Python -CommandArguments @('scripts/generate-demo-seed.py', '--landlords', $Landlords, '--tenants', $Tenants, '--properties-per-landlord', $PropertiesPerLandlord, '--rentals-per-tenant', $RentalsPerTenant)
         Invoke-SetupNative -Command $Python -CommandArguments @('scripts/generate-community-seed.py', '--posts', $CommunityPosts)
     }
     $seedArgs = "$common --app.database-setup.enabled=true"
     Invoke-SetupNative -Command '.\mvnw.cmd' -CommandArguments @('spring-boot:run', $jvmArgs, "-Dspring-boot.run.arguments=$seedArgs", '-q')
-    Write-Host 'rental_db and community demo data are ready (Flyway through V10). Start the backend normally with .\mvnw.cmd spring-boot:run.'
+    Write-Host 'rental_db and community demo data are ready (Flyway through V12). Start the backend normally with .\mvnw.cmd spring-boot:run.'
 } finally {
     Pop-Location
 }

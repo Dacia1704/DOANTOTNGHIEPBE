@@ -61,6 +61,16 @@ public class ReportController {
         @RequestParam(required=false) ReportReason reasonCode,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="10") int size) {
         return ApiResponse.success(service.admin(actor.getName(),status,reasonCode,page,size));
     }
+    @GetMapping("/admin/reports/{id}/sanction-options")
+    @PreAuthorize("hasAuthority('REPORT_READ') and hasAuthority('REPORT_HANDLE')")
+    public ApiResponse<ReportSanctionOptionsResponse> sanctionOptions(Principal actor,@PathVariable String id) {
+        return ApiResponse.success(service.sanctionOptions(actor.getName(),id));
+    }
+    @GetMapping("/admin/reports/{id}/listings/{listingId}")
+    @PreAuthorize("hasAuthority('REPORT_READ')")
+    public ApiResponse<ReportListingResponse> listingDetail(Principal actor,@PathVariable String id,@PathVariable String listingId) {
+        return ApiResponse.success(service.listingDetail(actor.getName(),id,listingId));
+    }
     @GetMapping("/admin/reports/summary")
     @PreAuthorize("hasAuthority('REPORT_READ')")
     public ApiResponse<Map<ReportStatus,Long>> summary(Principal actor) {

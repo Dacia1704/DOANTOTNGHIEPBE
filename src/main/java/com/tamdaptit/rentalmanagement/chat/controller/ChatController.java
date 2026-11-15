@@ -42,7 +42,7 @@ public class ChatController {
     }
 
     @PostMapping("/conversations/support")
-    @Operation(summary = "Tenant/Landlord mở hỗ trợ với tài khoản Admin cố định trong Flyway")
+    @Operation(summary = "Tenant/Landlord mở hỗ trợ với tài khoản Admin được cấu hình")
     public ApiResponse<ChatConversationResponse> getOrCreateSupportConversation(
             Authentication authentication
     ) {

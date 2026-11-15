@@ -77,7 +77,7 @@ Quyền admin: MODERATION_READ, MODERATION_HANDLE, MODERATION_RULE_MANAGE; duy�
 
 ## Database, khởi chạy và kiểm thử
 
-- Migration schema: `V9__community_and_content_moderation.sql`; seed cộng đồng tự chạy ở `V10__seed_community_demo_data.sql` sau V2/V9. `scripts/setup-demo.ps1 -CommunityPosts 600` tích hợp việc sinh và nạp dữ liệu khi dựng database mới. Không sửa migration đã áp dụng. Xem [hướng dẫn seed](../scripts/seed-community.README.md).
+- Migration schema: `V11__community_and_content_moderation.sql`; seed cộng đồng tự chạy ở `V12__seed_community_demo_data.sql` sau V2/V11. `scripts/setup-demo.ps1 -CommunityPosts 600` tích hợp việc sinh và nạp dữ liệu khi dựng database mới. Không sửa migration đã áp dụng. Xem [hướng dẫn seed](../scripts/seed-community.README.md).
 - Cần MySQL hoạt động để kiểm chứng migration/API thực tế; Cloudinary cho upload và RabbitMQ/relay hiện có để giao thông báo đầy đủ.
 - Chạy backend và frontend theo cấu hình sẵn có của hai repo, rồi đăng nhập lại admin/làm mới quyền để thấy menu Kiểm duyệt cộng đồng.
 - Bộ từ khởi tạo có vcl/đm ở mức hạn chế; cụm xúc phạm rõ nghĩa bị ẩn; “việc nhẹ lương cao” chờ duyệt; domain `.invalid` chỉ là dữ liệu demo.
