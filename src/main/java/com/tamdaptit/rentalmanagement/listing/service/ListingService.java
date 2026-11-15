@@ -10,6 +10,7 @@ import java.util.List;
 import com.tamdaptit.rentalmanagement.listing.dto.response.ListingPriceStatisticsResponse;
 
 public interface ListingService {
+    List<ListingResponse> searchCandidates(ListingSearchRequest request);
     List<ListingResponse> searchPublishedMap(ListingSearchRequest request);
     List<ListingPriceStatisticsResponse> priceStatistics(
             String provinceId, String wardId);

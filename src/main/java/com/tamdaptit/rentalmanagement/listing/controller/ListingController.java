@@ -19,11 +19,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ListingController {
     private final ListingService service;
+    private final com.tamdaptit.rentalmanagement.discovery.ListingDiscoveryService discovery;
 
     @GetMapping
-    public ApiResponse<PageResponse<ListingResponse>> published(@RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size, @Valid @ModelAttribute ListingSearchRequest request) {
-        return ApiResponse.success(service.searchPublished(page, size, request));
+    public ApiResponse<PageResponse<ListingResponse>> published(Principal principal,@RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size, @Valid @ModelAttribute ListingSearchRequest request,
+            @RequestParam(defaultValue="recommended") String sort,@RequestParam(required=false) String rankingSession) {
+        return ApiResponse.success(discovery.search(principal==null?null:principal.getName(),page,size,request,sort,rankingSession));
     }
 
     @GetMapping("/{id}")
@@ -32,8 +34,8 @@ public class ListingController {
     }
 
     @GetMapping("/map")
-    public ApiResponse<List<ListingResponse>> map(@Valid @ModelAttribute ListingSearchRequest request) {
-        return ApiResponse.success(service.searchPublishedMap(request));
+    public ApiResponse<List<ListingResponse>> map(Principal principal,@Valid @ModelAttribute ListingSearchRequest request,@RequestParam(defaultValue="recommended") String sort) {
+        return ApiResponse.success(discovery.map(principal==null?null:principal.getName(),request,sort));
     }
 
     @GetMapping("/price-statistics")

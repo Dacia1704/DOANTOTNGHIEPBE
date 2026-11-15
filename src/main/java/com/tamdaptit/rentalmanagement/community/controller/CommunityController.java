@@ -14,12 +14,23 @@ public class CommunityController {
     private final CommunityService service;
     private String actor(Principal p){return p==null?null:p.getName();}
     @GetMapping("/listings") public ApiResponse<java.util.List<ListingLink>> listings(@RequestParam(defaultValue="") String q){return ApiResponse.success(service.listingChoices(q));}
-    @GetMapping("/feed") public ApiResponse<Slice<Post>> feed(Principal p,@RequestParam(defaultValue="LATEST") String tab,@RequestParam(required=false) String cursor,@RequestParam(required=false) String q,@RequestParam(required=false) String area){return ApiResponse.success(service.feed(actor(p),tab,cursor,q,area));}
+    @GetMapping("/feed") public ApiResponse<Slice<Post>> feed(Principal p,@RequestParam(defaultValue="LATEST") String tab,@RequestParam(required=false) String cursor,@RequestParam(required=false) String q){return ApiResponse.success(service.feed(actor(p),tab,cursor,q));}
     @GetMapping("/posts/{id}") public ApiResponse<Post> post(Principal p,@PathVariable String id){return ApiResponse.success(service.post(actor(p),id));}
-    @PostMapping("/posts") public ApiResponse<Post> create(Principal p,@Valid @RequestBody PostInput b){return ApiResponse.success(service.save(actor(p),null,b));}
-    @PutMapping("/posts/{id}") public ApiResponse<Post> update(Principal p,@PathVariable String id,@Valid @RequestBody PostInput b){return ApiResponse.success(service.save(actor(p),id,b));}
+    @GetMapping("/authors/{id}") public ApiResponse<Author> author(Principal p,@PathVariable String id){return ApiResponse.success(service.author(actor(p),id));}
+    @GetMapping("/authors/{id}/posts") public ApiResponse<Slice<Post>> authorPosts(Principal p,@PathVariable String id,@RequestParam(required=false) String cursor){return ApiResponse.success(service.authorPosts(actor(p),id,cursor));}
+    @PostMapping(value="/posts",consumes="application/json") public ApiResponse<Post> create(Principal p,@Valid @RequestBody PostInput b){return ApiResponse.success(service.save(actor(p),null,b));}
+    @PutMapping(value="/posts/{id}",consumes="application/json") public ApiResponse<Post> update(Principal p,@PathVariable String id,@Valid @RequestBody PostInput b){return ApiResponse.success(service.save(actor(p),id,b));}
+    @PostMapping(value="/posts",consumes="multipart/form-data")
+    public ApiResponse<Post> createWithImages(Principal p,@Valid @RequestPart("post") PostInput b,
+        @RequestPart(value="files",required=false) java.util.List<MultipartFile> files) {
+        return ApiResponse.success(service.save(actor(p),null,b,files));
+    }
+    @PutMapping(value="/posts/{id}",consumes="multipart/form-data")
+    public ApiResponse<Post> updateWithImages(Principal p,@PathVariable String id,@Valid @RequestPart("post") PostInput b,
+        @RequestPart(value="files",required=false) java.util.List<MultipartFile> files) {
+        return ApiResponse.success(service.save(actor(p),id,b,files));
+    }
     @DeleteMapping("/posts/{id}") public ApiResponse<Void> delete(Principal p,@PathVariable String id){service.delete(actor(p),"POST",id);return ApiResponse.success(null);}
-    @PostMapping(value="/media",consumes="multipart/form-data") public ApiResponse<Media> media(Principal p,@RequestPart("file") MultipartFile file){return ApiResponse.success(service.upload(actor(p),file));}
     @GetMapping("/posts/{id}/comments") public ApiResponse<Slice<Comment>> comments(Principal p,@PathVariable String id,@RequestParam(required=false) String parent,@RequestParam(required=false) String cursor){return ApiResponse.success(service.comments(actor(p),id,parent,cursor));}
     @PostMapping("/posts/{id}/comments") public ApiResponse<Comment> comment(Principal p,@PathVariable String id,@Valid @RequestBody CommentInput b){return ApiResponse.success(service.comment(actor(p),id,null,b));}
     @PutMapping("/posts/{post}/comments/{id}") public ApiResponse<Comment> editComment(Principal p,@PathVariable String post,@PathVariable String id,@Valid @RequestBody CommentInput b){return ApiResponse.success(service.comment(actor(p),post,id,b));}

@@ -36,7 +36,12 @@ public class CloudinaryImageStorage implements ImageStorageService {
 
     @Override
     public StoredImage upload(String folder, MultipartFile file) {
-        byte[] bytes = validator.validate(file);
+        return upload(folder, file, 5L * 1024 * 1024);
+    }
+
+    @Override
+    public StoredImage upload(String folder, MultipartFile file, long maxBytes) {
+        byte[] bytes = validator.validate(file, maxBytes);
         ensureConfigured();
         String publicId = newPublicId(folder);
         try {

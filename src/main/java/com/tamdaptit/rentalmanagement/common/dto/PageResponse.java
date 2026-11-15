@@ -24,4 +24,5 @@ public class PageResponse<T> {
     long totalElements;
 
     List<T> data;
+    String rankingSession;
 }

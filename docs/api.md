@@ -1399,7 +1399,7 @@ Cơ sở phải thuộc chủ trọ và có phòng/căn AVAILABLE. Title bắt b
 - GET `/api/listings/pending?page=0&size=10`: ADMIN xem PENDING còn thời hạn chờ.
 - POST `/api/listings/{id}/approve`: ADMIN duyệt PENDING hợp lệ, kiểm tra lại gói/quota/phòng; đặt PUBLISHED, publishedAt tại lúc duyệt, expiresAt = publishedAt.plusMonths(1).
 - POST `/api/listings/{id}/reject`, body `{"reason":"Lý do"}`: ADMIN từ chối PENDING hợp lệ, reason bắt buộc và tối đa 2.000 ký tự.
-- GET `/api/listings?page=0&size=10`: công khai, chỉ PUBLISHED còn hạn; ưu tiên cao → thấp → thường, trong cùng mức theo publishedAt mới nhất, cuối cùng theo ID để phân trang ổn định.
+- GET `/api/listings?page=0&size=10`: công khai, chỉ PUBLISHED còn hạn; mặc định `sort=recommended` dùng thuật toán phối hợp độ phù hợp, ưu tiên gói/Boost và đa dạng chủ trọ. Các trang sau truyền `rankingSession` của trang đầu để giữ thứ tự. Có `newest`, `price-asc`, `price-desc` khi người dùng chọn sắp xếp.
 - GET `/api/listings/{id}`: công khai, chỉ chi tiết PUBLISHED còn hạn, các trường hợp khác trả 404.
 - GET `/api/listings/mine?page=0&size=10`: LANDLORD xem tin của mình ở mọi trạng thái; endpoint này vẫn yêu cầu xác thực.
 
@@ -1408,6 +1408,21 @@ ListingResponse gồm id, propertyId, property, propertyName, rentalMode, landlo
 Hết gói/hạ quota không xóa hoặc ẩn tin cũ trước expiresAt. Tin quá hạn không xuất hiện dù tác vụ nền chưa chuyển trạng thái. Đăng lại luôn PENDING, phải được duyệt lại để bắt đầu tháng hiển thị mới.
 
 ### 12.2.1. Tìm tin theo vị trí bản đồ
+
+Trang tìm phòng `/tim-phong` dùng GET `/api/listings` (phân trang) và GET `/api/listings/map` (ghim), cùng một bộ lọc. Ngoài khu vực, giá, loại phòng và tiện ích hiện có, `ListingSearchRequest` hỗ trợ:
+
+| Tham số | Điều kiện |
+| --- | --- |
+| `keyword` | Tối đa 100 ký tự; tìm các từ trong tên tin, mô tả, tên cơ sở, địa chỉ, phường/xã, tỉnh/thành; không phân biệt hoa/thường và dấu tiếng Việt |
+| `rentalMode` | `BY_ROOM` hoặc `WHOLE` |
+| `propertyTypeId` | Loại cơ sở; danh mục GET `/api/property-types` được đọc công khai, thao tác quản lý vẫn yêu cầu ADMIN |
+| `minArea`, `maxArea` | Diện tích m² không âm; tối thiểu không lớn hơn tối đa |
+| `minOccupants` | Sức chứa tối thiểu, số nguyên 1–100 |
+| `minFloor`, `maxFloor` | Tầng 0–200; 0 là tầng trệt; tối thiểu không lớn hơn tối đa |
+| `maxDeposit` | Tiền cọc tối đa, không âm |
+| `maxElectricityPrice`, `maxWaterPrice`, `maxServiceFee` | Giá điện/nước/phí dịch vụ tối đa theo giá trị chủ trọ đã khai báo, không âm |
+
+Giá, diện tích, sức chứa, tầng, tiền cọc, các khoản phí và **toàn bộ** tiện ích đã chọn phải cùng được đáp ứng bởi ít nhất một phòng trong cơ sở; không ghép giá của phòng này với diện tích/tiện ích của phòng khác. Tiện ích chung của cơ sở được tính cho các phòng. Trường chưa khai báo không được coi là 0 khi có bộ lọc tương ứng. Lọc ở backend trước khi tính tổng, phân trang và xếp hạng; FE dùng các phòng khớp bộ lọc để hiển thị giá và số phòng trống trên thẻ. Chi tiết tin vẫn cung cấp đầy đủ các phòng của cơ sở. Không có bộ lọc sao đánh giá, xác thực hoặc escrow khi chưa có nguồn dữ liệu tương ứng.
 
 GET `/api/listings` nhận thêm các bộ tham số tùy chọn:
 
@@ -1848,3 +1863,35 @@ STOMP kết nối `/ws`, CONNECT mang `Authorization: Bearer <access_token>`, g�
 ## Cộng đồng và kiểm duyệt nội dung
 
 API `/api/community/*` và `/api/admin/moderation/*`, DTO, phân quyền, migration và phạm vi hiện có được mô tả tại [community-implementation.md](community-implementation.md). Đánh giá listing vẫn yêu cầu hợp đồng thuê hợp lệ; không có bình luận listing tự do.
+
+## 24. Dashboard quản trị
+
+`GET /api/admin/dashboard?from=2026-11-09&to=2026-11-15` — chỉ `ADMIN`, trả `ApiResponse<AdminDashboardResponse>`. Không nhận/trả dữ liệu cá nhân hay ID bản ghi.
+
+- `from`, `to`: ngày ISO, bao gồm hai đầu; bỏ cả hai để lấy 7 ngày đến hôm nay. Phải truyền cả hai hoặc bỏ cả hai. Khoảng hợp lệ 1–366 ngày, không vượt quá hôm nay theo ngày máy chủ; sai trả HTTP 400 `INVALID_REQUEST`. Truy vấn dùng mốc đầu ngày và đầu ngày tiếp theo làm cận trên loại trừ.
+- `generatedAt`: thời điểm tạo thống kê. `current` luôn là trạng thái hiện tại, không phải snapshot tại ngày `to`: `users`, `properties`, `publishedListings`, `availableRooms`, `activeAgreements`, `paidLandlords`, `activeBoosts`, `openReports`, `pendingModeration`, `reviewPayments`.
+- `period`, `previous`: số phát sinh trong khoảng chọn và khoảng liền trước có cùng số ngày. Các khóa: `newUsers`, `newTenants`, `newLandlords`, `newProperties`, `newListings`, `rentalRequests`, `newAgreements`, `posts`, `comments`, `reactions`, `serviceRevenue`, `boostRevenue`, `revenue`. Khóa không có phát sinh được hiểu là 0. Kỳ chứa hôm nay có thể chưa hoàn tất.
+- `series`: một phần tử `{date, values}` cho mỗi ngày trong khoảng chọn, kể cả ngày không phát sinh. `values` dùng các khóa trên, trừ `revenue` (tổng hai nguồn doanh thu). FE gộp các ngày liên tiếp thành tối đa 10 nhóm khi cần, giữ nguyên tổng.
+- Doanh thu chỉ lấy `payments.status=SUCCESS`, `requires_review=0`, theo `paid_at`; tách `SERVICE_PACKAGE`/`BOOST_PACKAGE`. Không lấy đơn chưa trả, giao dịch lỗi, đã hoàn tiền, cần đối soát hay tiền thuê phòng. Số liệu lịch sử phản ánh trạng thái giao dịch đang lưu.
+- Hợp đồng mới tính theo thời điểm muộn hơn của hai xác nhận, yêu cầu cả hai đã xác nhận và trạng thái `ACTIVE`/`EXPIRED`/`TERMINATED`. Phòng trống theo `AVAILABLE`, loại phòng đang có hợp đồng `DRAFT`/`PENDING_CONFIRMATION`/`ACTIVE`, thống nhất với nghiệp vụ giữ phòng. Hợp đồng hiệu lực yêu cầu `ACTIVE` và chưa qua `end_date`.
+- Chủ trọ trả phí được đếm duy nhất theo kỳ subscription đang hiệu lực, snapshot mã gói khác `FREE`; Boost chỉ tính đã kích hoạt, còn hạn. Báo cáo chưa xử lý gồm `PENDING`/`PROCESSING` của report tin đăng/chủ trọ; nội dung chờ kiểm duyệt gồm các case chưa giải quyết của bài viết/bình luận/đánh giá, tránh cộng trùng content reports.
+- Bài viết/bình luận đã xóa không được tính; cảm xúc là các bản ghi còn lưu được tạo trong kỳ, không phải lịch sử mọi lần bấm. Biểu đồ người dùng phân nhóm theo vai trò hiện tại: có vai trò chủ trọ xếp vào chủ trọ, chỉ có tenant xếp vào người thuê; tài khoản admin không thuộc hai nhóm này.
+- `listingStatuses`: `PUBLISHED`, `HIDDEN`, `EXPIRED`, `PENDING`, `REJECTED`. Tin hiển thị/chờ duyệt đã hết hạn được tính vào `EXPIRED` ngay khi đọc, không cần chờ worker cập nhật trạng thái.
+
+Endpoint chỉ tổng hợp bằng SQL trong transaction đọc; không tải toàn bộ bản ghi về frontend và không thay đổi dữ liệu nghiệp vụ.
+
+## 25. Dashboard chủ trọ
+
+`GET /api/landlord/dashboard?from=2026-11-09&to=2026-11-15` — chỉ `LANDLORD`, trả `ApiResponse<LandlordDashboardResponse>`. Chủ sở hữu lấy từ principal; không nhận landlordId và không trả ID hay dữ liệu người thuê.
+
+- `from`, `to`: ISO date bao gồm hai đầu, bỏ cả hai mặc định 7 ngày. Truyền thiếu một đầu, đảo ngày, quá 366 ngày hoặc vượt hôm nay theo `Asia/Ho_Chi_Minh` trả 400 `INVALID_REQUEST`. Cận cuối SQL là đầu ngày kế tiếp, loại trừ.
+- `current`: hiện tại, không phụ thuộc khoảng chọn: `properties`, `rooms`, `wholeUnits`, `activeAgreements` (ACTIVE và đang trong start/end date), `pendingAgreements` (DRAFT/PENDING_CONFIRMATION), `endingAgreements` (ACTIVE, end_date từ hôm nay đến 30 ngày tới).
+- `roomStatuses`: RENTED, AVAILABLE, HELD, MAINTENANCE, các nhóm loại trừ nhau. Bảo trì ưu tiên trước; sau đó RENTED hoặc có hợp đồng ACTIVE; sau đó có DRAFT/PENDING_CONFIRMATION là giữ chỗ; còn lại AVAILABLE. Phòng trống khớp quy tắc không có hợp đồng chiếm phòng của RentalAvailabilityService. WHOLE có một Room đại diện.
+- `listingStatuses`: PUBLISHED, PENDING, HIDDEN, EXPIRED, REJECTED; tin hiển thị/chờ duyệt hết hạn được tính EXPIRED ngay khi đọc.
+- `period`, `previous`: số phát sinh kỳ chọn và kỳ liền trước cùng số ngày. `requests` theo created_at; `acceptedRequests`, `respondedRequests` là tập con yêu cầu tạo trong kỳ theo trạng thái/đã phản hồi đang lưu. `confirmedAgreements` theo thời điểm muộn hơn của hai xác nhận, có cả hai xác nhận và trạng thái ACTIVE/EXPIRED/TERMINATED. `endedAgreements` là hợp đồng EXPIRED có end_date trong kỳ, không hàm ý đã hoàn cọc.
+- `views`, `contacts` lấy SUM từ `listing_daily_stats` theo stat_date, join Listing → Property để giới hạn chủ sở hữu. Đây là số đếm thống kê đã lưu; không suy diễn thành số cuộc gọi hoặc số người duy nhất. `serviceSpend`, `boostSpend`, `spend` lấy payments theo paid_at, chỉ SUCCESS, requires_review=0, hai loại SERVICE_PACKAGE/BOOST_PACKAGE. Không tính tiền thuê, REFUNDED hay giao dịch cần đối soát.
+- `series`: một `{date,values}` cho mỗi ngày trong kỳ, có cả ngày rỗng; cùng khóa với period trừ tổng spend. Khóa không phát sinh được hiểu là 0.
+- `servicePackage`: name, endsAt, maxListings (null = không giới hạn), usedListings, remainingHigh, remainingLow (null = ưu tiên thường mặc định, không giới hạn), active. Đọc snapshot kỳ đang có hiệu lực; Free chỉ khi chưa có lịch sử subscription không bị hủy. usedListings khớp posting_quota_consumed/period; ưu tiên trừ consumed_priority_levels, không tự trả lượt khi ẩn/gỡ. Không gọi các service đồng bộ subscription có ghi/khóa dữ liệu trong endpoint thống kê.
+- `boost`: activePackages còn hạn, assignedListings đang hiển thị và không bị chặn ưu tiên, remainingHigh/remainingLow. Lượt đã dùng tính mọi allocation trong subscription, kể cả inactive; số tin đang gán chỉ tính allocation active và listing còn hạn.
+
+Mọi truy vấn ràng buộc chủ sở hữu và tham số ngày; transaction chỉ đọc. Không polling hay tạo sự kiện giả khi xem dashboard. Số lịch sử phản ánh trạng thái bản ghi hiện đang lưu.

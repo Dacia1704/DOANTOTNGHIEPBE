@@ -355,6 +355,10 @@ public class ListingServiceImpl implements ListingService {
                         && listing.property().longitude() != null)
                 .toList();
     }
+    @Override
+    public List<ListingResponse> searchCandidates(ListingSearchRequest request) {
+        return searchPublished(request, Pageable.unpaged()).getData();
+    }
 
     @Override
     public List<ListingPriceStatisticsResponse> priceStatistics(
@@ -367,6 +371,9 @@ public class ListingServiceImpl implements ListingService {
     }
 
     private PageResponse<ListingResponse> searchPublished(ListingSearchRequest request, Pageable pageable) {
+        if ((request.minArea()!=null && request.maxArea()!=null && request.minArea().compareTo(request.maxArea())>0)
+                || (request.minFloor()!=null && request.maxFloor()!=null && request.minFloor()>request.maxFloor()))
+            throw new AppException(ErrorCode.INVALID_REQUEST);
         validateLocationSearch(request);
         if ((request.minPrice() != null && request.minPrice().signum() < 0)
                 || (request.maxPrice() != null && request.maxPrice().signum() < 0)

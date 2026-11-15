@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 
 @Getter
 public enum ErrorCode {
+    FEED_SESSION_EXPIRED(HttpStatus.CONFLICT, "Bảng tin đã thay đổi, vui lòng tải lại"),
     CONTENT_VERSION_CONFLICT(HttpStatus.CONFLICT, "Nội dung đã thay đổi, vui lòng tải lại"),
     COMMUNITY_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "Bạn thao tác quá nhanh, vui lòng thử lại sau"),
     REPORT_RELATED_LISTING_REQUIRED(HttpStatus.BAD_REQUEST, "Cần chọn tin đăng liên quan của chủ trọ để áp dụng cảnh cáo lần 2"),

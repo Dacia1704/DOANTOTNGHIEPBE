@@ -6,11 +6,13 @@ import org.springframework.web.multipart.MultipartFile;
 
 public interface CommunityService {
     List<ListingLink> listingChoices(String query);
-    Slice<Post> feed(String actor,String tab,String cursor,String q,String area);
+    Slice<Post> feed(String actor,String tab,String cursor,String q);
     Post post(String actor,String id);
+    Author author(String actor,String id);
+    Slice<Post> authorPosts(String actor,String id,String cursor);
     Post save(String actor,String id,PostInput input);
+    Post save(String actor,String id,PostInput input,List<MultipartFile> files);
     void delete(String actor,String type,String id);
-    Media upload(String actor,MultipartFile file);
     Slice<Comment> comments(String actor,String post,String parent,String cursor);
     Comment comment(String actor,String post,String id,CommentInput input);
     void reaction(String actor,String type,String id,String reaction);

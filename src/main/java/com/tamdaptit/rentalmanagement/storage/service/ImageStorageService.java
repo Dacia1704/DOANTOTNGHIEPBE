@@ -29,6 +29,9 @@ public interface ImageStorageService {
      */
     StoredImage upload(String folder, MultipartFile file);
 
+    /** Tai len mot anh voi gioi han dung luong rieng cua module. */
+    StoredImage upload(String folder, MultipartFile file, long maxBytes);
+
     /**
      * Tai len nhieu anh cung luc vao cung mot folder.
      *

@@ -8,7 +8,7 @@ public final class CommunityDtos {
     private CommunityDtos() {}
     public record PostInput(@Size(max=10000) String content, @Size(max=150) String area,
         @Size(max=10) List<String> mediaIds, @Size(max=3) List<String> listingIds, Long expectedVersion) {}
-    public record CommentInput(@NotBlank @Size(max=4000) String content, String parentId, Long expectedVersion) {}
+    public record CommentInput(@NotBlank @Size(max=4000) String content, String parentId, Long expectedVersion, String replyToId) {}
     public record ReactionInput(@Pattern(regexp="LIKE|LOVE|WOW") @NotNull String type) {}
     public record ReportInput(@NotBlank @Size(max=1000) String reason) {}
     public record DecisionInput(@Pattern(regexp="VISIBLE|RESTRICTED|PENDING|HIDDEN|REMOVED") @NotNull String status,
@@ -23,13 +23,16 @@ public final class CommunityDtos {
     public record Evaluation(String status, String reason) {}
     public record Media(String id, String url) {}
     public record ListingLink(String id, String title, boolean available) {}
+    public record Author(String id, String fullName, String avatarUrl, String role,
+        LocalDateTime joinedAt, long postCount, long followerCount, boolean following) {}
     public record Post(String id, String authorId, String authorName, String avatarUrl, String role,
         String content, String area, String status, long version, boolean pinned, boolean edited,
         LocalDateTime createdAt, List<Media> media, List<ListingLink> listings,
-        long reactionCount, long commentCount, String myReaction, boolean saved, boolean following) {}
+        long reactionCount, long commentCount, String myReaction, boolean saved, boolean following,
+        List<String> reactionTypes) {}
     public record Comment(String id, String postId, String parentId, String authorId, String authorName,
         String avatarUrl, String content, String status, long version, LocalDateTime createdAt,
-        long reactionCount, String myReaction, boolean deleted) {}
+        long reactionCount, String myReaction, boolean deleted, String replyToId, String replyToAuthorName, long replyCount) {}
     public record Slice<T>(List<T> items, String nextCursor, boolean hasMore) {}
     public record ModerationCase(String id, String targetType, String targetId, String authorName,
         String snapshot, String reason, String status, String source, boolean resolved, long contentVersion, LocalDateTime createdAt) {}

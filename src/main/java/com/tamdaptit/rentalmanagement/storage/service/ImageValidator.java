@@ -35,10 +35,14 @@ public class ImageValidator {
      *         hoac vuot qua kich thuoc cho phep
      */
     public byte[] validate(MultipartFile file) {
+        return validate(file, MAX_BYTES);
+    }
+
+    public byte[] validate(MultipartFile file, long maxBytes) {
         if (file == null || file.isEmpty()) {
             throw new AppException(ErrorCode.IMAGE_INVALID);
         }
-        if (file.getSize() > MAX_BYTES) {
+        if (file.getSize() > maxBytes) {
             throw new AppException(ErrorCode.IMAGE_INVALID);
         }
 
@@ -47,8 +51,8 @@ public class ImageValidator {
             throw new AppException(ErrorCode.IMAGE_INVALID);
         }
 
-        byte[] bytes = read(file);
-        if (bytes.length > MAX_BYTES) {
+        byte[] bytes = read(file, maxBytes);
+        if (bytes.length > maxBytes) {
             throw new AppException(ErrorCode.IMAGE_INVALID);
         }
 
@@ -72,9 +76,9 @@ public class ImageValidator {
         return bytes;
     }
 
-    private byte[] read(MultipartFile file) {
+    private byte[] read(MultipartFile file, long maxBytes) {
         try (var stream = file.getInputStream()) {
-            return stream.readNBytes((int) MAX_BYTES + 1);
+            return stream.readNBytes(Math.toIntExact(maxBytes) + 1);
         } catch (IOException | RuntimeException ex) {
             throw new AppException(ErrorCode.IMAGE_INVALID);
         }

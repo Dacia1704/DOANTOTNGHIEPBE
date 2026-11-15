@@ -2,6 +2,9 @@ package com.tamdaptit.rentalmanagement.common.exception;
 
 import com.tamdaptit.rentalmanagement.common.dto.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.core.NestedExceptionUtils;
+import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -12,11 +15,37 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.util.DisconnectedClientHelper;
+import java.io.IOException;
 import java.util.stream.Collectors;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    private static final DisconnectedClientHelper disconnectedClients =
+            new DisconnectedClientHelper(GlobalExceptionHandler.class.getName());
+
+    @ExceptionHandler({HttpMessageNotWritableException.class, AsyncRequestNotUsableException.class})
+    public ResponseEntity<ApiResponse<Object>> handleResponseWrite(Exception ex, HttpServletResponse response) {
+        if (disconnectedClients.checkAndLogClientDisconnectedException(ex)) return null;
+
+        // Some Windows servlet write failures arrive without the usual container exception wrapper.
+        Throwable cause = NestedExceptionUtils.getMostSpecificCause(ex);
+        if (ex instanceof HttpMessageNotWritableException && ex.getMessage() != null
+                && ex.getMessage().contains("ServletOutputStream failed to write")
+                && cause instanceof IOException && cause.getMessage() != null
+                && cause.getMessage().contains("An established connection was aborted by the software in your host machine")) {
+            log.debug("Client disconnected while writing the HTTP response");
+            return null;
+        }
+
+        log.error("Failed to write HTTP response", ex);
+        if (response.isCommitted()) return null;
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.builder()
+                .code(500).errorCode("INTERNAL_SERVER_ERROR")
+                .message(ErrorCode.INTERNAL_SERVER_ERROR.getMessage()).build());
+    }
 
     @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ApiResponse<Object>> handleMethodNotAllowed(Exception ex) {
