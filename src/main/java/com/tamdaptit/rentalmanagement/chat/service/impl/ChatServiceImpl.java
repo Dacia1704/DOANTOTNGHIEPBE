@@ -44,7 +44,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ChatServiceImpl implements ChatService {
     // Stable identity seeded by V2__seed_reference_and_demo_data.sql; never choose an arbitrary admin.
-    static final String SUPPORT_ADMIN_EMAIL = "admin.demo@trotot.example.test";
+    static final String SUPPORT_ADMIN_EMAIL = "admin@gmail.com";
 
     private final ChatConversationRepository conversationRepository;
     private final ChatConversationParticipantRepository participantRepository;

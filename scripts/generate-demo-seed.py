@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 import uuid
+from seed_profiles import account_identity, ascii_slug, property_identity
 
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATIONS = ROOT / 'src/main/resources/db/migration'
@@ -95,14 +96,14 @@ if len(provinces) != 34:
     raise ValueError('Expected 34 provinces in the current snapshot')
 
 users = {}
+identities = {}
 for role, count in [('admin', 3), ('landlord', args.landlords), ('tenant', args.tenants)]:
     for n in range(1, count + 1):
-        suffix = '' if n == 1 else f'{n:02d}'
         key = f'{role}{n}'
         user_id = uid(key)
         users[key] = user_id
-        add('users', id=user_id, email=f'{role}{suffix}@gmail.com', password=PASSWORD,
-            full_name=f'{dict(admin="Quản trị", landlord="Chủ trọ", tenant="Người thuê")[role]} Demo {n:02d}',
+        identities[key] = account_identity(role, n)
+        add('users', id=user_id, **identities[key], password=PASSWORD,
             avatar_url=AVATAR, email_verified_at=at(-60), status='ACTIVE', created_at=at(-90))
         add('user_roles', id=uid('role/' + key), user_id=user_id,
             role_id=SQL(f"(SELECT id FROM roles WHERE code='{role.upper()}')"))
@@ -150,17 +151,18 @@ def payment(owner, target, kind, amount, status, key, package_id, paid_days=-5, 
     add('payments', id=pid, landlord_id=owner, type=kind, amount=amount, payment_method='BANK_TRANSFER',
         status=status, service_subscription_order_id=target if kind == 'SERVICE_PACKAGE' else None,
         boost_subscription_id=target if kind == 'BOOST_PACKAGE' else None,
-        merchant_order_id='DEMO-' + key, provider_txn_id='DEMO-TXN-' + key if status in ['SUCCESS', 'REFUNDED'] else None,
+        merchant_order_id='ORD-' + hashlib.sha256(key.encode()).hexdigest()[:18].upper(),
+        provider_txn_id='TXN-' + hashlib.sha256(key.encode()).hexdigest()[:18].upper() if status in ['SUCCESS', 'REFUNDED'] else None,
         paid_at=at(paid_days) if status in ['SUCCESS', 'REFUNDED'] else None,
         expires_at=at(1) if status == 'PENDING' else at(paid_days, 15),
         created_at=at(paid_days), requires_review=review,
-        review_reason='Giao dịch demo cần đối soát thủ công' if review else None)
+        review_reason='Nội dung chuyển khoản chưa khớp với đơn đăng ký, cần đối soát.' if review else None)
     if status == 'SUCCESS':
         add('invoices', id=uid('invoice/' + key), payment_id=pid, type=kind,
             service_package_id=package_id if kind == 'SERVICE_PACKAGE' else None,
             boost_service_package_id=package_id if kind == 'BOOST_PACKAGE' else None,
-            invoice_no='DEMO-INV-' + key, total_amount=amount, tax_amount=0,
-            buyer_name='Khách hàng Demo', issued_at=at(paid_days), created_at=at(paid_days))
+            invoice_no='HD-' + hashlib.sha256(key.encode()).hexdigest()[:14].upper(), total_amount=amount, tax_amount=0,
+            buyer_name=next(identities[k]['full_name'] for k,v in users.items() if v==owner), issued_at=at(paid_days), created_at=at(paid_days))
 
 active_periods = {}
 for n in range(1, args.landlords + 1):
@@ -225,12 +227,13 @@ for n in range(1, args.landlords + 1):
         whole = k % 8 == 7
         property_id = uid('property/' + key)
         label = ('Nhà nguyên căn' if whole else ['Nhà trọ', 'Căn hộ dịch vụ', 'Khu lưu trú'][k % 3])
-        pname = f'{label} Demo {n:02d}-{k + 1:02d}'
+        place = property_identity(n, k, label, province_name)
+        pname = place['name']
         lat, lng = ward_locations[ward_id]
         add('properties', id=property_id, landlord_id=users[f'landlord{n}'],
             property_type_id=catalog_ids['property_types']['Nhà riêng' if whole else ['Nhà trọ', 'Tòa căn hộ dịch vụ', 'Khu lưu trú sinh viên'][k % 3]],
             name=pname, rental_mode='WHOLE' if whole else 'BY_ROOM', total_floors=2 if whole else 4,
-            province_id=province_id, ward_id=ward_id, address_line=f'{20 + n * 3 + k} đường Demo, {ward_name}',
+            province_id=province_id, ward_id=ward_id, address_line=place['address_line'],
             latitude=round(lat + ((n % 7) - 3) * .001 + (k % 4) * .0005, 8),
             longitude=round(lng + ((n % 5) - 2) * .001 + (k % 4) * .0005, 8))
         for order, image in enumerate(IMAGES):
@@ -245,7 +248,7 @@ for n in range(1, args.landlords + 1):
             price = (6500000 + n * 150000) if whole else (1400000 + ((n + k + r) % 20) * 250000)
             room_type = 'Nhà riêng nhiều tầng' if whole else ['Phòng khép kín tiêu chuẩn', 'Phòng khép kín có gác', 'Căn hộ studio', 'Căn hộ một phòng ngủ'][r % 4]
             add('rooms', id=room_id, property_id=property_id, room_type_id=catalog_ids['room_types'][room_type],
-                room_number='WHOLE' if whole else f'{r // 2 + 1}0{r % 2 + 1}', floor_number=None if whole else r // 2 + 1,
+                room_number='Nguyên căn' if whole else f'{r // 2 + 1}0{r % 2 + 1}', floor_number=None if whole else r // 2 + 1,
                 price=price, electricity_price=None if whole else 3500, water_price=None if whole else 20000,
                 service_fee=None if whole else 100000 + (r % 3) * 50000, default_deposit=price,
                 area_m2=85 + n if whole else 18 + ((n + k + r) % 25) * 2, max_occupants=6 if whole else 2 + r % 3,
@@ -264,9 +267,11 @@ for n in range(1, args.landlords + 1):
         package_priority = 2 if paid and state == 'PUBLISHED' and k == 0 else 0
         boost_priority = (2 if k == 0 else 1) if n in active_boosts and k in [0, 1] else 0
         add('listings', id=listing_id, property_id=property_id,
-            title=f'{pname} - {province_name} - thoáng sáng, tiện đi lại', slug=f'cho-thue-demo-{n:02d}-{k + 1:02d}',
-            description=f'Cơ sở minh họa tại {ward_name}, {province_name}. Phòng đa dạng diện tích, có ảnh, giá thuê và tiện ích rõ ràng. Dữ liệu demo, địa chỉ và tọa độ mô phỏng.',
-            status=state, rejection_reason='Cần bổ sung nội dung mô tả và xác minh thông tin (demo).' if state == 'REJECTED' else None,
+            title=f'{pname} - {ward_name}, cửa sổ thoáng, chỗ để xe riêng', slug=f'{ascii_slug(pname)}-{n:03d}-{k + 1:02d}',
+            description=f'{pname} nằm tại {place["address_line"]}, {ward_name}, {province_name}. '
+                'Không gian sáng, có khu để xe, WiFi, camera an ninh và chỗ giặt đồ chung. '
+                'Chi phí điện, nước và dịch vụ được ghi rõ trong hợp đồng. Bạn có thể hẹn xem phòng trước khi quyết định thuê.',
+            status=state, rejection_reason='Cần bổ sung ảnh khu vệ sinh và làm rõ các khoản phí dịch vụ.' if state == 'REJECTED' else None,
             approved_by=users['admin1'] if state in ['PUBLISHED', 'HIDDEN', 'EXPIRED'] else None,
             approved_at=at(-10) if state in ['PUBLISHED', 'HIDDEN', 'EXPIRED'] else None,
             submitted_at=at(-1), pending_expires_at=at(2) if state == 'PENDING' else None,
@@ -294,7 +299,7 @@ for n in range(1, args.tenants + 1):
         move_in_date=date(14), max_distance_km=5 + n % 6, price_tolerance_pct=20,
         top_priority=['PRICE', 'LOCATION', 'AREA', 'AMENITIES'][n % 4], allow_personalization=n % 10 != 0)
     lat, lng = ward_locations[ward_id]
-    rows['tenant_profiles'][-1].update(anchor_label='Điểm mốc demo gần ' + dict(wards[province_id])[ward_id],
+    rows['tenant_profiles'][-1].update(anchor_label='Khu vực trung tâm ' + dict(wards[province_id])[ward_id],
                                       anchor_latitude=lat, anchor_longitude=lng)
     add('tenant_profile_wards', id=uid(f'tenant-ward/{n}'), tenant_profile_id=profile_id, ward_id=ward_id)
     for name in ['WiFi', 'Nhà vệ sinh riêng']:
@@ -318,14 +323,14 @@ for n in range(1, args.tenants + 1):
     if n <= args.tenants:
         state = ['PENDING', 'REJECTED', 'CANCELLED', 'EXPIRED'][n % 4]
         add('rental_requests', id=uid(f'request/{n}'), listing_id=listing_id, room_id=first_rooms[property_id],
-            tenant_id=tenant, landlord_id=users[f'landlord{owner_number}'], message='Em muốn thuê và hẹn xem phòng (dữ liệu demo).',
-            proposed_move_in_date=date(14), tenant_full_name=f'Người thuê Demo {n:02d}',
-            tenant_email=('tenant' if n == 1 else f'tenant{n:02d}') + '@gmail.com',
+            tenant_id=tenant, landlord_id=users[f'landlord{owner_number}'], message='Em quan tâm phòng này, chiều thứ Bảy em qua xem được không ạ?',
+            proposed_move_in_date=date(14), tenant_full_name=identities[f'tenant{n}']['full_name'],
+            tenant_email=identities[f'tenant{n}']['email'],
             occupant_count=1 + n % 2, duration_months=6, status=state,
             expires_at=at(2) if state == 'PENDING' else at(-1),
             responded_at=None if state in ['PENDING', 'EXPIRED'] else at(-1), created_at=at(-2))
     add('notifications', id=uid(f'notification/{n}'), user_id=tenant, type='SYSTEM', title='Chào mừng đến Trọ Tốt',
-        body='Tài khoản demo đã sẵn sàng. Bạn có thể tìm trọ, lưu tin và nhắn tin với chủ trọ.', is_read=n % 3 == 0)
+        body='Chào mừng bạn đến với Trọ Tốt. Hãy cập nhật nhu cầu thuê để tìm phòng phù hợp hơn.', is_read=n % 3 == 0)
 
 # Revoked, expired token fixtures cannot be used to authenticate.
 for key, user in users.items():
@@ -348,28 +353,28 @@ for n in range(1, args.tenants + 1):
         end = -15 - (position // len(published)) * 70
         start = end - 60
         add('rental_requests', id=request_id, listing_id=listing_id, room_id=room_id,
-            tenant_id=tenant, landlord_id=landlord, message='Yêu cầu thuê đã hoàn thành (demo).',
-            proposed_move_in_date=date(start), tenant_full_name=f'Người thuê Demo {n:02d}',
-            tenant_email=('tenant' if n == 1 else f'tenant{n:02d}') + '@gmail.com',
+            tenant_id=tenant, landlord_id=landlord, message='Em đã xem phòng và thống nhất thời gian nhận phòng với anh/chị.',
+            proposed_move_in_date=date(start), tenant_full_name=identities[f'tenant{n}']['full_name'],
+            tenant_email=identities[f'tenant{n}']['email'],
             occupant_count=2, duration_months=2, status='ACCEPTED', responded_at=at(start - 2),
             expires_at=at(start - 1), created_at=at(start - 3))
-        agreement_code = f'DEMO-HISTORY-{n:05d}-{j:02d}'
-        asset_id = f'demo-not-uploaded/{agreement_id}'
+        agreement_code = f'HD-TRO-{n:05d}-{j + 1:02d}'
+        asset_id = f'contracts/pending/{agreement_id}'
         snapshot_sql = SQL("JSON_OBJECT('fixture',TRUE,'agreementCode'," + value(agreement_code)
                            + ",'price'," + value(str(room['price'])) + ",'deposit'," + value(str(room['price']))
                            + ",'startDate',DATE_FORMAT(" + at(start) + ",'%Y-%m-%d'),'endDate',DATE_FORMAT("
-                           + at(end) + ",'%Y-%m-%d'),'tenantName'," + value(f'Người thuê Demo {n:02d}')
-                           + ",'landlordName'," + value(f'Chủ trọ Demo {owner_number:02d}')
-                           + ",'terms','Hợp đồng dữ liệu mẫu, không có giá trị giao dịch.')")
+                           + at(end) + ",'%Y-%m-%d'),'tenantName'," + value(identities[f'tenant{n}']['full_name'])
+                           + ",'landlordName'," + value(identities[f'landlord{owner_number}']['full_name'])
+                           + ",'terms','Thanh toán tiền thuê vào đầu tháng; điện, nước tính theo chỉ số sử dụng.')")
         add('rental_agreements', id=agreement_id, agreement_code=agreement_code,
             rental_request_id=request_id, room_id=room_id, tenant_id=tenant, landlord_id=landlord,
             price=room['price'], deposit=room['price'], electricity_price=room['electricity_price'],
             water_price=room['water_price'], service_fee=room['service_fee'], payment_cycle_months=1,
             start_date=date(start), end_date=date(end), created_by_role='LANDLORD',
             status='EXPIRED' if j % 2 == 0 else 'TERMINATED',
-            terms_text='Hợp đồng demo đã kết thúc; đủ điều kiện đánh giá.',
+            terms_text='Thanh toán tiền thuê vào đầu tháng; điện, nước tính theo chỉ số sử dụng. Báo trước khi chấm dứt hợp đồng theo thời hạn hai bên đã thống nhất.',
             landlord_confirmed_at=at(start - 2), tenant_confirmed_at=at(start - 1), created_at=at(start - 2),
-            pdf_status='FAILED', pdf_error='Demo: chưa upload PDF; không có tài liệu từ Cloudinary.',
+            pdf_status='FAILED', pdf_error='Tệp hợp đồng chưa được tải lên kho lưu trữ.',
             pdf_attempt_count=6, pdf_public_id=asset_id, contract_snapshot=snapshot_sql)
         add('rental_pdf_assets', public_id=asset_id, agreement_id=agreement_id,
             created_at=at(start - 2), last_cleanup_at=at(-1))
@@ -379,7 +384,7 @@ for n in range(1, args.tenants + 1):
         hidden = position % 13 == 0
         moderation = dict(is_hidden=hidden, hidden_by=users['admin1'] if hidden else None,
                           hidden_at=at(-2) if hidden else None,
-                          hidden_reason='Ẩn đánh giá demo để minh họa kiểm duyệt.' if hidden else None)
+                          hidden_reason='Nội dung có thông tin cá nhân của người khác, cần chỉnh sửa trước khi hiển thị.' if hidden else None)
         add('room_reviews', id=uid('room-review/' + key), rental_agreement_id=agreement_id,
             tenant_id=tenant, room_id=room_id, rating=[5, 4, 5, 3, 4, 2, 5][position % 7],
             comment=['Phòng sạch, WiFi ổn định, đúng hình ảnh.', 'Khu vực thuận tiện, chủ trọ hỗ trợ tốt.',
@@ -388,11 +393,15 @@ for n in range(1, args.tenants + 1):
             created_at=at(end + 2), **moderation)
         add('landlord_reviews', id=uid('landlord-review/' + key), rental_agreement_id=agreement_id,
             tenant_id=tenant, landlord_id=landlord, rating=3 + position % 3,
-            comment='Chủ trọ phản hồi nhanh, chi phí minh bạch (demo).',
+            comment=['Chủ trọ phản hồi nhanh khi mình báo hỏng vòi nước, chi phí ghi rõ trong hợp đồng.',
+                     'Giờ giấc thoải mái, chủ nhà lịch sự. Mong khu để xe được sắp xếp gọn hơn.',
+                     'Mình nhận lại tiền cọc đúng hẹn sau khi bàn giao phòng sạch sẽ.'][position % 3],
             landlord_reply='Cảm ơn bạn đã tin tưởng.', created_at=at(end + 3), **moderation)
         add('tenant_reviews', id=uid('tenant-review/' + key), rental_agreement_id=agreement_id,
             landlord_id=landlord, tenant_id=tenant, rating=3 + (position + 1) % 3,
-            comment='Người thuê thanh toán đúng hạn, giữ gìn phòng (demo).',
+            comment=['Thanh toán đúng hẹn, giữ phòng sạch và báo trước lịch chuyển đi.',
+                     'Trao đổi lịch sự, sử dụng thiết bị cẩn thận, bàn giao đầy đủ chìa khóa.',
+                     'Sinh hoạt hòa nhã, có trách nhiệm với không gian chung.'][position % 3],
             created_at=at(end + 4), **moderation)
     # Pending/current contracts use a separate room so historical reviews remain stable.
     if n % 4 == 0:
@@ -404,14 +413,14 @@ for n in range(1, args.tenants + 1):
             room = room_by_id[room_id]
             state = ['ACTIVE', 'PENDING_CONFIRMATION', 'DRAFT', 'CANCELLED'][(n // 4) % 4]
             aid = uid(f'current-agreement/{n}')
-            add('rental_agreements', id=aid, agreement_code=f'DEMO-CURRENT-{n:05d}', room_id=room_id,
+            add('rental_agreements', id=aid, agreement_code=f'HD-THUE-{n:05d}', room_id=room_id,
                 tenant_id=tenant, landlord_id=users[f'landlord{owner_number}'], price=room['price'],
                 deposit=room['price'], start_date=date(-5 if state == 'ACTIVE' else 7), end_date=date(180),
-                status=state, created_by_role='LANDLORD', terms_text='Hợp đồng demo đang xử lý.',
+                status=state, created_by_role='LANDLORD', terms_text='Tiền thuê thanh toán hàng tháng. Người thuê giữ gìn phòng và thực hiện nội quy sinh hoạt đã thống nhất.',
                 landlord_confirmed_at=at(-6) if state in ['ACTIVE', 'PENDING_CONFIRMATION'] else None,
                 tenant_confirmed_at=at(-5) if state == 'ACTIVE' else None,
                 confirmation_expires_at=at(3) if state == 'PENDING_CONFIRMATION' else None,
-                pdf_status='FAILED', pdf_attempt_count=6, pdf_error='Demo: chưa tạo PDF.', created_at=at(-7))
+                pdf_status='FAILED', pdf_attempt_count=6, pdf_error='Chưa tạo được tệp hợp đồng, vui lòng thử lại.', created_at=at(-7))
             if state == 'ACTIVE':
                 room['rental_status'] = 'RENTED'
     listing_id, _, owner_number, _, _ = published[(n - 1) % len(published)]
@@ -421,9 +430,11 @@ for n in range(1, args.tenants + 1):
         listing_id=listing_id if n % 2 == 0 else None,
         landlord_id=users[f'landlord{owner_number}'] if n % 2 else None,
         reason_code='MISLEADING_INFORMATION' if n % 2 == 0 else 'OTHER',
-        description='Báo cáo dữ liệu mẫu, cần đối chiếu thông tin và hình ảnh minh họa.',
+        description=['Giá trong phần mô tả chưa khớp với mức giá được trao đổi khi liên hệ, nhờ kiểm tra lại.',
+                     'Một số tiện ích hiển thị trong tin chưa có khi đến xem phòng, mong được xác minh.',
+                     'Chưa nhận được phản hồi về khoản phí phát sinh, đề nghị hỗ trợ đối chiếu.'][n % 3],
         status=state, handled_by=users['admin1'] if state != 'PENDING' else None,
-        resolution_note='Đã kiểm tra và phản hồi báo cáo demo.' if state in ['RESOLVED', 'REJECTED'] else None,
+        resolution_note='Đã đối chiếu thông tin và gửi kết quả xử lý cho các bên liên quan.' if state in ['RESOLVED', 'REJECTED'] else None,
         resolved_at=at(-1) if state in ['RESOLVED', 'REJECTED'] else None, created_at=at(-3))
     for k, image in enumerate(IMAGES[:2]):
         add('report_evidences', id=uid(f'evidence/{n}/{k}'), report_id=report_id,
@@ -436,7 +447,12 @@ for n in range(1, args.tenants + 1):
             'CHAT': ('CHAT_CONVERSATION', uid(f'chat/{n}')),
         }[kind]
         add('notifications', id=uid(f'notification/{n}/{kind}'), user_id=tenant, type=kind,
-            title='Thông báo minh họa ' + kind, body='Dữ liệu demo để xem lịch sử và trạng thái.',
+            title={'REPORT':'Báo cáo của bạn đã được cập nhật', 'RENTAL_REQUEST':'Yêu cầu thuê có cập nhật mới',
+                   'RENTAL_AGREEMENT':'Thông tin hợp đồng thuê', 'CHAT':'Bạn có tin nhắn mới'}[kind],
+            body={'REPORT':'Bạn có thể mở chi tiết báo cáo để xem tiến độ xử lý.',
+                  'RENTAL_REQUEST':'Vui lòng kiểm tra lịch xem phòng và trạng thái yêu cầu thuê.',
+                  'RENTAL_AGREEMENT':'Hợp đồng thuê đã được cập nhật, hãy kiểm tra thông tin trước khi xác nhận.',
+                  'CHAT':'Chủ trọ vừa phản hồi cuộc trò chuyện của bạn.'}[kind],
             reference_type=reference_type, reference_id=reference_id, is_read=n % 2 == 0, created_at=at(-1))
 
 # Event-backed counters stay consistent with their histories and daily breakdown.
@@ -447,7 +463,7 @@ for lid, _, _, _, _ in published:
         add('listing_daily_stats', id=uid(f'stat/{lid}/{d}'), listing_id=lid, stat_date=date(-d), view_count=views, contact_count=contacts)
 
 out = ["-- V2: Reference catalog and fictional demo data for a fresh database.\n"
-       "-- Demo accounts use BCrypt(10) password 123456 and @gmail.com emails.\n"
+       "-- Seed accounts use BCrypt(10) password 123456; named accounts use a reserved test domain.\n"
        "-- Example accounts: admin@gmail.com, landlord@gmail.com, tenant@gmail.com.\n"
        "-- Relative timestamps keep active subscriptions/listings usable on migration day.\n"
        "-- External image URLs have NULL Cloudinary public_id. No remote payments/mail/uploads are performed.\n"
@@ -485,4 +501,9 @@ counts.update(provinces=len(provinces), wards=sum(map(len, wards.values())))
 counts_path = (ROOT / 'scripts/data/demo-counts.json' if args.output.resolve() == SEED.resolve()
                else args.output.with_suffix('.counts.json'))
 counts_path.write_text(json.dumps(counts, indent=2), encoding='utf-8')
+accounts_path = (ROOT / 'scripts/data/seed-accounts.json' if args.output.resolve() == SEED.resolve()
+                 else args.output.with_suffix('.accounts.json'))
+accounts = [{'id': user_id, 'role': re.sub(r'\d+$', '', key).upper(), **identities[key]}
+            for key, user_id in users.items()]
+accounts_path.write_text(json.dumps(accounts, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
 print(json.dumps(counts, indent=2))

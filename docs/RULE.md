@@ -67,4 +67,4 @@ Property giữ chủ sở hữu/địa chỉ; Room là đơn vị thuê, Listing
 
 Room phải khóa trước request/agreement; không gọi storage, render PDF hoặc giữ transaction khi chờ mạng dưới Room lock. Giữ unique guard chống thuê trùng và test concurrency. Không sửa migration đã chạy, không tự chuyển đổi dữ liệu tài chính chưa đối soát.
 
-`ControllerServiceArchitectureTest` kiểm tra dependency controller/interface; `SchemaEntityCoverageTest` đối chiếu migration/entity và bảng JDBC. Luồng thông báo, thuê phòng và review/report có các integration suite riêng. Xem [nghiệp vụ](BUSINESS.md), [API](api.md), [vận hành và kiểm thử](OPERATIONS.md).
+Các bộ kiểm thử tự động đã được tạm gỡ ngày 15/11/2026 và sẽ được bổ sung lại sau. Hiện kiểm tra biên dịch bằng Maven; giữ các quy tắc controller/service và ranh giới dữ liệu nêu trên. Xem [nghiệp vụ](BUSINESS.md), [API](api.md), [vận hành](OPERATIONS.md).

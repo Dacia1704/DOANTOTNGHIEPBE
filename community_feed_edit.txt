@@ -1,0 +1,189 @@
+Thiết kế tính năng Mạng xã hội cộng đồng (Community Feed)
+Hệ thống Cho thuê Trọ | Phiên bản 1.0 | 12/11/2026 | Stack: Spring Boot, Angular, MySQL, Redis, Elasticsearch, WebSocket
+1. Tổng quan
+Tính năng này thêm một không gian cộng đồng giống Facebook vào hệ thống: người thuê, chủ trọ và admin đều có thể đăng bài, đính kèm phòng trọ, bình luận, thả cảm xúc. Bài của chủ trọ đang dùng gói tháng hoặc gói đẩy tin (boost) được ưu tiên hiển thị trên feed.
+Mục tiêu:
+• Người thuê có nơi hỏi đáp, tìm người ở ghép, chia sẻ kinh nghiệm thuê trọ.
+• Chủ trọ có thêm kênh quảng bá phòng, tăng giá trị của gói dịch vụ và boost.
+• Admin có kênh đăng thông báo chính thức tới toàn bộ người dùng.
+• Kéo người dùng quay lại hệ thống thường xuyên hơn, từ đó tăng lượt xem tin đăng.
+Nguyên tắc thiết kế:
+• Tái sử dụng tối đa module đã có: tài khoản/JWT, upload ảnh, thông báo, report, gói dịch vụ/boost, Elasticsearch, WebSocket.
+• Làm gọn: tính feed lúc người dùng đọc (pull model) kết hợp cache Redis, không làm fan-out phức tạp.
+• Gắn chặt với nghiệp vụ lõi: bài đăng đính kèm được tin đăng phòng, quyền ưu tiên của bài lấy từ gói dịch vụ.
+2. Phạm vi và phân quyền
+• Khách vãng lai: xem feed công khai và chi tiết bài; phải đăng nhập mới được tương tác.
+• Người thuê: đăng bài, đính kèm link tin đăng phòng đang hiển thị công khai; thích, bình luận, lưu bài, theo dõi người khác, report.
+• Chủ trọ: có mọi quyền của người thuê, thêm: bài đăng tự động được ưu tiên hiển thị theo gói dịch vụ hoặc boost đang dùng, xem thống kê bài đăng.
+• Admin: đăng bài như mọi người dùng (có thể ghim lên đầu feed), ẩn/xóa bài và bình luận, xử lý report, khóa tài khoản vi phạm.
+3. Yêu cầu chức năng
+3.1 Bài đăng
+• Chỉ có bài đăng thông thường (POST), không chia DISCUSSION, ROOMMATE, SHARE_LISTING, PROMOTION hay ANNOUNCEMENT. Người thuê, chủ trọ và admin đều dùng chung chức năng tạo bài.
+• Nội dung: văn bản tối đa 5000 ký tự, tối đa 10 ảnh (mỗi ảnh tối đa 5MB), hashtag, khu vực (quận/huyện, không bắt buộc).
+• Mọi người đều có thể chèn liên kết URL trong nội dung bài và bình luận, đồng thời đính kèm tối đa 3 tin đăng phòng. Tin phòng được hiển thị dạng thẻ nhỏ (ảnh, giá, diện tích, địa chỉ) dẫn tới trang chi tiết.
+• Quy tắc đính kèm: ai cũng đính kèm được bất kỳ tin đang hiển thị công khai (người thuê, chủ trọ, admin như nhau). Nếu tin bị hết hạn hoặc gỡ, thẻ hiển thị trạng thái 'Tin không còn khả dụng'.
+• Sửa bài (hiển thị nhãn 'Đã chỉnh sửa'), xóa mềm bài của mình.
+3.2 Tương tác
+• Cảm xúc: Thích, Yêu thích, Ngạc nhiên (mỗi người một cảm xúc trên mỗi bài hoặc bình luận, có thể đổi hoặc bỏ).
+• Bình luận 2 cấp (bình luận gốc và trả lời), hỗ trợ văn bản và link URL, sửa/xóa bình luận của mình; tác giả bài và admin xóa được bình luận trong bài.
+• Lưu bài để xem lại, theo dõi (follow) người dùng khác.
+• Bình luận mới hiển thị real-time cho người đang xem bài (WebSocket).
+3.3 Feed
+• Tab 'Dành cho bạn' (xếp hạng theo độ phù hợp), 'Đang theo dõi', 'Mới nhất', 'Quanh tôi' (cùng khu vực trong hồ sơ nhu cầu).
+• Tải thêm bằng cuộn vô hạn (cursor-based pagination).
+• Chèn thẻ gợi ý phòng phù hợp (tái sử dụng module AI gợi ý) vào feed của người thuê, tối đa 1 thẻ mỗi 10 bài.
+3.4 Đẩy bài theo gói dịch vụ
+• Chỉ bài do tài khoản chủ trọ đăng mới có thể được boost/ưu tiên theo gói hiện hành, không cần tạo loại bài riêng: Boost, Gói 2, Gói 3 (phần ưu tiên cao) là mức CAO; Gói 1 và phần dư của Gói 3 là mức THẤP; gói Free là mức THƯỜNG (không có ưu tiên).
+• Bài đăng của người thuê và admin không được boost theo gói chủ trọ, xếp hạng theo thời gian và tương tác; admin vẫn có quyền ghim thông báo quan trọng mà không cần loại bài ANNOUNCEMENT.
+• Ưu tiên có thời hạn: kết thúc khi gói hoặc boost hết hạn, bài trở về xếp hạng thường.
+• Bài được ưu tiên luôn gắn nhãn 'Đề xuất' để minh bạch với người dùng.
+3.5 Thông báo
+Thêm các loại thông báo: có người bình luận bài của bạn, có người trả lời bình luận của bạn, có người thích bài, có người theo dõi bạn, bài của bạn bị ẩn/gỡ, report của bạn đã được xử lý, admin đăng thông báo mới.
+3.6 Tìm kiếm
+Tìm bài theo từ khóa, hashtag và khu vực qua Elasticsearch; không có bộ lọc loại bài.
+4. Quy tắc nghiệp vụ và kiểm duyệt
+• Hậu kiểm: bài của người thuê và chủ trọ hiển thị ngay sau khi đăng, trừ khi vi phạm bộ lọc tự động.
+• Bộ lọc tự động: bài hoặc bình luận chứa từ khóa cấm, URL độc hại/lừa đảo hoặc dấu hiệu spam sẽ vào trạng thái PENDING chờ admin duyệt. Link ngoài hợp lệ vẫn được phép đăng và bình luận.
+• Đính kèm tin đăng: thẻ tin đăng chỉ hiển thị khi tin ở trạng thái đã duyệt.
+• Report: tái sử dụng chức năng report hiện có, mở rộng đối tượng bị report thành bài hoặc bình luận. Khi một nội dung bị từ 3 người dùng khác nhau report, hệ thống tự ẩn tạm (HIDDEN) và đẩy lên đầu hàng đợi của admin.
+• Chống spam (Redis rate limit): tối đa 5 bài mỗi giờ, 30 bình luận mỗi giờ; tài khoản mới dưới 24 giờ giảm còn một nửa; chặn bài trùng nội dung trong 10 phút.
+• Ưu tiên theo gói: không giới hạn số bài của chủ trọ, nhưng mỗi chủ trọ chỉ có tối đa 2 bài được ưu tiên cùng lúc để không chiếm hết feed; bài cũ hơn trở về xếp hạng thường.
+• Khóa tài khoản: toàn bộ bài và bình luận của người bị khóa tự động ẩn khỏi feed.
+• Gỡ nội dung: admin gỡ bài thì hiển thị lý do cho tác giả, bài giữ lại ở dạng xóa mềm để làm bằng chứng.
+5. Thiết kế dữ liệu (MySQL)
+posts: id, author_id, content, area (quận/huyện), status (VISIBLE, PENDING, HIDDEN, REMOVED), is_pinned, promotion_level (NONE, LOW, HIGH), promotion_source (PACKAGE, BOOST), promoted_until, like_count, comment_count, edited_at, created_at, updated_at, deleted_at. Index: (status, created_at), (author_id, created_at), (promotion_level, promoted_until).
+post_media: id, post_id, url, sort_order.
+post_listing_links: id, post_id, listing_id. Ràng buộc unique (post_id, listing_id), tối đa 3 dòng mỗi bài.
+post_hashtags: post_id, tag. Index theo tag.
+post_reactions: id, post_id, user_id, type, created_at. Unique (post_id, user_id).
+comments: id, post_id, user_id, parent_id (null nếu là bình luận gốc, chỉ cho phép 2 cấp), content, status, reaction_count, created_at, deleted_at. Index (post_id, parent_id, created_at).
+comment_reactions: id, comment_id, user_id, type. Unique (comment_id, user_id).
+saved_posts: user_id, post_id, created_at.
+follows: follower_id, followee_id, created_at. Unique (follower_id, followee_id).
+content_reports: nếu bảng report hiện tại chỉ gắn với chủ trọ thì thêm cột target_type (POST, COMMENT, LANDLORD) và target_id; nếu khó sửa thì tạo bảng riêng gồm reporter_id, target_type, target_id, reason, description, evidence_url, status, handled_by, handled_at.
+post_promotions (nhật ký đẩy bài): id, post_id, source (PACKAGE, BOOST), boost_purchase_id, level, start_at, end_at. Dùng để thống kê và đối soát với giao dịch.
+notifications: dùng bảng hiện có, bổ sung các loại ở mục 3.5 và cột reference (post_id hoặc comment_id).
+Các bộ đếm like_count, comment_count được lưu dư (denormalize) trong posts và cập nhật cùng giao dịch ghi để feed không phải COUNT mỗi lần.
+6. Thiết kế Feed và cơ chế đẩy bài
+6.1 Thuật toán tạo feed (tab 'Dành cho bạn')
+Bước 1, lấy ứng viên:
+• Bài của người đang theo dõi trong 7 ngày.
+• Bài mới và nhiều tương tác trong toàn hệ thống trong 48 giờ.
+• Bài cùng khu vực với hồ sơ nhu cầu của người thuê.
+• Bài admin đang ghim.
+Bước 2, chấm điểm bài thường:
+• score = 0.5 x recency + 0.3 x engagement + 0.2 x relevance
+• recency = exp(-số giờ kể từ lúc đăng / 24)
+• engagement = log(1 + like + 2 x comment), chuẩn hóa về khoảng 0 đến 1
+• relevance = cộng 1 nếu đang theo dõi tác giả, cộng 0.5 nếu cùng khu vực, cộng 0.3 nếu cùng loại phòng đang tìm
+Bước 3, chèn bài ưu tiên theo slot:
+• Cứ mỗi 5 bài thường có 1 slot quảng bá (vị trí 2, 7, 12...).
+• Slot lấy từ nhóm mức CAO trước; hết nhóm CAO mới đến mức THẤP.
+• Trong cùng nhóm xoay vòng (round-robin) theo chủ trọ để công bằng, không để một người chiếm liên tiếp.
+• Bài ghim của admin luôn đứng đầu feed.
+Bước 4, giới hạn hiển thị:
+• Mỗi người dùng thấy một bài quảng bá tối đa 2 lần trong 24 giờ (Redis set seen:{userId}).
+• Không hiển thị 2 bài quảng bá liên tiếp.
+6.2 Phân trang và cache
+• Kết quả xếp hạng lưu thành snapshot trong Redis (ZSET feed:{userId}:{tab}, TTL 5 phút). Cursor là vị trí trong snapshot, nhờ đó cuộn vô hạn không bị trùng hay sót bài khi có bài mới.
+• Kéo để làm mới (pull to refresh) thì tạo snapshot mới.
+• Khách vãng lai dùng snapshot chung feed:guest, TTL 2 phút.
+• Tab 'Đang theo dõi' và 'Mới nhất' truy vấn trực tiếp MySQL theo cursor (created_at, id), không cần xếp hạng.
+6.3 Vòng đời ưu tiên
+• Khi chủ trọ đăng bài, hệ thống kiểm tra gói hiện hành và số bài đang được ưu tiên (tối đa 2), ghi promotion_level và promoted_until = min(ngày hết hạn gói, ngày hết hạn boost).
+• Scheduler chạy mỗi giờ: các bài hết hạn ưu tiên được đặt về NONE.
+• Chủ trọ nâng cấp hoặc mua boost thì bài đang có chuyển lên mức cao hơn ngay mà không cần đăng lại.
+7. Kiến trúc và công nghệ
+• Backend: thêm package community trong Spring Boot gồm controller, service, repository, entity, dto, scheduler; chia sẻ JWT và phân quyền với module hiện có.
+• Redis: snapshot feed, tập bài đã thấy, rate limit (INCR kèm TTL), cache số liệu bài hot.
+• WebSocket (STOMP): topic /topic/posts/{postId}/comments đẩy bình luận mới; kênh /user/queue/notifications đẩy thông báo cá nhân; có thể thêm topic /topic/feed/new-post để hiện banner 'Có bài mới'.
+• Elasticsearch: index posts gồm content, hashtags, authorName, area, createdAt; đồng bộ sau khi ghi MySQL thành công bằng event; nếu ES lỗi thì fallback tìm bằng LIKE trong MySQL.
+• Lưu ảnh: dùng lại dịch vụ upload hiện có, thêm thư mục community.
+• Angular: module community tải lười (lazy load) gồm các component FeedPage, PostCard, PostComposer, ListingPicker, CommentThread, ReactionBar, SavedPosts, CommunityProfile, AdminModeration.
+8. Thiết kế API (REST)
+Bài đăng
+• POST /api/posts: tạo bài (content, area, mediaUrls, listingIds, hashtags); link URL nằm trong content, không yêu cầu postType.
+• GET /api/posts/{id}: xem chi tiết.
+• PUT /api/posts/{id}: sửa bài của mình.
+• DELETE /api/posts/{id}: xóa mềm.
+• GET /api/feed?tab=&cursor=&size=: lấy feed, trả về danh sách bài kèm nextCursor; mỗi bài có cờ isPromoted để hiện nhãn 'Đề xuất'.
+• GET /api/users/{id}/posts: bài của một người dùng.
+• GET /api/posts/search?q=&area=: tìm kiếm.
+Cảm xúc
+• PUT /api/posts/{id}/reaction: đặt hoặc đổi cảm xúc (type).
+• DELETE /api/posts/{id}/reaction: bỏ cảm xúc.
+• PUT và DELETE /api/comments/{id}/reaction: tương tự cho bình luận.
+Bình luận
+• GET /api/posts/{id}/comments?cursor=: bình luận gốc, mỗi bình luận kèm số reply.
+• GET /api/comments/{id}/replies?cursor=: các trả lời.
+• POST /api/posts/{id}/comments: tạo (content có thể chứa URL, parentId nếu là trả lời).
+• PUT và DELETE /api/comments/{id}: sửa, xóa.
+Lưu bài và theo dõi
+• POST và DELETE /api/posts/{id}/save; GET /api/me/saved-posts.
+• POST và DELETE /api/users/{id}/follow; GET /api/me/following.
+Report
+• POST /api/posts/{id}/report và POST /api/comments/{id}/report: reason, description, ảnh minh chứng.
+Quảng bá (chủ trọ)
+• GET /api/landlord/post-quota: số bài đang được ưu tiên và mức ưu tiên hiện hành.
+• GET /api/landlord/posts/stats: lượt hiển thị, cảm xúc, bình luận, lượt bấm vào tin đính kèm.
+Admin
+• GET /api/admin/posts?status=: danh sách bài theo trạng thái (PENDING, HIDDEN, bị report).
+• PATCH /api/admin/posts/{id}/status: duyệt, ẩn, gỡ kèm lý do.
+• PATCH /api/admin/posts/{id}/pin: ghim hoặc bỏ ghim.
+• Admin đăng bài bằng POST /api/posts như mọi người dùng.
+• DELETE /api/admin/comments/{id}: gỡ bình luận.
+• Xử lý report: dùng lại API admin report hiện có với target_type mới.
+WebSocket
+• Subscribe /topic/posts/{postId}/comments: nhận bình luận mới.
+• Subscribe /user/queue/notifications: nhận thông báo cá nhân.
+9. Luồng nghiệp vụ chính
+Đăng bài có đính kèm phòng
+1. Người dùng mở khung đăng bài, viết nội dung và chọn tin đăng muốn gắn bằng ListingPicker (chủ trọ hay người thuê đều làm như nhau).
+2. Backend kiểm tra: tin được gắn đã duyệt và đang hiển thị, không vượt rate limit.
+3. Bài qua bộ lọc tự động: sạch thì VISIBLE, nghi ngờ thì PENDING.
+4. Nếu tác giả là chủ trọ đang có gói hoặc boost, hệ thống ghi promotion_level theo gói và đẩy event để đồng bộ Elasticsearch.
+5. Bài của chủ trọ có ưu tiên xuất hiện ở slot quảng bá kèm nhãn 'Đề xuất'; bài của người khác xếp hạng thường.
+Xem feed và bình luận
+1. Angular gọi GET /api/feed, nhận snapshot trang đầu cùng nextCursor.
+2. Người dùng cuộn xuống, Angular gọi tiếp với cursor.
+3. Người dùng mở bài và bình luận, backend lưu rồi phát lên /topic/posts/{postId}/comments, tất cả người đang xem nhận ngay.
+4. Backend tạo thông báo cho tác giả bài (hoặc tác giả bình luận được trả lời) qua kênh notifications.
+Report và kiểm duyệt
+1. Người dùng report bài, hệ thống ghi nhận và đếm số người report khác nhau.
+2. Đủ 3 người: bài tự động HIDDEN và lên đầu hàng đợi admin.
+3. Admin xem bằng chứng, chọn: khôi phục, gỡ bài, cảnh cáo hoặc khóa tài khoản; người report và tác giả đều nhận thông báo kết quả.
+10. Thiết kế giao diện (Angular)
+• /community: feed với 4 tab, ô 'Bạn đang nghĩ gì?' mở composer, cột phải gợi ý theo dõi và hashtag nổi bật (ẩn trên mobile).
+• PostCard: đầu thẻ (avatar, tên, nhãn vai trò Chủ trọ/Admin, hiển thị link có thể bấm, nhãn 'Đề xuất' nếu là bài ưu tiên), nội dung, lưới ảnh, thẻ tin đăng đính kèm, thanh cảm xúc và số bình luận, nút bình luận, lưu, report.
+• PostComposer: soạn nội dung có thể chèn link URL, tải ảnh có xem trước, ListingPicker (tìm mọi tin đang hiển thị công khai), thêm hashtag, chủ trọ thấy dòng báo bài sẽ được ưu tiên theo gói hiện tại.
+• /community/posts/:id: chi tiết bài với cây bình luận 2 cấp, nhận bình luận real-time.
+• /community/profile/:userId: bài đăng của người đó, nút theo dõi, huy hiệu xác thực.
+• /community/saved: bài đã lưu.
+• Admin /admin/community: hàng đợi PENDING, bài bị report, thao tác ghim bài.
+• Responsive: layout 1 cột trên mobile, composer mở toàn màn hình.
+11. Kế hoạch triển khai (khoảng 10 ngày làm việc)
+Ngày 1, cả nhóm: chốt ERD các bảng mục 5, chốt API trên Swagger, tạo migration.
+Giai đoạn 1 (ngày 2-4): lõi bài đăng và bình luận
+• TV1: API tạo/sửa/xóa bài, upload ảnh bài đăng, API đính kèm tin đăng kèm kiểm tra tin đang hiển thị.
+• TV2: API feed phiên bản đầu (tab Mới nhất, cursor), trang FeedPage và PostCard có cuộn vô hạn.
+• TV3: API bình luận 2 cấp có phân trang, CommentThread, API và UI cảm xúc cho bài và bình luận.
+Giai đoạn 2 (ngày 5-7): tương tác và xếp hạng
+• TV1: PostComposer và ListingPicker, trang chi tiết bài, trang cá nhân cộng đồng.
+• TV2: thuật toán xếp hạng, snapshot Redis, tab Đang theo dõi và Quanh tôi, các cột promotion trong posts.
+• TV3: WebSocket bình luận real-time, các loại thông báo mới, API lưu bài và theo dõi.
+Giai đoạn 3 (ngày 8-10): đẩy bài, kiểm duyệt, hoàn thiện
+• TV1: report bài/bình luận, màn hình admin kiểm duyệt, ghim bài, bộ lọc từ khóa tự động.
+• TV2: gắn mức ưu tiên theo gói khi chủ trọ đăng bài, giới hạn 2 bài ưu tiên cùng lúc, chèn slot quảng bá, scheduler hết hạn ưu tiên, đồng bộ và tìm kiếm Elasticsearch, thống kê bài cho chủ trọ.
+• TV3: rate limit và chống spam bằng Redis, responsive mobile, kiểm thử luồng end-to-end, bổ sung dữ liệu mẫu cho demo.
+12. Rủi ro và phương án tối giản
+• Xếp hạng feed phức tạp: nếu chậm tiến độ, giữ tab Mới nhất cộng slot quảng bá cố định, bỏ công thức điểm.
+• Elasticsearch: nếu chưa kịp đồng bộ, tìm bài bằng LIKE trong MySQL trước, thêm ES sau.
+• WebSocket bình luận: nếu chưa ổn, dùng polling 5 giây cho trang chi tiết bài, vẫn demo được.
+• Phình dữ liệu và hiệu năng: luôn phân trang bằng cursor, có index như mục 5, không COUNT trực tiếp trên feed.
+• Nội dung xấu và spam: rate limit, bộ lọc từ khóa và ngưỡng 3 report tự ẩn là ba lớp bảo vệ tối thiểu.
+13. Giả định cần bạn xác nhận
+• 'Đẩy các tin của chủ trọ có gói tháng/boost' được hiểu là bài viết của chủ trọ tự động được ưu tiên trên feed theo gói hoặc boost. Tin đăng phòng không tự chèn lên feed khi chủ trọ không viết bài; nếu cần thì thêm sau.
+• Giới hạn tối đa 2 bài ưu tiên cùng lúc mỗi chủ trọ ở mục 4 là số đề xuất, có thể chỉnh hoặc bỏ.
+• Không làm chia sẻ lại (repost), nhắn tin riêng, nhóm/cộng đồng con và story trong phạm vi này; có thể bổ sung sau nếu còn thời gian.
+• Mô hình hậu kiểm (bài hiển thị ngay, kiểm duyệt sau) khác với quy tắc 'tin đăng phòng phải duyệt trước'. Nếu muốn bài của chủ trọ cũng phải duyệt trước thì đặt mặc định PENDING cho bài của chủ trọ.
+Quy ước thống nhất: Không có post_type/category cho bài cộng đồng, không có API riêng cho từng loại bài. Link hợp lệ được phép xuất hiện trong cả bài đăng lẫn bình luận. Boost là thuộc tính ưu tiên hiển thị dành riêng cho bài của chủ trọ đủ điều kiện, không phải một loại bài đăng.

@@ -49,7 +49,7 @@ public class ListingReviewServiceImpl implements ListingReviewService {
                 .totalPages(result.getTotalPages()).totalElements(result.getTotalElements())
                 .data(result.getData().stream().map(r -> new Item(r.id(),
                         r.authorName() == null || r.authorName().isBlank() ? "Người thuê" : r.authorName(),
-                        r.rating(), r.comment(), r.landlordReply(), r.createdAt(), null, r.verifiedStay())).toList())
+                        r.rating(), r.comment(), r.landlordReply(), r.createdAt(), null, r.verifiedStay(), r.textStatus(), r.replyStatus())).toList())
                 .build());
     }
 }

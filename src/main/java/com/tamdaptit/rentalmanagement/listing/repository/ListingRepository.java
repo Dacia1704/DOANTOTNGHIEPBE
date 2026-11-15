@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.Optional;
 @Repository
 public interface ListingRepository extends JpaRepository<Listing, String> {
+    @Query("select l from Listing l where " + PUBLIC_CONDITION + " and lower(l.title) like lower(concat('%', :query, '%')) order by l.publishedAt desc,l.id")
+    List<Listing> findForCommunity(@Param("time") LocalDateTime time,@Param("query") String query,org.springframework.data.domain.Pageable pageable);
     String PRICE_STATISTICS_FROM = """
             from Room r join r.property p join p.province province join p.ward ward
             where r.price > 0 and r.rentalStatus = 'AVAILABLE'

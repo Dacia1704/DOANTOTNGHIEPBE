@@ -1,0 +1,12 @@
+{
+  "posts": 600,
+  "comments": 7184,
+  "images": 880,
+  "post_statuses": {
+    "HIDDEN": 20,
+    "RESTRICTED": 20,
+    "REMOVED": 20,
+    "VISIBLE": 520,
+    "PENDING": 20
+  }
+}

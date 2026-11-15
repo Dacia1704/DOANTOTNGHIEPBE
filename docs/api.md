@@ -1838,3 +1838,8 @@ Các endpoint `/api/chat` yêu cầu access token và kiểm tra thành viên h�
 | PUT | `/conversations/{id}/read` | Đánh dấu đã đọc |
 
 STOMP kết nối `/ws`, CONNECT mang `Authorization: Bearer <access_token>`, gửi tới `/app/chat.send`, nhận tại `/user/queue/messages` và lỗi tại `/user/queue/errors`. Payload gửi gồm `conversationId`, `content`, `messageType` (mặc định TEXT); sender lấy từ principal, không nhận senderId/receiverId từ client. Database lưu tin trước khi phát realtime sau commit. Không có API tìm người hoặc tạo direct chat tùy ý trong controller hiện tại.
+
+
+## Cộng đồng và kiểm duyệt nội dung
+
+API `/api/community/*` và `/api/admin/moderation/*`, DTO, phân quyền, migration và phạm vi hiện có được mô tả tại [community-implementation.md](community-implementation.md). Đánh giá listing vẫn yêu cầu hợp đồng thuê hợp lệ; không có bình luận listing tự do.

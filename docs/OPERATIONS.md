@@ -1,10 +1,12 @@
 # Vận hành và kiểm thử backend
 
+Ngày 15/11/2026, các bộ kiểm thử tự động và helper kiểm thử đã được tạm gỡ. Các kết quả kiểm chứng bên dưới được giữ làm lịch sử; dùng `./mvnw.cmd compile` để kiểm tra biên dịch hiện tại.
+
 [Mục lục](../README.md) · [API](api.md) · [Nghiệp vụ](BUSINESS.md)
 
 ## Database và migration hiện tại
 
-Tại ngày hợp nhất 10/11/2026, thư mục migration có `V1__fullsql.sql`, `V2__seed_reference_and_demo_data.sql`, `V6__notification_delivery.sql`, `V7__role_permission_management.sql`. V1 là schema đã gộp, V2 là seed; V6/V7 bổ sung giao thông báo và phân quyền. Những số migration V3–V5, V8–V14 trong báo cáo triển khai cũ không phải hướng dẫn áp dụng cho checkout hiện tại. Không sửa migration đã áp dụng hoặc chạy repair để che lỗi checksum.
+Luồng dựng mới hiện dùng V1 schema lõi, V2 seed nghiệp vụ, V6 thông báo, V7 phân quyền, V8 địa điểm lân cận, V9 schema cộng đồng và V10 seed cộng đồng. `scripts/setup-demo.ps1` sinh V2/V10 trước khi áp dụng phần migration còn lại; mặc định có 600 bài cộng đồng, tăng bằng `-CommunityPosts` khi tạo database mới. Không sửa migration đã áp dụng hoặc chạy repair để che lỗi checksum. Hướng dẫn dựng lại cả hai DB ở mục 2.2 của [README chung](../../AIService/README.md).
 
 Cài đặt toàn hệ thống, biến môi trường và seed theo [README chung](../../AIService/README.md). Không reset hoặc seed lại database đang dùng để chạy thử tính năng. Source là cơ sở đối chiếu bảng/cột, không dùng số bảng trong báo cáo cũ làm tiêu chí xóa bảng.
 
@@ -67,11 +69,7 @@ QueryDr được kiểm tra bằng HTTP server local giả lập VNPay và các 
 
 Chạy nhóm kiểm thử bằng JDK 21 và MySQL thử nghiệm, không đặt URL database ứng dụng:
 
-```powershell
-$env:SUBSCRIPTION_TEST_MYSQL_URL='jdbc:mysql://127.0.0.1:33317/'
-$env:SUBSCRIPTION_TEST_MYSQL_USER='root'
-./mvnw.cmd '-Dtest=PackageCatalogApiTest,SubscriptionSchemaMigrationTest,VnPaySignerTest,VnPayQueryClientTest' test
-```
+
 
 Nếu MySQL thử nghiệm có mật khẩu, truyền `SUBSCRIPTION_TEST_MYSQL_PASSWORD` qua môi trường chạy. Các schema được tạo với tên ngẫu nhiên `subscription_test_<uuid>` và dọn sau test; test database không chạy khi thiếu URL phù hợp. Hai kiểm thử chữ ký vẫn có thể chạy độc lập, không cần MySQL.
 
@@ -137,9 +135,7 @@ Thông báo hợp đồng mở chi tiết hợp đồng; yêu cầu thuê mở d
 
 `NotificationInfrastructureTest` chạy với MySQL/Redis/RabbitMQ thật khi `NOTIFICATION_INFRA_TEST=true`. Cần `SUBSCRIPTION_TEST_MYSQL_URL=jdbc:mysql://127.0.0.1:3306/`, `SUBSCRIPTION_TEST_MYSQL_USER`, `SUBSCRIPTION_TEST_MYSQL_PASSWORD` và các biến `REDIS_PASSWORD`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD` tương ứng Docker. Tài khoản RabbitMQ cần quyền quản trị để test tạo/xóa vhost tạm; MySQL cần quyền tạo/xóa schema tạm. Test dùng schema/vhost/cache riêng, không xóa dữ liệu ứng dụng.
 
-```powershell
-.\mvnw.cmd test "-Dtest=NotificationInfrastructureTest,ResilientCacheTest,WebSocketAuthInterceptorTest"
-```
+
 
 Kiểm tra rollback, publisher confirm, routing lỗi và gửi lại, chống trùng, DLQ, phân trang/phân quyền, cache JSON/TTL và thời điểm xóa cache. FE chạy `npm test -- --watch=false` và `npm run build`.
 
@@ -147,12 +143,7 @@ Kiểm tra rollback, publisher confirm, routing lỗi và gửi lại, chống t
 
 Từ BE, với MySQL 8 local; URL chỉ chấp nhận localhost/127.0.0.1. Test tự tạo/xóa schema ngẫu nhiên, không dùng DB ứng dụng:
 
-```powershell
-$env:SUBSCRIPTION_TEST_MYSQL_URL='jdbc:mysql://localhost:3306/'
-$env:SUBSCRIPTION_TEST_MYSQL_USER='root'
-# Đặt SUBSCRIPTION_TEST_MYSQL_PASSWORD từ cấu hình riêng, không commit mật khẩu.
-.\mvnw.cmd '-Dtest=RentalWorkflowTest,RentalValidationTest,RentalMigrationTest' test
-```
+
 
 15 test gồm transactions song song bằng CountDownLatch, duplicate submit/accept, accept-vs-submit, confirm-vs-timeout cả trước/đúng boundary, unique DB bypass, khác phòng cùng ACTIVE, bàn giao/lịch sử, WHOLE/foreign room, RBAC/IDOR, PDF Unicode/hash/snapshot, storage fail/retry, lease recovery, MySQL timeout 3 giây, room status bypass và migration conflict/repair.
 
@@ -160,10 +151,7 @@ $env:SUBSCRIPTION_TEST_MYSQL_USER='root'
 
 Từ FE:
 
-```powershell
-npx ng test --watch=false
-npm run build
-```
+
 
 Fullstack thực: khởi động BE trên 18080 với DB_NAME trỏ vào **database tạm riêng**, áp dụng các migration trong checkout hiện tại, giữ worker bật. FE build production rồi chạy `node scripts/rental-e2e-preview.cjs`. Đặt PLAYWRIGHT_MODULE_PATH nếu Playwright không nằm trong node_modules, RENTAL_E2E_ISOLATED=true, chạy `node scripts/rental-booking.e2e.cjs`. Script dùng các tài khoản demo V2, tạo tin trong DB tạm, đặt qua UI, duyệt qua UI, tải Cloudinary PDF, xác nhận, kiểm tra RENTED/IDOR/redirect/mobile; ảnh lưu ở `docs/screenshots/rental_*.png`. Sau test cần dừng BE tạm, xóa các raw/authenticated PDF của chính database tạm và drop schema tạm. Không chạy script lên DB ứng dụng hoặc production.
 
@@ -173,12 +161,7 @@ Fullstack thực: khởi động BE trên 18080 với DB_NAME trỏ vào **datab
 
 Chạy với một MySQL thử nghiệm riêng, Java 21 và Maven wrapper:
 
-```powershell
-$env:SUBSCRIPTION_TEST_MYSQL_URL = 'jdbc:mysql://127.0.0.1:33317/'
-$env:SUBSCRIPTION_TEST_MYSQL_USER = 'root'
-# SUBSCRIPTION_TEST_MYSQL_PASSWORD được cấp qua môi trường nếu server yêu cầu.
-.\mvnw.cmd "-Dtest=SubscriptionSchemaMigrationTest,PackageCatalogApiTest,VnPaySignerTest,VnPayQueryClientTest" test
-```
+
 
 Các test MySQL bỏ qua khi chưa đặt URL thử nghiệm; test chữ ký không cần database. Bài kiểm tra schema gồm migration không tạo bảng phân bổ riêng, JPA validate toàn bộ entity, nâng cấp tin/danh mục cũ, guard lịch sử không xác minh được, FK/check cho ưu tiên trên tin, unique cho ACTIVE/SCHEDULED/CHANGE/Boost/mã giao dịch và nâng V3 lên V4 khi đã có dữ liệu thanh toán.
 

@@ -1,8 +1,8 @@
 -- MySQL 8, chạy thủ công trên DATABASE DEMO đã migrate V1-V3 trở lên.
 -- Chọn database trước (USE ten_database), chạy toàn bộ file trong cùng connection.
 -- Không đặt file này trong Flyway: đây là dữ liệu mẫu tùy chọn.
--- Phạm vi: tài khoản demo tenant@gmail.com / tenant02..tenant100@gmail.com,
--- landlord@gmail.com / landlord02..landlord24@gmail.com, đúng role và ACTIVE.
+-- Phạm vi: ba tài khoản đăng nhập chính và tài khoản tên Việt tại @trotot.example.test,
+-- đúng role TENANT/LANDLORD và trạng thái ACTIVE.
 -- Tạo hợp đồng lịch sử giả lập EXPIRED; KHÔNG tạo PDF hoặc thay trạng thái phòng.
 -- Xác nhận trong các hợp đồng này cũng là dữ liệu giả lập, không phải giao dịch thật.
 -- Có thể chạy lại: không sửa/xóa hợp đồng, nội dung review hoặc moderation đã có.
@@ -19,7 +19,7 @@ CREATE TEMPORARY TABLE tmp_review_demo_tenants AS
 SELECT u.id, ROW_NUMBER() OVER (ORDER BY u.email, u.id) AS seq
 FROM users u
 WHERE u.status='ACTIVE'
-  AND (u.email='tenant@gmail.com' OR u.email REGEXP '^tenant(0[2-9]|[1-9][0-9]|100)@gmail[.]com$')
+  AND (u.email='tenant@gmail.com' OR u.email REGEXP '[.]t[0-9]{4,}@trotot[.]example[.]test$')
   AND EXISTS (SELECT 1 FROM user_roles ur JOIN roles role ON role.id=ur.role_id
               WHERE ur.user_id=u.id AND role.code='TENANT');
 
@@ -34,7 +34,7 @@ FROM (
                       AND l.status='PUBLISHED' AND l.expires_at>@demo_review_now) DESC, r.id) AS chosen
     FROM rooms r JOIN properties p ON p.id=r.property_id JOIN users u ON u.id=p.landlord_id
     WHERE u.status='ACTIVE'
-      AND (u.email='landlord@gmail.com' OR u.email REGEXP '^landlord(0[2-9]|1[0-9]|2[0-4])@gmail[.]com$')
+      AND (u.email='landlord@gmail.com' OR u.email REGEXP '[.]l[0-9]{4,}@trotot[.]example[.]test$')
       AND EXISTS (SELECT 1 FROM user_roles ur JOIN roles role ON role.id=ur.role_id
                   WHERE ur.user_id=u.id AND role.code='LANDLORD')
 ) candidates WHERE chosen=1;
@@ -56,16 +56,16 @@ INSERT INTO rental_agreements
      electricity_price, water_price, service_fee, payment_cycle_months,
      start_date, end_date, terms_text, status, created_by_role,
      landlord_confirmed_at, tenant_confirmed_at, pdf_status, pdf_error, created_at, updated_at)
-SELECT p.agreement_id, CONCAT('DEMO-REVIEW-',p.agreement_id), p.room_id, p.tenant_id, p.landlord_id,
+SELECT p.agreement_id, CONCAT('HD-REVIEW-',p.agreement_id), p.room_id, p.tenant_id, p.landlord_id,
        p.price, COALESCE(p.default_deposit,0), p.electricity_price, p.water_price, p.service_fee, 1,
        DATE_SUB(DATE(@demo_review_now),INTERVAL 8 MONTH), DATE_SUB(DATE(@demo_review_now),INTERVAL 2 MONTH),
-       '[DEMO] Hợp đồng lịch sử giả lập dùng minh họa đánh giá; không có hợp đồng PDF hoặc giao dịch thật.',
+       'Tiền thuê thanh toán hàng tháng; điện, nước tính theo chỉ số sử dụng. Hai bên đã hoàn tất bàn giao phòng.',
        'EXPIRED', 'LANDLORD', DATE_SUB(@demo_review_now,INTERVAL 8 MONTH),
-       DATE_SUB(@demo_review_now,INTERVAL 8 MONTH), 'FAILED', '[DEMO] Không tạo PDF cho hợp đồng giả lập.',
+       DATE_SUB(@demo_review_now,INTERVAL 8 MONTH), 'FAILED', 'Tệp hợp đồng chưa được tải lên kho lưu trữ.',
        DATE_SUB(@demo_review_now,INTERVAL 8 MONTH), DATE_SUB(@demo_review_now,INTERVAL 2 MONTH)
 FROM tmp_review_demo_plan p
 WHERE NOT EXISTS (SELECT 1 FROM rental_agreements a WHERE a.id=p.agreement_id
-                  OR a.agreement_code=CONCAT('DEMO-REVIEW-',p.agreement_id));
+                  OR a.agreement_code=CONCAT('HD-REVIEW-',p.agreement_id));
 SET @demo_review_inserted_agreements=ROW_COUNT();
 
 -- Lấy lại các bên từ hợp đồng, chỉ dùng hợp đồng demo đủ điều kiện nghiệp vụ.
@@ -73,12 +73,12 @@ INSERT INTO landlord_reviews
     (id,rental_agreement_id,tenant_id,landlord_id,rating,comment,landlord_reply,is_hidden,created_at,updated_at)
 SELECT UUID(),a.id,a.tenant_id,a.landlord_id,1+MOD(CRC32(CONCAT('landlord:',a.id)),5),
        CASE MOD(CRC32(CONCAT('landlord:',a.id)),5)
-           WHEN 0 THEN '[DEMO] Việc xử lý yêu cầu sửa chữa còn chậm, cần cải thiện.'
-           WHEN 1 THEN '[DEMO] Mong chủ trọ thông báo chi phí và hỗ trợ rõ ràng hơn.'
-           WHEN 2 THEN '[DEMO] Chủ trọ hỗ trợ ở mức ổn, một số việc còn phải nhắc lại.'
-           WHEN 3 THEN '[DEMO] Chủ trọ thân thiện, thông báo chi phí rõ ràng.'
-           ELSE '[DEMO] Chủ trọ hỗ trợ nhanh, trao đổi minh bạch và đúng thỏa thuận.' END,
-       IF(MOD(CRC32(a.id),2)=0,'[DEMO] Cảm ơn góp ý, chúng tôi đã ghi nhận để cải thiện dịch vụ.',NULL),
+           WHEN 0 THEN 'Việc xử lý yêu cầu sửa chữa còn chậm, cần cải thiện.'
+           WHEN 1 THEN 'Mong chủ trọ thông báo chi phí và hỗ trợ rõ ràng hơn.'
+           WHEN 2 THEN 'Chủ trọ hỗ trợ ở mức ổn, một số việc còn phải nhắc lại.'
+           WHEN 3 THEN 'Chủ trọ thân thiện, thông báo chi phí rõ ràng.'
+           ELSE 'Chủ trọ hỗ trợ nhanh, trao đổi minh bạch và đúng thỏa thuận.' END,
+       IF(MOD(CRC32(a.id),2)=0,'Cảm ơn góp ý, chúng tôi đã ghi nhận để cải thiện dịch vụ.',NULL),
        0,DATE_ADD(a.end_date,INTERVAL 2 DAY),DATE_ADD(a.end_date,INTERVAL 3 DAY)
 FROM rental_agreements a JOIN tmp_review_demo_plan p ON p.agreement_id=a.id
 WHERE a.tenant_id=p.tenant_id AND a.landlord_id=p.landlord_id AND a.room_id=p.room_id
@@ -91,11 +91,11 @@ INSERT INTO tenant_reviews
     (id,rental_agreement_id,landlord_id,tenant_id,rating,comment,is_hidden,created_at,updated_at)
 SELECT UUID(),a.id,a.landlord_id,a.tenant_id,1+MOD(CRC32(CONCAT('tenant:',a.id)),5),
        CASE MOD(CRC32(CONCAT('tenant:',a.id)),5)
-           WHEN 0 THEN '[DEMO] Cần cải thiện việc giữ gìn phòng và tuân thủ nội quy.'
-           WHEN 1 THEN '[DEMO] Đôi lúc thanh toán chậm, cần chủ động trao đổi hơn.'
-           WHEN 2 THEN '[DEMO] Sinh hoạt nhìn chung ổn, còn vài điểm cần nhắc nhở.'
-           WHEN 3 THEN '[DEMO] Người thuê giữ phòng sạch, trao đổi lịch sự.'
-           ELSE '[DEMO] Người thuê thanh toán đúng hạn, giữ phòng tốt và bàn giao đầy đủ.' END,
+           WHEN 0 THEN 'Cần cải thiện việc giữ gìn phòng và tuân thủ nội quy.'
+           WHEN 1 THEN 'Đôi lúc thanh toán chậm, cần chủ động trao đổi hơn.'
+           WHEN 2 THEN 'Sinh hoạt nhìn chung ổn, còn vài điểm cần nhắc nhở.'
+           WHEN 3 THEN 'Người thuê giữ phòng sạch, trao đổi lịch sự.'
+           ELSE 'Người thuê thanh toán đúng hạn, giữ phòng tốt và bàn giao đầy đủ.' END,
        0,DATE_ADD(a.end_date,INTERVAL 4 DAY),DATE_ADD(a.end_date,INTERVAL 4 DAY)
 FROM rental_agreements a JOIN tmp_review_demo_plan p ON p.agreement_id=a.id
 WHERE a.tenant_id=p.tenant_id AND a.landlord_id=p.landlord_id AND a.room_id=p.room_id
@@ -108,12 +108,12 @@ INSERT INTO room_reviews
     (id,rental_agreement_id,tenant_id,room_id,rating,comment,landlord_reply,is_hidden,created_at,updated_at)
 SELECT UUID(),a.id,a.tenant_id,a.room_id,1+MOD(CRC32(CONCAT('room:',a.id)),5),
        CASE MOD(CRC32(CONCAT('room:',a.id)),5)
-           WHEN 0 THEN '[DEMO] Phòng cách âm kém, cần cải thiện bảo trì.'
-           WHEN 1 THEN '[DEMO] Một số thiết bị chưa tốt, cần kiểm tra thường xuyên hơn.'
-           WHEN 2 THEN '[DEMO] Phòng đáp ứng nhu cầu cơ bản, tiện nghi ở mức vừa phải.'
-           WHEN 3 THEN '[DEMO] Phòng sạch, tiện ích đầy đủ, phù hợp giá thuê.'
-           ELSE '[DEMO] Phòng thoáng, yên tĩnh và thuận tiện cho sinh hoạt.' END,
-       IF(MOD(CRC32(a.id),3)=0,'[DEMO] Cảm ơn bạn đã chia sẻ trải nghiệm về phòng.',NULL),
+           WHEN 0 THEN 'Phòng cách âm kém, cần cải thiện bảo trì.'
+           WHEN 1 THEN 'Một số thiết bị chưa tốt, cần kiểm tra thường xuyên hơn.'
+           WHEN 2 THEN 'Phòng đáp ứng nhu cầu cơ bản, tiện nghi ở mức vừa phải.'
+           WHEN 3 THEN 'Phòng sạch, tiện ích đầy đủ, phù hợp giá thuê.'
+           ELSE 'Phòng thoáng, yên tĩnh và thuận tiện cho sinh hoạt.' END,
+       IF(MOD(CRC32(a.id),3)=0,'Cảm ơn bạn đã chia sẻ trải nghiệm về phòng.',NULL),
        0,DATE_ADD(a.end_date,INTERVAL 1 DAY),DATE_ADD(a.end_date,INTERVAL 3 DAY)
 FROM rental_agreements a JOIN tmp_review_demo_plan p ON p.agreement_id=a.id
 WHERE a.tenant_id=p.tenant_id AND a.landlord_id=p.landlord_id AND a.room_id=p.room_id

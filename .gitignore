@@ -40,3 +40,7 @@ build/
 
 ### Logs ###
 *.log
+
+# Python generator caches
+__pycache__/
+*.py[cod]

@@ -62,6 +62,14 @@ public class LandlordReview implements ReviewEntry {
     private String landlordReply;
 
     @Builder.Default
+    @Column(name = "text_status", nullable = false)
+    private String textStatus = "VISIBLE";
+
+    @Builder.Default
+    @Column(name = "reply_status", nullable = false)
+    private String replyStatus = "VISIBLE";
+
+    @Builder.Default
     @Column(name = "is_hidden", nullable = false)
     private Boolean hidden = false;
 

@@ -43,6 +43,7 @@ public class ReviewServiceImpl implements ReviewService {
     private final UserRepository users;
     private final ReviewMapper mapper;
     private final Clock clock;
+    private final com.tamdaptit.rentalmanagement.moderation.service.ContentModerationService moderation;
     private final com.tamdaptit.rentalmanagement.room.repository.RoomRepository roomRepository;
 
     @Override
@@ -58,14 +59,17 @@ public class ReviewServiceImpl implements ReviewService {
         if (!eligible(agreement)) throw new AppException(REVIEW_NOT_ELIGIBLE);
         if (existing(type,agreement.getId())!=null) throw new AppException(duplicate(type));
         String comment=text(body.comment(),2000);
-        return switch(type) {
-            case ROOM -> mapper.toResponse(rooms.saveAndFlush(RoomReview.builder().rentalAgreement(agreement)
-                .tenant(agreement.getTenant()).room(agreement.getRoom()).rating(body.rating()).comment(comment).build()));
-            case LANDLORD -> mapper.toResponse(landlords.saveAndFlush(LandlordReview.builder().rentalAgreement(agreement)
-                .tenant(agreement.getTenant()).landlord(agreement.getLandlord()).rating(body.rating()).comment(comment).build()));
-            case TENANT -> mapper.toResponse(tenants.saveAndFlush(TenantReview.builder().rentalAgreement(agreement)
-                .tenant(agreement.getTenant()).landlord(agreement.getLandlord()).rating(body.rating()).comment(comment).build()));
+        var evaluation=moderation.evaluate(type.name()+"_REVIEW_TEXT",comment);
+        ReviewEntry saved = switch(type) {
+            case ROOM -> rooms.saveAndFlush(RoomReview.builder().rentalAgreement(agreement)
+                .tenant(agreement.getTenant()).room(agreement.getRoom()).rating(body.rating()).comment(comment).textStatus(evaluation.status()).build());
+            case LANDLORD -> landlords.saveAndFlush(LandlordReview.builder().rentalAgreement(agreement)
+                .tenant(agreement.getTenant()).landlord(agreement.getLandlord()).rating(body.rating()).comment(comment).textStatus(evaluation.status()).build());
+            case TENANT -> tenants.saveAndFlush(TenantReview.builder().rentalAgreement(agreement)
+                .tenant(agreement.getTenant()).landlord(agreement.getLandlord()).rating(body.rating()).comment(comment).build());
         };
+        moderation.record(type.name()+"_REVIEW_TEXT",saved.getId(),actor,1,comment,evaluation);
+        return response(saved);
     }
 
     @Override
@@ -192,8 +196,10 @@ public class ReviewServiceImpl implements ReviewService {
         if (!actor.equals(entry.getRentalAgreement().getLandlord().getId())) throw new AppException(UNAUTHORIZED);
         if (Boolean.TRUE.equals(entry.getHidden())) throw new AppException(REVIEW_HIDDEN);
         String reply=required(body.reply(),2000);
-        if (entry instanceof RoomReview review) review.setLandlordReply(reply);
-        else ((LandlordReview)entry).setLandlordReply(reply);
+        var evaluation=moderation.evaluate(type.name()+"_REVIEW_REPLY",reply);
+        if (entry instanceof RoomReview review) {review.setLandlordReply(reply);review.setReplyStatus(evaluation.status());}
+        else {var review=(LandlordReview)entry;review.setLandlordReply(reply);review.setReplyStatus(evaluation.status());}
+        moderation.record(type.name()+"_REVIEW_REPLY",id,actor,1,reply,evaluation);
         // Flush before mapping so updatedAt in the response reflects the mutation.
         if (type==ReviewType.ROOM) rooms.flush(); else landlords.flush();
         return response(entry);
@@ -287,7 +293,7 @@ public class ReviewServiceImpl implements ReviewService {
         boolean verified = matches && eligible(agreement)
                 && entry.getTenant().getId().equals(agreement.getTenant().getId());
         return new ReviewResponse(dto.id(), dto.type(), dto.rating(), dto.comment(), dto.landlordReply(),
-                dto.authorName(), dto.authorAvatarUrl(), dto.createdAt(), dto.updatedAt(), verified);
+                dto.authorName(), dto.authorAvatarUrl(), dto.createdAt(), dto.updatedAt(), verified, dto.textStatus(), dto.replyStatus());
     }
     private ReviewDetailResponse detail(ReviewEntry entry) {
         return new ReviewDetailResponse(response(entry),entry.getRentalAgreement().getId(),Boolean.TRUE.equals(entry.getHidden()),
