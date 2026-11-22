@@ -4,6 +4,7 @@ Java/Spring Boot backend cho hệ thống cho thuê trọ. Khởi chạy cả FE
 
 | Tài liệu | Nội dung |
 | --- | --- |
+| [Use case cho báo cáo đồ án](README_USE_CASE.md) | Tác nhân, 12 nhóm chức năng, danh sách use case, hướng dẫn sơ đồ và đặc tả nghiệp vụ chính |
 | [API chung BE/FE](docs/api.md) | Request/response, phân quyền, Property, Listing, gói/Boost, thuê/PDF, review/report, chat và thông báo |
 | [Nghiệp vụ và dữ liệu](docs/BUSINESS.md) | Quan hệ domain, lượt đăng, snapshot gói, transaction/khóa, worker PDF |
 | [Vận hành và kiểm thử](docs/OPERATIONS.md) | Migration hiện tại, VNPay/IPN, Redis/RabbitMQ và integration tests |
