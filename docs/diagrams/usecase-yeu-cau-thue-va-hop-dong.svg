@@ -1,0 +1,182 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="1460" viewBox="0 0 1560 1460" role="img" aria-labelledby="diagram-title diagram-desc">
+  <title id="diagram-title">Use case quản lý yêu cầu thuê và hợp đồng</title>
+  <desc id="diagram-desc">Tám use case TH01 đến TH08 của hệ thống cho thuê trọ. Người thuê gửi, theo dõi, hủy yêu cầu; xem PDF, đồng ý hoặc từ chối hợp đồng. Chủ trọ xử lý yêu cầu, xem hợp đồng và xác nhận bàn giao. Quản trị viên đọc chi tiết yêu cầu và hợp đồng. Cloudinary hỗ trợ lấy PDF. Xác nhận hợp đồng bao gồm kiểm tra phiên bản và toàn vẹn PDF. Các hình cùng tên là cùng một tác nhân.</desc>
+  <rect width="1560" height="1460" fill="white" />
+  <defs>
+    <marker id="include-arrow" markerWidth="13" markerHeight="12" refX="11" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M 1 1 L 11 6 L 1 11" fill="none" stroke="#222" stroke-width="1.6" />
+    </marker>
+  </defs>
+  <text x="780.0" y="43" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="600" fill="#171717">
+    <tspan x="780.0" dy="0">USE CASE QUẢN LÝ YÊU CẦU THUÊ VÀ HỢP ĐỒNG</tspan>
+  </text>
+  <rect x="250" y="90" width="1060" height="1170" fill="white" stroke="#303030" stroke-width="1.8" />
+  <text x="780.0" y="121" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="600" fill="#171717">
+    <tspan x="780.0" dy="0">Hệ thống cho thuê trọ</tspan>
+  </text>
+  <rect x="285" y="145" width="990" height="410" fill="white" stroke="#9a9a9a" stroke-width="1.1" />
+  <text x="780.0" y="176" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="600" fill="#171717">
+    <tspan x="780.0" dy="0">Quản lý yêu cầu thuê</tspan>
+  </text>
+  <rect x="285" y="600" width="990" height="610" fill="white" stroke="#9a9a9a" stroke-width="1.1" />
+  <text x="780.0" y="631" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="600" fill="#171717">
+    <tspan x="780.0" dy="0">Quản lý hợp đồng</tspan>
+  </text>
+  <polyline points="130,339 345,250" fill="none" stroke="#333333" stroke-width="1.65" stroke-linejoin="round" />
+  <polyline points="130,339 345,370" fill="none" stroke="#333333" stroke-width="1.65" stroke-linejoin="round" />
+  <polyline points="130,339 345,485" fill="none" stroke="#333333" stroke-width="1.65" stroke-linejoin="round" />
+  <polyline points="1420,254 1205,270" fill="none" stroke="#333333" stroke-width="1.65" stroke-linejoin="round" />
+  <polyline points="1420,444 1190,450" fill="none" stroke="#333333" stroke-width="1.65" stroke-linejoin="round" />
+  <polyline points="130,894 240,740 775,740 775,900 830,900" fill="none" stroke="#333333" stroke-width="1.65" stroke-linejoin="round" />
+  <polyline points="130,894 345,840" fill="none" stroke="#333333" stroke-width="1.65" stroke-linejoin="round" />
+  <polyline points="130,894 345,1080" fill="none" stroke="#333333" stroke-width="1.65" stroke-linejoin="round" />
+  <polyline points="1420,694 1200,900" fill="none" stroke="#333333" stroke-width="1.65" stroke-linejoin="round" />
+  <polyline points="1420,694 1200,700" fill="none" stroke="#333333" stroke-width="1.65" stroke-linejoin="round" />
+  <polyline points="1420,894 1200,900" fill="none" stroke="#333333" stroke-width="1.65" stroke-linejoin="round" />
+  <polyline points="1420,1094 1200,900" fill="none" stroke="#333333" stroke-width="1.65" stroke-linejoin="round" />
+  <polyline points="675,840 740,840 740,1080 830,1080" fill="none" stroke="#333333" stroke-width="1.65" stroke-linejoin="round" stroke-dasharray="8 6" marker-end="url(#include-arrow)" />
+  <rect x="673" y="958" width="134" height="30" fill="white" />
+  <text x="740" y="980" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400" fill="#171717">
+    <tspan x="740" dy="0">«include»</tspan>
+  </text>
+  <ellipse cx="500" cy="250" rx="155" ry="43" fill="white" stroke="#2b2b2b" stroke-width="1.6" />
+  <text x="500" y="245.0" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#171717">
+    <tspan x="500" dy="0" font-weight="600">TH01</tspan>
+    <tspan x="500" dy="24">Gửi yêu cầu thuê phòng</tspan>
+  </text>
+  <ellipse cx="500" cy="370" rx="155" ry="52" fill="white" stroke="#2b2b2b" stroke-width="1.6" />
+  <text x="500" y="353.0" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#171717">
+    <tspan x="500" dy="0" font-weight="600">TH02</tspan>
+    <tspan x="500" dy="24">Theo dõi yêu cầu thuê</tspan>
+    <tspan x="500" dy="24">của mình</tspan>
+  </text>
+  <ellipse cx="500" cy="485" rx="155" ry="43" fill="white" stroke="#2b2b2b" stroke-width="1.6" />
+  <text x="500" y="480.0" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#171717">
+    <tspan x="500" dy="0" font-weight="600">TH03</tspan>
+    <tspan x="500" dy="24">Hủy yêu cầu thuê</tspan>
+  </text>
+  <ellipse cx="1020" cy="270" rx="185" ry="55" fill="white" stroke="#2b2b2b" stroke-width="1.6" />
+  <text x="1020" y="253.0" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#171717">
+    <tspan x="1020" dy="0" font-weight="600">TH04</tspan>
+    <tspan x="1020" dy="24">Tiếp nhận và xử lý</tspan>
+    <tspan x="1020" dy="24">yêu cầu thuê</tspan>
+  </text>
+  <ellipse cx="1020" cy="450" rx="170" ry="45" fill="white" stroke="#2b2b2b" stroke-width="1.6" />
+  <text x="1020" y="445.0" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#171717">
+    <tspan x="1020" dy="0">Xem chi tiết</tspan>
+    <tspan x="1020" dy="24">yêu cầu thuê</tspan>
+  </text>
+  <ellipse cx="1015" cy="900" rx="185" ry="45" fill="white" stroke="#2b2b2b" stroke-width="1.6" />
+  <text x="1015" y="895.0" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#171717">
+    <tspan x="1015" dy="0" font-weight="600">TH05</tspan>
+    <tspan x="1015" dy="24">Xem và tải hợp đồng PDF</tspan>
+  </text>
+  <ellipse cx="510" cy="840" rx="165" ry="50" fill="white" stroke="#2b2b2b" stroke-width="1.6" />
+  <text x="510" y="823.0" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#171717">
+    <tspan x="510" dy="0" font-weight="600">TH06</tspan>
+    <tspan x="510" dy="24">Xác nhận đồng ý</tspan>
+    <tspan x="510" dy="24">hợp đồng</tspan>
+  </text>
+  <ellipse cx="510" cy="1080" rx="165" ry="50" fill="white" stroke="#2b2b2b" stroke-width="1.6" />
+  <text x="510" y="1063.0" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#171717">
+    <tspan x="510" dy="0" font-weight="600">TH07</tspan>
+    <tspan x="510" dy="24">Từ chối hợp đồng</tspan>
+    <tspan x="510" dy="24">chờ xác nhận</tspan>
+  </text>
+  <ellipse cx="1015" cy="700" rx="185" ry="50" fill="white" stroke="#2b2b2b" stroke-width="1.6" />
+  <text x="1015" y="683.0" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#171717">
+    <tspan x="1015" dy="0" font-weight="600">TH08</tspan>
+    <tspan x="1015" dy="24">Xác nhận bàn giao</tspan>
+    <tspan x="1015" dy="24">và kết thúc thuê</tspan>
+  </text>
+  <ellipse cx="1015" cy="1080" rx="185" ry="43" fill="white" stroke="#2b2b2b" stroke-width="1.6" />
+  <text x="1015" y="1075.0" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#171717">
+    <tspan x="1015" dy="0">Kiểm tra phiên bản /</tspan>
+    <tspan x="1015" dy="24">toàn vẹn PDF</tspan>
+  </text>
+  <g fill="white" stroke="#262626" stroke-width="1.8" stroke-linecap="round">
+    <circle cx="100" cy="303" r="15" />
+    <line x1="100" y1="318" x2="100" y2="370" />
+    <line x1="71" y1="339" x2="129" y2="339" />
+    <line x1="100" y1="370" x2="75" y2="405" />
+    <line x1="100" y1="370" x2="125" y2="405" />
+  </g>
+  <text x="100" y="432" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#171717">
+    <tspan x="100" dy="0">Người thuê</tspan>
+  </text>
+  <g fill="white" stroke="#262626" stroke-width="1.8" stroke-linecap="round">
+    <circle cx="1450" cy="218" r="15" />
+    <line x1="1450" y1="233" x2="1450" y2="285" />
+    <line x1="1421" y1="254" x2="1479" y2="254" />
+    <line x1="1450" y1="285" x2="1425" y2="320" />
+    <line x1="1450" y1="285" x2="1475" y2="320" />
+  </g>
+  <text x="1450" y="347" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#171717">
+    <tspan x="1450" dy="0">Chủ trọ</tspan>
+  </text>
+  <g fill="white" stroke="#262626" stroke-width="1.8" stroke-linecap="round">
+    <circle cx="1450" cy="408" r="15" />
+    <line x1="1450" y1="423" x2="1450" y2="475" />
+    <line x1="1421" y1="444" x2="1479" y2="444" />
+    <line x1="1450" y1="475" x2="1425" y2="510" />
+    <line x1="1450" y1="475" x2="1475" y2="510" />
+  </g>
+  <text x="1450" y="537" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#171717">
+    <tspan x="1450" dy="0">Quản trị viên</tspan>
+  </text>
+  <g fill="white" stroke="#262626" stroke-width="1.8" stroke-linecap="round">
+    <circle cx="100" cy="858" r="15" />
+    <line x1="100" y1="873" x2="100" y2="925" />
+    <line x1="71" y1="894" x2="129" y2="894" />
+    <line x1="100" y1="925" x2="75" y2="960" />
+    <line x1="100" y1="925" x2="125" y2="960" />
+  </g>
+  <text x="100" y="987" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#171717">
+    <tspan x="100" dy="0">Người thuê</tspan>
+  </text>
+  <g fill="white" stroke="#262626" stroke-width="1.8" stroke-linecap="round">
+    <circle cx="1450" cy="658" r="15" />
+    <line x1="1450" y1="673" x2="1450" y2="725" />
+    <line x1="1421" y1="694" x2="1479" y2="694" />
+    <line x1="1450" y1="725" x2="1425" y2="760" />
+    <line x1="1450" y1="725" x2="1475" y2="760" />
+  </g>
+  <text x="1450" y="787" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#171717">
+    <tspan x="1450" dy="0">Chủ trọ</tspan>
+  </text>
+  <g fill="white" stroke="#262626" stroke-width="1.8" stroke-linecap="round">
+    <circle cx="1450" cy="858" r="15" />
+    <line x1="1450" y1="873" x2="1450" y2="925" />
+    <line x1="1421" y1="894" x2="1479" y2="894" />
+    <line x1="1450" y1="925" x2="1425" y2="960" />
+    <line x1="1450" y1="925" x2="1475" y2="960" />
+  </g>
+  <text x="1450" y="987" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#171717">
+    <tspan x="1450" dy="0">Quản trị viên</tspan>
+  </text>
+  <g fill="white" stroke="#262626" stroke-width="1.8" stroke-linecap="round">
+    <circle cx="1450" cy="1058" r="15" />
+    <line x1="1450" y1="1073" x2="1450" y2="1125" />
+    <line x1="1421" y1="1094" x2="1479" y2="1094" />
+    <line x1="1450" y1="1125" x2="1425" y2="1160" />
+    <line x1="1450" y1="1125" x2="1475" y2="1160" />
+  </g>
+  <text x="1450" y="1187" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#171717">
+    <tspan x="1450" dy="0">Dịch vụ lưu trữ</tspan>
+    <tspan x="1450" dy="26.88">Cloudinary</tspan>
+  </text>
+  <line x1="250" y1="1290" x2="1310" y2="1290" stroke="#aaa" stroke-width="1" />
+  <text x="250" y="1322" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400" fill="#404040">
+    <tspan x="250" dy="0">TH04: Chấp nhận → tạo hợp đồng chờ xác nhận, giữ phòng 48 giờ và tự tạo PDF; từ chối → ghi nhận lý do.</tspan>
+  </text>
+  <text x="250" y="1351" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400" fill="#404040">
+    <tspan x="250" dy="0">TH06: Xác nhận thành công → hợp đồng có hiệu lực, phòng chuyển sang đã thuê.</tspan>
+  </text>
+  <text x="250" y="1380" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400" fill="#404040">
+    <tspan x="250" dy="0">Quản trị viên chỉ đọc chi tiết yêu cầu và hợp đồng/PDF. Người thuê, chủ trọ truy cập dữ liệu theo quyền.</tspan>
+  </text>
+  <text x="250" y="1409" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400" fill="#404040">
+    <tspan x="250" dy="0">«include» là hành vi bắt buộc. Đăng nhập là tiền điều kiện. Các hình cùng tên biểu diễn cùng một tác nhân.</tspan>
+  </text>
+</svg>

@@ -7,7 +7,18 @@ import com.tamdaptit.rentalmanagement.property.dto.response.PropertyResponse;
 
 public interface PropertyService {
     PropertyResponse create(String userId, CreatePropertyRequest request);
-    PropertyResponse updateLocation(String userId, String id, PropertyLocationRequest request);
+
+    PropertyResponse updateLocation(
+        String userId,
+        String id,
+        PropertyLocationRequest request
+    );
+
     PropertyResponse get(String userId, String id);
-    PageResponse<PropertyResponse> mine(String userId, int page, int size);
+
+    PageResponse<PropertyResponse> mine(
+        String userId,
+        int page,
+        int size
+    );
 }

@@ -1,5 +1,7 @@
 package com.tamdaptit.rentalmanagement.notification;
 
+import java.util.Collections;
+
 import com.tamdaptit.rentalmanagement.common.dto.PageResponse;
 import com.tamdaptit.rentalmanagement.common.exception.AppException;
 import com.tamdaptit.rentalmanagement.common.exception.ErrorCode;
@@ -17,18 +19,19 @@ import org.mockito.quality.Strictness;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
-import java.util.Collections;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.contains;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("Phần 2: Trao đổi, thông báo & Quản trị bổ trợ - NotificationService")
 class NotificationServiceTest {
-
     @Mock
     private JdbcTemplate jdbc;
 
@@ -47,7 +50,7 @@ class NotificationServiceTest {
     void testUnreadCount() {
         String userId = "tenant-1";
         when(jdbc.queryForObject(contains("COUNT(*) FROM notifications"), eq(Long.class), eq(userId)))
-                .thenReturn(7L);
+            .thenReturn(7L);
 
         long count = notificationService.unreadCount(userId);
         assertThat(count).isEqualTo(7L);
@@ -58,7 +61,7 @@ class NotificationServiceTest {
     void testUnreadCountZero() {
         String userId = "tenant-zero";
         when(jdbc.queryForObject(contains("COUNT(*) FROM notifications"), eq(Long.class), eq(userId)))
-                .thenReturn(0L);
+            .thenReturn(0L);
 
         long count = notificationService.unreadCount(userId);
         assertThat(count).isZero();
@@ -68,24 +71,24 @@ class NotificationServiceTest {
     @DisplayName("Phân trang thông báo với tham số page âm hoặc size không hợp lệ bị ném INVALID_REQUEST")
     void testInvalidPaginationParameters() {
         assertThatThrownBy(() -> notificationService.list("user-1", false, -1, 10))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.INVALID_REQUEST);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.INVALID_REQUEST);
 
         assertThatThrownBy(() -> notificationService.list("user-1", false, 0, 0))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.INVALID_REQUEST);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.INVALID_REQUEST);
 
         assertThatThrownBy(() -> notificationService.list("user-1", false, 0, 101))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.INVALID_REQUEST);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.INVALID_REQUEST);
 
         assertThatThrownBy(() -> notificationService.list("user-1", false, 1_000_001, 20))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.INVALID_REQUEST);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.INVALID_REQUEST);
     }
 
     @Test
@@ -93,9 +96,9 @@ class NotificationServiceTest {
     void testListNotificationsSuccess() {
         String userId = "tenant-1";
         when(jdbc.queryForObject(contains("COUNT(*) FROM notifications"), eq(Long.class), eq(userId)))
-                .thenReturn(15L);
+            .thenReturn(15L);
         when(jdbc.query(contains("SELECT * FROM notifications"), any(RowMapper.class), eq(userId), eq(10), eq(0L)))
-                .thenReturn(Collections.emptyList());
+            .thenReturn(Collections.emptyList());
 
         PageResponse<NotificationResponse> result = notificationService.list(userId, false, 0, 10);
 
@@ -110,9 +113,9 @@ class NotificationServiceTest {
     void testListNotificationsUnreadOnly() {
         String userId = "tenant-1";
         when(jdbc.queryForObject(contains("AND is_read=false"), eq(Long.class), eq(userId)))
-                .thenReturn(3L);
+            .thenReturn(3L);
         when(jdbc.query(contains("AND is_read=false"), any(RowMapper.class), eq(userId), eq(10), eq(0L)))
-                .thenReturn(Collections.emptyList());
+            .thenReturn(Collections.emptyList());
 
         PageResponse<NotificationResponse> result = notificationService.list(userId, true, 0, 10);
 
@@ -125,13 +128,20 @@ class NotificationServiceTest {
     void testMarkReadNotFound() {
         String userId = "tenant-1";
         String notificationId = "notif-999";
-        when(jdbc.queryForObject(contains("COUNT(*) FROM notifications WHERE id=?"), eq(Long.class), eq(notificationId), eq(userId)))
-                .thenReturn(0L);
+        when(
+            jdbc.queryForObject(
+                contains("COUNT(*) FROM notifications WHERE id=?"),
+                eq(Long.class),
+                eq(notificationId),
+                eq(userId)
+            )
+        )
+            .thenReturn(0L);
 
         assertThatThrownBy(() -> notificationService.markRead(userId, notificationId))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.NOT_FOUND);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.NOT_FOUND);
     }
 
     @Test
@@ -139,14 +149,22 @@ class NotificationServiceTest {
     void testMarkReadSuccess() {
         String userId = "tenant-1";
         String notificationId = "notif-1";
-        when(jdbc.queryForObject(contains("COUNT(*) FROM notifications WHERE id=?"), eq(Long.class), eq(notificationId), eq(userId)))
-                .thenReturn(1L);
+        when(
+            jdbc.queryForObject(
+                contains("COUNT(*) FROM notifications WHERE id=?"),
+                eq(Long.class),
+                eq(notificationId),
+                eq(userId)
+            )
+        )
+            .thenReturn(1L);
 
         notificationService.markRead(userId, notificationId);
 
         verify(jdbc, times(1)).update(
-                contains("UPDATE notifications SET is_read=true WHERE id=? AND user_id=?"),
-                eq(notificationId), eq(userId)
+            contains("UPDATE notifications SET is_read=true WHERE id=? AND user_id=?"),
+            eq(notificationId),
+            eq(userId)
         );
         verify(realtime, times(1)).changedAfterCommit(userId);
     }
@@ -159,8 +177,8 @@ class NotificationServiceTest {
         notificationService.markAllRead(userId);
 
         verify(jdbc, times(1)).update(
-                contains("UPDATE notifications SET is_read=true WHERE user_id=? AND is_read=false"),
-                eq(userId)
+            contains("UPDATE notifications SET is_read=true WHERE user_id=? AND is_read=false"),
+            eq(userId)
         );
         verify(realtime, times(1)).changedAfterCommit(userId);
     }

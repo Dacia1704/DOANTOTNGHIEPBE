@@ -1,5 +1,8 @@
 package com.tamdaptit.rentalmanagement.chat.repository;
 
+import java.time.LocalDateTime;
+import java.util.Optional;
+
 import com.tamdaptit.rentalmanagement.chat.entity.ChatMessage;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -7,9 +10,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-
-import java.time.LocalDateTime;
-import java.util.Optional;
 
 @Repository
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, String> {
@@ -43,8 +43,8 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, String
               AND m.createdAt > :cutoffTime
             """)
     long countUnread(
-            @Param("conversationId") String conversationId,
-            @Param("userId") String userId,
-            @Param("cutoffTime") LocalDateTime cutoffTime
+        @Param("conversationId") String conversationId,
+        @Param("userId") String userId,
+        @Param("cutoffTime") LocalDateTime cutoffTime
     );
 }

@@ -1,4 +1,6 @@
 package com.tamdaptit.rentalmanagement.notification.repository;
+
 import com.tamdaptit.rentalmanagement.notification.entity.Notification;
 import org.springframework.data.jpa.repository.JpaRepository;
-public interface NotificationRepository extends JpaRepository<Notification,String> {}
+
+public interface NotificationRepository extends JpaRepository<Notification, String> {}

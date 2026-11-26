@@ -1,5 +1,12 @@
 package com.tamdaptit.rentalmanagement.address.entity;
 
+import java.math.BigDecimal;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -8,11 +15,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.UuidGenerator;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "provinces")
@@ -23,7 +25,6 @@ import jakarta.persistence.Table;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class Province {
-
     @Id
     @UuidGenerator
     @Column(length = 36)
@@ -36,8 +37,8 @@ public class Province {
     private String name;
 
     @Column(name = "centroid_lat", precision = 10, scale = 8)
-    private java.math.BigDecimal centroidLat;
+    private BigDecimal centroidLat;
 
     @Column(name = "centroid_lng", precision = 11, scale = 8)
-    private java.math.BigDecimal centroidLng;
+    private BigDecimal centroidLng;
 }

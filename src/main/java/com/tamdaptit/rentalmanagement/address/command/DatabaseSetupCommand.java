@@ -15,7 +15,8 @@ import org.springframework.stereotype.Component;
 public class DatabaseSetupCommand implements ApplicationRunner {
     private final ConfigurableApplicationContext context;
 
-    @Override public void run(ApplicationArguments args) {
+    @Override
+    public void run(ApplicationArguments args) {
         System.exit(SpringApplication.exit(context, () -> 0));
     }
 }

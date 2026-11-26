@@ -1,5 +1,9 @@
 package com.tamdaptit.rentalmanagement.subscription.job;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.HashSet;
+
 import com.tamdaptit.rentalmanagement.listing.repository.ListingRepository;
 import com.tamdaptit.rentalmanagement.payment.repository.PaymentRepository;
 import com.tamdaptit.rentalmanagement.subscription.repository.BoostPurchaseRepository;
@@ -10,9 +14,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import java.time.Clock;
-import java.time.LocalDateTime;
-import java.util.HashSet;
 
 @Slf4j
 @Component
@@ -38,7 +39,11 @@ public class SubscriptionExpiryJob {
             try {
                 lifecycle.refreshOwner(owner);
             } catch (RuntimeException exception) {
-                log.warn("Could not refresh subscriptions for landlord {}: {}", owner, exception.getClass().getSimpleName());
+                log.warn(
+                    "Could not refresh subscriptions for landlord {}: {}",
+                    owner,
+                    exception.getClass().getSimpleName()
+                );
             }
         }
     }

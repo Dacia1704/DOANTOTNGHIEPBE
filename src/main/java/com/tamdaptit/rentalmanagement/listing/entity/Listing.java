@@ -1,19 +1,11 @@
 package com.tamdaptit.rentalmanagement.listing.entity;
 
+import java.time.LocalDateTime;
+
 import com.tamdaptit.rentalmanagement.identity.entity.User;
 import com.tamdaptit.rentalmanagement.listing.entity.enums.ListingStatus;
 import com.tamdaptit.rentalmanagement.property.entity.Property;
 import com.tamdaptit.rentalmanagement.subscription.entity.ServiceSubscriptionPeriod;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
-import org.hibernate.annotations.UuidGenerator;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -24,7 +16,16 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import java.time.LocalDateTime;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.UuidGenerator;
 
 @Entity
 @Table(name = "listings")
@@ -35,7 +36,7 @@ import java.time.LocalDateTime;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class Listing {
-    @Column(name="priority_suppressed", nullable=false)
+    @Column(name = "priority_suppressed", nullable = false)
     @Builder.Default
     private Boolean prioritySuppressed = false;
 

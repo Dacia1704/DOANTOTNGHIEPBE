@@ -1,15 +1,16 @@
 package com.tamdaptit.rentalmanagement.address.controller;
 
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
-import com.tamdaptit.rentalmanagement.address.dto.response.ProvinceResponse;
+import java.util.List;
+
 import com.tamdaptit.rentalmanagement.address.dto.request.WardRequest;
+import com.tamdaptit.rentalmanagement.address.dto.response.ProvinceResponse;
 import com.tamdaptit.rentalmanagement.address.dto.response.WardResponse;
 import com.tamdaptit.rentalmanagement.address.service.WardService;
 import com.tamdaptit.rentalmanagement.common.dto.ApiResponse;
 import com.tamdaptit.rentalmanagement.common.dto.PageResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import java.util.List;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -37,10 +38,11 @@ public class WardController {
 
     @GetMapping("/wards")
     public ApiResponse<PageResponse<WardResponse>> list(
-            @RequestParam(required = false) String provinceId,
-            @RequestParam(required = false) String q,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+        @RequestParam(required = false) String provinceId,
+        @RequestParam(required = false) String q,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size
+    ) {
         return ApiResponse.success(service.list(provinceId, q, page, size));
     }
 

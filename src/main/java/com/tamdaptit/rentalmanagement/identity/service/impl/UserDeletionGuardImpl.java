@@ -23,10 +23,17 @@ public class UserDeletionGuardImpl implements UserDeletionGuard {
         for (var key : keys) {
             String table = key.get("TABLE_NAME").toString().replace("`", "``");
             String column = key.get("COLUMN_NAME").toString().replace("`", "``");
-            Integer count = jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM `" + table
-                    + "` WHERE `" + column + "` = ?)", Integer.class, userId);
-            if (count != null && count > 0) return true;
+            Integer count = jdbc.queryForObject(
+                "SELECT EXISTS(SELECT 1 FROM `" + table
+                    + "` WHERE `" + column + "` = ?)",
+                Integer.class,
+                userId
+            );
+            if (count != null && count > 0) {
+                return true;
+            }
         }
+
         return false;
     }
 }

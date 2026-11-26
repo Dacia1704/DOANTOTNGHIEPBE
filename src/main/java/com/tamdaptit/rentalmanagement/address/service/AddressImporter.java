@@ -5,5 +5,4 @@ import com.tamdaptit.rentalmanagement.address.dto.response.AddressSyncResult;
 
 public interface AddressImporter {
     AddressSyncResult apply(AddressSnapshot snapshot);
-
 }

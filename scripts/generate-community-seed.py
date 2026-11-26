@@ -13,34 +13,145 @@ IMAGES = [
     'https://images.stockcake.com/public/c/0/1/c01d3664-8c4c-46d8-85c6-ec2a3b9be90e_large/luxurious-beach-resort-stockcake.jpg',
     'https://tse4.mm.bing.net/th/id/OIP.21ZvL7uodC5HIbuO-eiXWwHaEo?r=0&pid=Api&h=220&P=0',
 ]
-AREAS = ['Bình Thạnh', 'Thủ Đức', 'Gò Vấp', 'Tân Bình', 'Quận 7', 'Bình Tân',
-         'Cầu Giấy', 'Đống Đa', 'Thanh Xuân', 'Hà Đông', 'Liên Chiểu', 'Hải Châu',
-         'Sơn Trà', 'Ninh Kiều', 'Dĩ An', 'Biên Hòa']
+AREAS = [
+    'Bình Thạnh',
+    'Thủ Đức',
+    'Gò Vấp',
+    'Tân Bình',
+    'Quận 7',
+    'Bình Tân',
+    'Cầu Giấy',
+    'Đống Đa',
+    'Thanh Xuân',
+    'Hà Đông',
+    'Liên Chiểu',
+    'Hải Châu',
+    'Sơn Trà',
+    'Ninh Kiều',
+    'Dĩ An',
+    'Biên Hòa',
+]
 TOPICS = [
-    ('Tìm bạn ở ghép', 'Mình đang tìm bạn ở ghép tại {area}, ngân sách khoảng {budget} triệu/người/tháng. Ưu tiên người gọn gàng, tôn trọng giờ nghỉ và trao đổi rõ chi phí sinh hoạt.', '#oghep #timban'),
-    ('Kinh nghiệm xem phòng', 'Cuối tuần này mình đi xem phòng tại {area}. Mình ghi lại checklist: thử áp lực nước, kiểm tra ổ điện, hỏi chỗ phơi đồ, giờ giấc và xem hợp đồng trước khi đặt cọc.', '#kinhnghiem #xemphong'),
-    ('Góc học tập ở trọ', 'Mình vừa sắp xếp lại góc học tập ở phòng thuê tại {area}. Chỉ cần một chiếc đèn đủ sáng, bàn nhỏ sát cửa sổ và kệ để sách là phòng gọn hơn nhiều.', '#gochoctap #decor'),
-    ('Hỏi kinh nghiệm chuyển trọ', 'Sắp chuyển sang {area}, mình muốn xin kinh nghiệm thuê xe chở đồ và đóng gói máy tính. Mọi người thường chuẩn bị trước bao nhiêu ngày?', '#chuyentro #hoidap'),
-    ('Chi phí sinh hoạt', 'Mình dự trù tổng ngân sách {budget} triệu mỗi tháng khi thuê tại {area}. Ngoài tiền phòng còn điện, nước, gửi xe, internet và đồ dùng chung. Có khoản nào dễ bị quên không?', '#chiphisinhhoat #thuenha'),
-    ('Nấu ăn tiết kiệm', 'Một tuần tự nấu ăn ở trọ tại {area} giúp mình chủ động chi tiêu hơn. Mình chia nguyên liệu thành từng bữa, ghi ngày bảo quản và dùng hộp kín để tủ lạnh sạch sẽ.', '#nauan #songtietkiem'),
-    ('Đọc hợp đồng trước khi ký', 'Mọi người tìm phòng tại {area} nhớ đọc kỹ điều khoản đặt cọc, báo trước khi chuyển đi, giá dịch vụ và cách chốt chỉ số điện nước. Có gì chưa rõ nên hỏi lại và lưu thỏa thuận bằng văn bản.', '#hopdong #datcoc'),
-    ('Tìm quán học bài', 'Có ai biết thư viện hoặc quán yên tĩnh gần {area} không? Mình cần chỗ có ổ cắm, ánh sáng tốt, phù hợp học buổi tối và không quá đông.', '#hoidap #sinhvien'),
-    ('Cách giữ phòng thoáng', 'Mùa mưa ở {area}, mình tranh thủ mở cửa khi trời ráo, tránh phơi đồ ướt trong phòng kín và vệ sinh khu bếp thường xuyên. Mọi người có mẹo chống ẩm nào dễ làm không?', '#meovat #phongtro'),
-    ('Giao thông quanh khu trọ', 'Mình đang cân nhắc thuê tại {area}, tầm giá {budget} triệu. Muốn hỏi trải nghiệm đi xe buýt, chỗ gửi xe và thời gian di chuyển vào giờ cao điểm.', '#giaothong #timphong'),
-    ('Chia sẻ tin phòng', 'Mình thấy một số tin phòng công khai tại {area} khá phù hợp ngân sách {budget} triệu. Mình gắn tin bên dưới để mọi người tham khảo, nhớ xem thực tế và xác nhận lại với chủ trọ.', '#chiasephong #timtro'),
-    ('An toàn điện ở phòng thuê', 'Mọi người ở {area} lưu ý không cắm quá nhiều thiết bị công suất lớn vào một ổ chia. Nếu thấy dây điện nóng hoặc ổ cắm lỏng, nên báo người quản lý kiểm tra.', '#antoan #kinhnghiem'),
-    ('Cuối tuần dọn phòng', 'Lịch cuối tuần của mình tại {area}: giặt ga gối, lau góc bếp, phân loại rác và kiểm tra đồ dùng sắp hết. Dọn mỗi lần một ít sẽ nhẹ nhàng hơn.', '#donphong #songgon'),
-    ('Tìm phòng cho người đi làm', 'Mình làm việc theo ca và muốn tìm phòng yên tĩnh tại {area}, ngân sách {budget} triệu. Ưu tiên lối đi riêng và có thể trao đổi rõ lịch sinh hoạt với người ở cùng.', '#nguoidiLam #timphong'),
-    ('Ứng xử với hàng xóm', 'Một lời chào và thông báo trước khi có bạn đến chơi giúp mình sống thoải mái hơn ở khu trọ {area}. Nếu có tiếng ồn, mình chọn trao đổi lịch sự, cụ thể về khung giờ.', '#vanminh #hangxom'),
-    ('Chăm cây ở phòng trọ', 'Mình thử trồng một chậu cây nhỏ cạnh cửa sổ tại {area}. Phòng sáng vừa phải nên mình chọn loại dễ chăm, đặt khay hứng nước để không làm ẩm sàn.', '#gocxanh #decor'),
-    ('Chuẩn bị nhập học', 'Tân sinh viên đang tìm phòng tại {area} có thể lập danh sách nhu cầu trước: khoảng cách đến trường, mức chi phí {budget} triệu, chỗ học và điều kiện đi lại khi trời mưa.', '#tansinhvien #timtro'),
-    ('Nuôi thú cưng khi thuê', 'Có bạn nào đang thuê tại {area} và nuôi mèo không? Mình muốn hỏi cách trao đổi với chủ trọ, xử lý vệ sinh và bảo đảm không ảnh hưởng người ở xung quanh.', '#thucung #hoidap'),
-    ('Phòng ồn, nên xử lý thế nào?', 'Mình đã thuê tại {area}, phòng buổi tối hơi ồn nên chưa hài lòng. Mình muốn tìm cách trao đổi lịch sự với hàng xóm và người quản lý trước khi quyết định chuyển đi.', '#trainghiem #tiengon'),
-    ('Cảnh báo lừa đảo tiền cọc', 'Khi tìm phòng tại {area}, mình chỉ xem đây là lời nhắc chung: kiểm tra danh tính bên cho thuê, xem phòng thực tế, đọc hợp đồng và giữ chứng từ. Không vội chuyển khoản chỉ vì bị thúc giục.', '#antoanthue #canhbao'),
-    ('Internet khi ở ghép', 'Nhóm mình ở {area} muốn chia sẻ mạng ổn định để học và làm việc. Có bạn nào có kinh nghiệm chọn vị trí router, trao đổi chi phí và khung giờ tải dữ liệu không?', '#internet #oghep'),
-    ('Giữ giấy tờ thuê nhà', 'Mình tạo một thư mục riêng để giữ hợp đồng, biên nhận và ảnh chốt chỉ số tại phòng thuê ở {area}. Khi cần đối chiếu thì tìm lại rất nhanh.', '#hopdong #quanlychitieu'),
-    ('Tìm bạn chạy bộ', 'Có ai ở gần {area} muốn lập nhóm đi bộ hoặc chạy nhẹ cuối tuần không? Mình muốn giữ lịch sinh hoạt đều đặn, tập ở nơi công cộng và ưu tiên an toàn.', '#ketnoi #songkhoe'),
-    ('Góc thư giãn mình yêu thích', 'Mình thích không gian nhiều cây xanh và ánh sáng tự nhiên. Đang muốn sắp xếp lại góc nghỉ ngơi trong phòng tại {area}, mọi người có gợi ý nào dễ làm và tiết kiệm không?', '#camhung #khonggiansong'),
+    (
+        'Tìm bạn ở ghép',
+        'Mình đang tìm bạn ở ghép tại {area}, ngân sách khoảng {budget} triệu/người/tháng. Ưu tiên người gọn gàng, tôn trọng giờ nghỉ và trao đổi rõ chi phí sinh hoạt.',
+        '#oghep #timban',
+    ),
+    (
+        'Kinh nghiệm xem phòng',
+        'Cuối tuần này mình đi xem phòng tại {area}. Mình ghi lại checklist: thử áp lực nước, kiểm tra ổ điện, hỏi chỗ phơi đồ, giờ giấc và xem hợp đồng trước khi đặt cọc.',
+        '#kinhnghiem #xemphong',
+    ),
+    (
+        'Góc học tập ở trọ',
+        'Mình vừa sắp xếp lại góc học tập ở phòng thuê tại {area}. Chỉ cần một chiếc đèn đủ sáng, bàn nhỏ sát cửa sổ và kệ để sách là phòng gọn hơn nhiều.',
+        '#gochoctap #decor',
+    ),
+    (
+        'Hỏi kinh nghiệm chuyển trọ',
+        'Sắp chuyển sang {area}, mình muốn xin kinh nghiệm thuê xe chở đồ và đóng gói máy tính. Mọi người thường chuẩn bị trước bao nhiêu ngày?',
+        '#chuyentro #hoidap',
+    ),
+    (
+        'Chi phí sinh hoạt',
+        'Mình dự trù tổng ngân sách {budget} triệu mỗi tháng khi thuê tại {area}. Ngoài tiền phòng còn điện, nước, gửi xe, internet và đồ dùng chung. Có khoản nào dễ bị quên không?',
+        '#chiphisinhhoat #thuenha',
+    ),
+    (
+        'Nấu ăn tiết kiệm',
+        'Một tuần tự nấu ăn ở trọ tại {area} giúp mình chủ động chi tiêu hơn. Mình chia nguyên liệu thành từng bữa, ghi ngày bảo quản và dùng hộp kín để tủ lạnh sạch sẽ.',
+        '#nauan #songtietkiem',
+    ),
+    (
+        'Đọc hợp đồng trước khi ký',
+        'Mọi người tìm phòng tại {area} nhớ đọc kỹ điều khoản đặt cọc, báo trước khi chuyển đi, giá dịch vụ và cách chốt chỉ số điện nước. Có gì chưa rõ nên hỏi lại và lưu thỏa thuận bằng văn bản.',
+        '#hopdong #datcoc',
+    ),
+    (
+        'Tìm quán học bài',
+        'Có ai biết thư viện hoặc quán yên tĩnh gần {area} không? Mình cần chỗ có ổ cắm, ánh sáng tốt, phù hợp học buổi tối và không quá đông.',
+        '#hoidap #sinhvien',
+    ),
+    (
+        'Cách giữ phòng thoáng',
+        'Mùa mưa ở {area}, mình tranh thủ mở cửa khi trời ráo, tránh phơi đồ ướt trong phòng kín và vệ sinh khu bếp thường xuyên. Mọi người có mẹo chống ẩm nào dễ làm không?',
+        '#meovat #phongtro',
+    ),
+    (
+        'Giao thông quanh khu trọ',
+        'Mình đang cân nhắc thuê tại {area}, tầm giá {budget} triệu. Muốn hỏi trải nghiệm đi xe buýt, chỗ gửi xe và thời gian di chuyển vào giờ cao điểm.',
+        '#giaothong #timphong',
+    ),
+    (
+        'Chia sẻ tin phòng',
+        'Mình thấy một số tin phòng công khai tại {area} khá phù hợp ngân sách {budget} triệu. Mình gắn tin bên dưới để mọi người tham khảo, nhớ xem thực tế và xác nhận lại với chủ trọ.',
+        '#chiasephong #timtro',
+    ),
+    (
+        'An toàn điện ở phòng thuê',
+        'Mọi người ở {area} lưu ý không cắm quá nhiều thiết bị công suất lớn vào một ổ chia. Nếu thấy dây điện nóng hoặc ổ cắm lỏng, nên báo người quản lý kiểm tra.',
+        '#antoan #kinhnghiem',
+    ),
+    (
+        'Cuối tuần dọn phòng',
+        'Lịch cuối tuần của mình tại {area}: giặt ga gối, lau góc bếp, phân loại rác và kiểm tra đồ dùng sắp hết. Dọn mỗi lần một ít sẽ nhẹ nhàng hơn.',
+        '#donphong #songgon',
+    ),
+    (
+        'Tìm phòng cho người đi làm',
+        'Mình làm việc theo ca và muốn tìm phòng yên tĩnh tại {area}, ngân sách {budget} triệu. Ưu tiên lối đi riêng và có thể trao đổi rõ lịch sinh hoạt với người ở cùng.',
+        '#nguoidiLam #timphong',
+    ),
+    (
+        'Ứng xử với hàng xóm',
+        'Một lời chào và thông báo trước khi có bạn đến chơi giúp mình sống thoải mái hơn ở khu trọ {area}. Nếu có tiếng ồn, mình chọn trao đổi lịch sự, cụ thể về khung giờ.',
+        '#vanminh #hangxom',
+    ),
+    (
+        'Chăm cây ở phòng trọ',
+        'Mình thử trồng một chậu cây nhỏ cạnh cửa sổ tại {area}. Phòng sáng vừa phải nên mình chọn loại dễ chăm, đặt khay hứng nước để không làm ẩm sàn.',
+        '#gocxanh #decor',
+    ),
+    (
+        'Chuẩn bị nhập học',
+        'Tân sinh viên đang tìm phòng tại {area} có thể lập danh sách nhu cầu trước: khoảng cách đến trường, mức chi phí {budget} triệu, chỗ học và điều kiện đi lại khi trời mưa.',
+        '#tansinhvien #timtro',
+    ),
+    (
+        'Nuôi thú cưng khi thuê',
+        'Có bạn nào đang thuê tại {area} và nuôi mèo không? Mình muốn hỏi cách trao đổi với chủ trọ, xử lý vệ sinh và bảo đảm không ảnh hưởng người ở xung quanh.',
+        '#thucung #hoidap',
+    ),
+    (
+        'Phòng ồn, nên xử lý thế nào?',
+        'Mình đã thuê tại {area}, phòng buổi tối hơi ồn nên chưa hài lòng. Mình muốn tìm cách trao đổi lịch sự với hàng xóm và người quản lý trước khi quyết định chuyển đi.',
+        '#trainghiem #tiengon',
+    ),
+    (
+        'Cảnh báo lừa đảo tiền cọc',
+        'Khi tìm phòng tại {area}, mình chỉ xem đây là lời nhắc chung: kiểm tra danh tính bên cho thuê, xem phòng thực tế, đọc hợp đồng và giữ chứng từ. Không vội chuyển khoản chỉ vì bị thúc giục.',
+        '#antoanthue #canhbao',
+    ),
+    (
+        'Internet khi ở ghép',
+        'Nhóm mình ở {area} muốn chia sẻ mạng ổn định để học và làm việc. Có bạn nào có kinh nghiệm chọn vị trí router, trao đổi chi phí và khung giờ tải dữ liệu không?',
+        '#internet #oghep',
+    ),
+    (
+        'Giữ giấy tờ thuê nhà',
+        'Mình tạo một thư mục riêng để giữ hợp đồng, biên nhận và ảnh chốt chỉ số tại phòng thuê ở {area}. Khi cần đối chiếu thì tìm lại rất nhanh.',
+        '#hopdong #quanlychitieu',
+    ),
+    (
+        'Tìm bạn chạy bộ',
+        'Có ai ở gần {area} muốn lập nhóm đi bộ hoặc chạy nhẹ cuối tuần không? Mình muốn giữ lịch sinh hoạt đều đặn, tập ở nơi công cộng và ưu tiên an toàn.',
+        '#ketnoi #songkhoe',
+    ),
+    (
+        'Góc thư giãn mình yêu thích',
+        'Mình thích không gian nhiều cây xanh và ánh sáng tự nhiên. Đang muốn sắp xếp lại góc nghỉ ngơi trong phòng tại {area}, mọi người có gợi ý nào dễ làm và tiết kiệm không?',
+        '#camhung #khonggiansong',
+    ),
 ]
 ROOT_COMMENTS = [
     'Cảm ơn bạn đã chia sẻ, checklist này rất hữu ích cho người mới tìm phòng.',
@@ -71,10 +182,8 @@ REPLIES = [
     'Nhóm mình thường chia sẻ công việc và chi phí theo lịch để ai cũng chủ động được.',
 ]
 
-
 def uid(key):
     return str(uuid.uuid5(uuid.NAMESPACE_URL, 'trotot-community-seed-v1/' + str(key)))
-
 
 def quote(value):
     if value is None:
@@ -82,21 +191,23 @@ def quote(value):
     if isinstance(value, int):
         return str(value)
     # Keep SQL independent of the connection's backslash-escape mode.
-    return "'" + str(value).replace("'", "''") + "'"
 
+    return "'" + str(value).replace("'", "''") + "'"
 
 def sql_uuid(expression):
     digest = f'SHA2({expression},256)'
     return f"CONCAT(SUBSTR({digest},1,8),'-',SUBSTR({digest},9,4),'-',SUBSTR({digest},13,4),'-',SUBSTR({digest},17,4),'-',SUBSTR({digest},21,12))"
 
-
 def values(table, columns, rows):
     output = []
     for offset in range(0, len(rows), 150):
-        chunk = rows[offset:offset + 150]
-        output.append(f"INSERT INTO {table} ({','.join(columns)}) VALUES\n" + ',\n'.join('(' + ','.join(quote(v) for v in row) + ')' for row in chunk) + ';\n')
+        chunk = rows[offset : offset + 150]
+        output.append(
+            f"INSERT INTO {table} ({','.join(columns)}) VALUES\n"
+            + ',\n'.join('(' + ','.join(quote(v) for v in row) + ')' for row in chunk)
+            + ';\n'
+        )
     return ''.join(output)
-
 
 def build(post_count, migration=False, accounts=None):
     if accounts is None:
@@ -130,12 +241,26 @@ def build(post_count, migration=False, accounts=None):
         text += f'\n\n{tags} #congdongthue'
         post_id = uid(f'post/{number}')
         age = 240 + (number - 1) * 101
-        posts.append((post_id, number, role, text, area, status, version,
-                      int(role == 'ADMIN' and status == 'VISIBLE' and number <= 60), age, deleted, source))
+        posts.append(
+            (
+                post_id,
+                number,
+                role,
+                text,
+                area,
+                status,
+                version,
+                int(role == 'ADMIN' and status == 'VISIBLE' and number <= 60),
+                age,
+                deleted,
+                source,
+            )
+        )
         if number % 4 != 0 and not deleted:
             for slot in range(1, 2 + number % 3):
                 media.append((uid(f'media/{number}/{slot}'), post_id, IMAGES[(number + slot - 2) % 3]))
         # Pending/automatically hidden posts were never public and cannot have replies.
+
         if deleted or status in ('PENDING', 'RESTRICTED') or (status == 'HIDDEN' and source == 'AUTO_RULE'):
             continue
         roots = 24 if number % 25 == 0 else 4
@@ -148,24 +273,41 @@ def build(post_count, migration=False, accounts=None):
             if cstatus == 'RESTRICTED':
                 message += ' Đọc giá mà bất ngờ vcl, chắc mình phải tìm thêm khu khác.'
             elif cstatus == 'PENDING':
-                message += ' Có người giới thiệu việc nhẹ lương cao để kiếm thêm tiền trọ, không biết có đáng tin không?'
+                message += (
+                    ' Có người giới thiệu việc nhẹ lương cao để kiếm thêm tiền trọ, không biết có đáng tin không?'
+                )
             elif cstatus == 'HIDDEN':
                 message += ' Mình nhận được tin nhắn “tao sẽ giết mày” nên muốn nhờ quản trị viên hỗ trợ.'
             comments.append((root_id, post_id, None, index, message, cstatus, 1, root * 2, cdeleted))
             if cstatus != 'VISIBLE':
                 continue
             for reply in range(1, 3):
-                comments.append((uid(f'reply/{number}/{root}/{reply}'), post_id, root_id,
-                                 index + reply * 13, REPLIES[(index + reply) % len(REPLIES)],
-                                 'VISIBLE', 1, root * 2 + 2 + reply, 0))
-
-    sql = ('''-- V12: Community demo data, MySQL 8.0.16+, UTF-8.
+                comments.append(
+                    (
+                        uid(f'reply/{number}/{root}/{reply}'),
+                        post_id,
+                        root_id,
+                        index + reply * 13,
+                        REPLIES[(index + reply) % len(REPLIES)],
+                        'VISIBLE',
+                        1,
+                        root * 2 + 2 + reply,
+                        0,
+                    )
+                )
+    sql = (
+        (
+            '''-- V12: Community demo data, MySQL 8.0.16+, UTF-8.
 -- Generated by scripts/generate-community-seed.py during fresh scripts/setup-demo.ps1.
 -- Flyway runs this once after V2 core demo data and V11 community schema.
 -- Do not regenerate an applied migration; use a preview output or rebuild a fresh demo DB.
-''' if migration else '''-- OPTIONAL DEMO PREVIEW, MySQL 8.0.16+, UTF-8.
+'''
+            if migration
+            else '''-- OPTIONAL DEMO PREVIEW, MySQL 8.0.16+, UTF-8.
 -- Generated; execute only in a selected demo database after V11, in ONE connection.
-''') + '''-- Does not create users/contracts/reviews or change credentials.
+'''
+        )
+        + '''-- Does not create users/contracts/reviews or change credentials.
 -- Uses existing ACTIVE seed identities listed in scripts/data/seed-accounts.json.
 -- Existing posts/comments/cases are never overwritten. Missing demo interactions may be reinserted.
 -- Do not use a client that continues after SQL errors: on error STOP and ROLLBACK.
@@ -175,7 +317,19 @@ def build(post_count, migration=False, accounts=None):
 SET NAMES utf8mb4;
 SET @community_seed_now = CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+07:00');
 '''
-    temp_names = ['identities', 'actors', 'authors', 'reporters', 'listings', 'posts', 'comments', 'media', 'numbers', 'guard']
+    )
+    temp_names = [
+        'identities',
+        'actors',
+        'authors',
+        'reporters',
+        'listings',
+        'posts',
+        'comments',
+        'media',
+        'numbers',
+        'guard',
+    ]
     sql += ''.join(f'DROP TEMPORARY TABLE IF EXISTS tmp_community_seed_{name};\n' for name in temp_names)
     sql += '''CREATE TEMPORARY TABLE tmp_community_seed_identities(id varchar(36) PRIMARY KEY,role_code varchar(12))
  DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
@@ -231,8 +385,28 @@ CREATE TEMPORARY TABLE tmp_community_seed_media(id varchar(36) PRIMARY KEY,post_
 CREATE TEMPORARY TABLE tmp_community_seed_numbers(n int PRIMARY KEY);
 '''
     sql += values('tmp_community_seed_numbers', ['n'], [(i,) for i in range(1, 61)])
-    sql += values('tmp_community_seed_posts', ['id', 'n', 'author_role', 'content', 'area', 'status', 'version', 'pinned', 'age_minutes', 'deleted', 'source'], posts)
-    sql += values('tmp_community_seed_comments', ['id', 'post_id', 'parent_id', 'author_slot', 'content', 'status', 'version', 'delay_minutes', 'deleted'], comments)
+    sql += values(
+        'tmp_community_seed_posts',
+        [
+            'id',
+            'n',
+            'author_role',
+            'content',
+            'area',
+            'status',
+            'version',
+            'pinned',
+            'age_minutes',
+            'deleted',
+            'source',
+        ],
+        posts,
+    )
+    sql += values(
+        'tmp_community_seed_comments',
+        ['id', 'post_id', 'parent_id', 'author_slot', 'content', 'status', 'version', 'delay_minutes', 'deleted'],
+        comments,
+    )
     sql += values('tmp_community_seed_media', ['id', 'post_id', 'url'], media)
     sql += '''
 START TRANSACTION;
@@ -280,7 +454,8 @@ WHERE c.parent_id IS {'NULL' if is_root else 'NOT NULL'} AND existing.id IS NULL
 {' AND root.id IS NOT NULL AND root.parent_id IS NULL AND root.post_id=p.id AND root.status=\'VISIBLE\'' if not is_root else ''};
 SET @community_seed_added_{'roots' if is_root else 'replies'}=ROW_COUNT();
 '''
-    sql += '''
+    sql += (
+        '''
 -- Reactions use actual actors, deterministic types, no reactions on hidden/deleted content.
 INSERT INTO community_reactions(target_type,target_id,user_id,type)
 SELECT DISTINCT t.target_type,t.id,a.id,ELT(1+MOD(CRC32(CONCAT(t.id,a.id)),3),'LIKE','LOVE','WOW')
@@ -315,12 +490,15 @@ SET @community_seed_added_saves=ROW_COUNT();
 INSERT INTO community_follows(follower_id,followee_id)
 SELECT DISTINCT a.id,p.author_id
 FROM tmp_community_seed_actors a JOIN tmp_community_seed_numbers n ON n.n<=10
-JOIN tmp_community_seed_posts plan ON plan.n=1+MOD(a.seq*13+n.n*17,''' + str(post_count) + ''')
+JOIN tmp_community_seed_posts plan ON plan.n=1+MOD(a.seq*13+n.n*17,'''
+        + str(post_count)
+        + ''')
 JOIN community_posts p ON p.id=plan.id
 LEFT JOIN community_follows existing ON existing.follower_id=a.id AND existing.followee_id=p.author_id
 WHERE a.id<>p.author_id AND existing.follower_id IS NULL;
 SET @community_seed_added_follows=ROW_COUNT();
 '''
+    )
     report_id = sql_uuid("CONCAT('community-seed-report/',r.target_id,'/',r.reporter_id)")
     sql += f'''
 INSERT INTO content_reports(id,target_type,target_id,content_version,reporter_id,reason,created_at)
@@ -401,10 +579,17 @@ SELECT status,COUNT(*) seeded_posts FROM community_posts p JOIN tmp_community_se
 SELECT @community_seed_actor_count available_seed_accounts,@community_seed_listing_count available_public_listings;
 '''
     # Qualify status in the final count: both the actual and planned tables have it.
-    sql = sql.replace('SELECT status,COUNT(*) seeded_posts', 'SELECT p.status,COUNT(*) seeded_posts').replace('GROUP BY status;', 'GROUP BY p.status;')
-    sql += ''.join(f'DROP TEMPORARY TABLE IF EXISTS tmp_community_seed_{name};\n' for name in reversed(temp_names))
-    return sql, {'posts': len(posts), 'comments': len(comments), 'images': len(media), 'post_statuses': dict(Counter(p[5] for p in posts))}
 
+    sql = sql.replace('SELECT status,COUNT(*) seeded_posts', 'SELECT p.status,COUNT(*) seeded_posts').replace(
+        'GROUP BY status;', 'GROUP BY p.status;'
+    )
+    sql += ''.join(f'DROP TEMPORARY TABLE IF EXISTS tmp_community_seed_{name};\n' for name in reversed(temp_names))
+    return sql, {
+        'posts': len(posts),
+        'comments': len(comments),
+        'images': len(media),
+        'post_statuses': dict(Counter(p[5] for p in posts)),
+    }
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -417,11 +602,13 @@ def main():
     accounts = json.loads(args.accounts.read_text(encoding='utf-8'))
     sql, summary = build(args.posts, migration=args.output.resolve() == SEED.resolve(), accounts=accounts)
     args.output.write_text(sql, encoding='utf-8', newline='\n')
-    counts_path = (ROOT / 'scripts/data/community-counts.json' if args.output.resolve() == SEED.resolve()
-                   else args.output.with_suffix('.counts.json'))
+    counts_path = (
+        ROOT / 'scripts/data/community-counts.json'
+        if args.output.resolve() == SEED.resolve()
+        else args.output.with_suffix('.counts.json')
+    )
     counts_path.write_text(json.dumps(summary, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
     print(f'Generated {args.output}: {summary}')
-
 
 if __name__ == '__main__':
     main()

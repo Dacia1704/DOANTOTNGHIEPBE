@@ -7,7 +7,7 @@ Tài liệu này mô tả mã nguồn hiện có, khác với toàn bộ phạm 
 - Bảng tin công khai, tab Mới nhất, Đang theo dõi, Quanh tôi; tìm từ khóa/hashtag trong nội dung bằng MySQL. Quanh tôi hiện dùng chuỗi khu vực người viết nhập, đối chiếu chính xác; chưa lấy địa bàn tự động từ hồ sơ nhu cầu.
 - Phân trang cursor `(created_at,id)` cho bài/bình luận, phân trang riêng cho reply; nút Xem thêm.
 - Bài của tôi, bài đã lưu; tạo/sửa có kiểm tra version, xóa mềm bài, nhãn đã chỉnh sửa.
-- Upload JPEG/PNG qua ImageStorageService/Cloudinary, 5 MiB/ảnh, tối đa 10 ảnh/bài. Backend kiểm tra nội dung ảnh theo validator hiện có; chưa bật WebP.
+- Upload JPEG/PNG qua FileStorageService/Cloudinary, 5 MiB/ảnh, tối đa 10 ảnh/bài. Backend kiểm tra nội dung ảnh theo validator hiện có; chưa bật WebP.
 - Tìm listing công khai theo tiêu đề, đính kèm tối đa 3 tin. Mỗi lần đọc kiểm tra lại điều kiện công khai theo ListingRepository; tin không còn hợp lệ hiển thị placeholder.
 - Bình luận hai cấp, sửa/xóa, placeholder gốc đã xóa; cảm xúc LIKE/LOVE/WOW cho bài và bình luận. UI bình luận hiện cung cấp nút Thích.
 - Lưu bài, theo dõi tác giả; các thao tác đặt trạng thái dùng PUT/DELETE để không tăng trùng.

@@ -7,18 +7,24 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.UuidGenerator;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.UuidGenerator;
 
 @Entity
-@Table(name = "room_amenities", uniqueConstraints = @jakarta.persistence.UniqueConstraint(
-        name = "uk_room_amenities", columnNames = {"room_id", "amenity_id"}))
+@Table(
+    name = "room_amenities",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_room_amenities",
+        columnNames = { "room_id", "amenity_id" }
+    )
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -26,7 +32,6 @@ import lombok.experimental.FieldDefaults;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class RoomAmenity {
-
     @Id
     @UuidGenerator
     @Column(length = 36)

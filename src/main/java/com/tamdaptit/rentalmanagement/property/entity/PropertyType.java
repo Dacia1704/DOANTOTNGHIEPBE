@@ -1,5 +1,7 @@
 package com.tamdaptit.rentalmanagement.property.entity;
 
+import java.time.LocalDateTime;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -10,11 +12,10 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
-import lombok.experimental.FieldDefaults;
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "property_types")
@@ -25,7 +26,6 @@ import java.time.LocalDateTime;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class PropertyType {
-
     @Id
     @UuidGenerator
     @Column(length = 36)

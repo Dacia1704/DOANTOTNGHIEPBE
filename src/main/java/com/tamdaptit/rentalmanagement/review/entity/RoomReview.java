@@ -1,5 +1,10 @@
 package com.tamdaptit.rentalmanagement.review.entity;
 
+import java.time.LocalDateTime;
+
+import com.tamdaptit.rentalmanagement.identity.entity.User;
+import com.tamdaptit.rentalmanagement.rental.entity.RentalAgreement;
+import com.tamdaptit.rentalmanagement.room.entity.Room;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -14,14 +19,10 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import com.tamdaptit.rentalmanagement.identity.entity.User;
-import com.tamdaptit.rentalmanagement.rental.entity.RentalAgreement;
-import com.tamdaptit.rentalmanagement.room.entity.Room;
+import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
-import lombok.experimental.FieldDefaults;
-import java.time.LocalDateTime;
 
 /**
  * Tenant danh gia phong sau khi thue.
@@ -36,7 +37,6 @@ import java.time.LocalDateTime;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class RoomReview implements ReviewEntry {
-
     @Id
     @UuidGenerator
     @Column(length = 36)

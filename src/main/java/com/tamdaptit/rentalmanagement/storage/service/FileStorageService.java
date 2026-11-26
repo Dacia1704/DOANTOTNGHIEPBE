@@ -1,6 +1,8 @@
 package com.tamdaptit.rentalmanagement.storage.service;
 
+import java.io.IOException;
 import java.util.List;
+
 import org.springframework.web.multipart.MultipartFile;
 
 /**
@@ -14,11 +16,10 @@ import org.springframework.web.multipart.MultipartFile;
  * <p>Cau hinh Cloudinary lay tu bien moi truong
  * {@code CLOUDINARY_CLOUD_NAME}, {@code CLOUDINARY_API_KEY}, {@code CLOUDINARY_API_SECRET}.
  */
-public interface ImageStorageService {
+public interface FileStorageService {
 
     /** Ket qua upload: URL cong public + public id de xoa sau. */
-    record StoredImage(String url, String publicId) {
-    }
+    record StoredImage(String url, String publicId) {}
 
     /**
      * Tai lenh mot anh.
@@ -30,7 +31,11 @@ public interface ImageStorageService {
     StoredImage upload(String folder, MultipartFile file);
 
     /** Tai len mot anh voi gioi han dung luong rieng cua module. */
-    StoredImage upload(String folder, MultipartFile file, long maxBytes);
+    StoredImage upload(
+        String folder,
+        MultipartFile file,
+        long maxBytes
+    );
 
     /**
      * Tai len nhieu anh cung luc vao cung mot folder.
@@ -56,9 +61,12 @@ public interface ImageStorageService {
      */
     void deleteByPrefix(String folder);
 
-    /**
-     * Tai mot tep PDF len bo luu tru voi {@code resource_type=raw}.
-     * Dung cho hop dong thue.
-     */
-    StoredImage uploadRaw(String folder, MultipartFile file);
+    /** Luu PDF rieng tu theo public id da duoc ghi nhan de retry/cleanup. */
+    void uploadPrivatePdf(String publicId, byte[] bytes) throws IOException;
+
+    /** Tai PDF qua URL ky ngan han; khong cong khai URL cua hop dong. */
+    byte[] downloadPrivatePdf(String publicId) throws IOException, InterruptedException;
+
+    /** Xoa PDF rieng tu; tep da bi xoa duoc xem la thanh cong. */
+    void deletePrivatePdf(String publicId) throws IOException;
 }

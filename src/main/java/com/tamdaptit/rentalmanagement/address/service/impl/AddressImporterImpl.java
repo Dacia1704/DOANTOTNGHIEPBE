@@ -1,5 +1,10 @@
 package com.tamdaptit.rentalmanagement.address.service.impl;
 
+import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+
 import com.tamdaptit.rentalmanagement.address.dto.response.AddressSnapshot;
 import com.tamdaptit.rentalmanagement.address.dto.response.AddressSyncResult;
 import com.tamdaptit.rentalmanagement.address.entity.Province;
@@ -10,11 +15,9 @@ import com.tamdaptit.rentalmanagement.address.service.AddressImporter;
 import com.tamdaptit.rentalmanagement.common.exception.AppException;
 import com.tamdaptit.rentalmanagement.common.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
 
 /**
  * Dong bo du lieu don vi hanh chinh tu snapshot cua nguon ben ngoai.
@@ -22,20 +25,20 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class AddressImporterImpl implements AddressImporter {
-
     private final ProvinceRepository provinces;
     private final WardRepository wards;
 
     @Override
     @Transactional
-    @org.springframework.cache.annotation.CacheEvict(cacheNames={"provinces","wards"}, allEntries=true)
+    @CacheEvict(cacheNames = { "provinces", "wards" }, allEntries = true)
     public AddressSyncResult apply(AddressSnapshot snapshot) {
         Map<String, Province> provinceMap = new HashMap<>();
         for (Province p : provinces.findAll()) {
             if (provinceMap.putIfAbsent(normalize(p.getCode(), 2), p) != null) {
                 throw new AppException(
-                        ErrorCode.ADDRESS_CODE_EXISTS,
-                        "Tồn tại mã tỉnh/thành phố trùng lặp sau khi chuẩn hóa, vui lòng xử lý trước khi đồng bộ");
+                    ErrorCode.ADDRESS_CODE_EXISTS,
+                    "Tồn tại mã tỉnh/thành phố trùng lặp sau khi chuẩn hóa, vui lòng xử lý trước khi đồng bộ"
+                );
             }
         }
 
@@ -43,8 +46,9 @@ public class AddressImporterImpl implements AddressImporter {
         for (Ward w : wards.findAll()) {
             if (wardMap.putIfAbsent(normalize(w.getCode(), 5), w) != null) {
                 throw new AppException(
-                        ErrorCode.ADDRESS_CODE_EXISTS,
-                        "Tồn tại mã phường/xã trùng lặp sau khi chuẩn hóa, vui lòng xử lý trước khi đồng bộ");
+                    ErrorCode.ADDRESS_CODE_EXISTS,
+                    "Tồn tại mã phường/xã trùng lặp sau khi chuẩn hóa, vui lòng xử lý trước khi đồng bộ"
+                );
             }
         }
 
@@ -57,39 +61,60 @@ public class AddressImporterImpl implements AddressImporter {
             Province province = provinceMap.get(data.code());
             if (province == null) {
                 province = provinces.save(
-                        Province.builder().code(data.code()).name(data.name())
-                                .centroidLat(data.centroidLat()).centroidLng(data.centroidLng()).build());
+                    Province.builder()
+                        .code(data.code())
+                        .name(data.name())
+                        .centroidLat(data.centroidLat())
+                        .centroidLng(data.centroidLng())
+                        .build()
+                );
                 provinceMap.put(data.code(), province);
                 provincesCreated++;
-            } else if (!province.getCode().equals(data.code())
-                    || !province.getName().equals(data.name())
-                    || coordinatesChanged(province.getCentroidLat(), province.getCentroidLng(),
-                            data.centroidLat(), data.centroidLng())) {
+            } else if (
+                !province.getCode().equals(data.code()) ||
+                    !province.getName().equals(data.name()) ||
+                    coordinatesChanged(
+                        province.getCentroidLat(),
+                        province.getCentroidLng(),
+                        data.centroidLat(),
+                        data.centroidLng()
+                    )
+            ) {
                 province.setCode(data.code());
                 province.setName(data.name());
                 if (data.centroidLat() != null) {
                     province.setCentroidLat(data.centroidLat());
                     province.setCentroidLng(data.centroidLng());
                 }
+
                 provincesUpdated++;
             }
 
             for (var child : data.wards()) {
                 Ward ward = wardMap.get(child.code());
                 if (ward == null) {
-                    ward = wards.save(Ward.builder()
+                    ward = wards.save(
+                        Ward.builder()
                             .code(child.code())
                             .name(child.name())
                             .province(province)
-                            .centroidLat(child.centroidLat()).centroidLng(child.centroidLng())
-                            .build());
+                            .centroidLat(child.centroidLat())
+                            .centroidLng(child.centroidLng())
+                            .build()
+                    );
                     wardMap.put(child.code(), ward);
                     wardsCreated++;
-                } else if (!ward.getCode().equals(child.code())
-                        || !ward.getName().equals(child.name())
-                        || !ward.getProvince().getId().equals(province.getId())
-                        || coordinatesChanged(ward.getCentroidLat(), ward.getCentroidLng(),
-                                child.centroidLat(), child.centroidLng())) {
+                } else if (
+                    !ward.getCode().equals(child.code()) ||
+                        !ward.getName().equals(child.name()) ||
+                        !ward.getProvince().getId().equals(province.getId()) ||
+                        coordinatesChanged(
+                            ward.getCentroidLat(),
+                            ward.getCentroidLng(),
+                            child.centroidLat(),
+                            child.centroidLng()
+                        )
+                ) {
                     ward.setCode(child.code());
                     ward.setName(child.name());
                     ward.setProvince(province);
@@ -97,6 +122,7 @@ public class AddressImporterImpl implements AddressImporter {
                         ward.setCentroidLat(child.centroidLat());
                         ward.setCentroidLng(child.centroidLng());
                     }
+
                     wardsUpdated++;
                 }
             }
@@ -107,16 +133,21 @@ public class AddressImporterImpl implements AddressImporter {
         return new AddressSyncResult(provincesCreated, provincesUpdated, wardsCreated, wardsUpdated);
     }
 
-    private boolean coordinatesChanged(java.math.BigDecimal oldLat, java.math.BigDecimal oldLng,
-                                       java.math.BigDecimal lat, java.math.BigDecimal lng) {
-        return lat != null && (oldLat == null || oldLng == null
-                || oldLat.compareTo(lat) != 0 || oldLng.compareTo(lng) != 0);
+    private boolean coordinatesChanged(
+        BigDecimal oldLat,
+        BigDecimal oldLng,
+        BigDecimal lat,
+        BigDecimal lng
+    ) {
+        return lat != null &&
+            (oldLat == null || oldLng == null || oldLat.compareTo(lat) != 0 || oldLng.compareTo(lng) != 0);
     }
 
     private String normalize(String code, int length) {
         if (code.matches("[0-9]{1," + length + "}")) {
             return String.format(Locale.ROOT, "%0" + length + "d", Integer.parseInt(code));
         }
+
         return code;
     }
 }

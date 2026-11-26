@@ -1,6 +1,8 @@
 package com.tamdaptit.rentalmanagement.room.controller;
 
 import java.security.Principal;
+import java.util.List;
+
 import com.tamdaptit.rentalmanagement.common.dto.ApiResponse;
 import com.tamdaptit.rentalmanagement.common.dto.PageResponse;
 import com.tamdaptit.rentalmanagement.room.dto.request.RoomTypeRequest;
@@ -10,7 +12,6 @@ import com.tamdaptit.rentalmanagement.room.service.RoomTypeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.List;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -36,18 +37,20 @@ public class RoomTypeController {
     @GetMapping
     @Operation(summary = "Lấy danh sách loại phòng có phân trang")
     public ApiResponse<PageResponse<RoomTypeResponse>> getAll(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size
+    ) {
         return ApiResponse.success("Lấy danh sách loại phòng thành công", roomTypeService.getAll(page, size));
     }
 
     @GetMapping("/filter")
     @Operation(summary = "Lọc loại phòng theo tên và danh mục cha")
     public ApiResponse<PageResponse<RoomTypeResponse>> filter(
-            @RequestParam(required = false) String name,
-            @RequestParam(required = false) String parentId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+        @RequestParam(required = false) String name,
+        @RequestParam(required = false) String parentId,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size
+    ) {
         return ApiResponse.success("Lọc loại phòng thành công", roomTypeService.filter(name, parentId, page, size));
     }
 
@@ -55,7 +58,8 @@ public class RoomTypeController {
     @PreAuthorize("hasRole('LANDLORD')")
     @Operation(summary = "Lấy danh mục loại phòng kèm các phòng của chủ trọ")
     public ApiResponse<List<RoomTypeCategoryResponse>> getCategoriesWithRooms(Principal principal) {
-        return ApiResponse.success("Lấy danh mục phòng thành công", roomTypeService.getCategoriesWithRooms(principal.getName()));
+        return ApiResponse
+            .success("Lấy danh mục phòng thành công", roomTypeService.getCategoriesWithRooms(principal.getName()));
     }
 
     @GetMapping("/{id}")

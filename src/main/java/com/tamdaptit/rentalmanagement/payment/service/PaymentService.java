@@ -1,19 +1,60 @@
 package com.tamdaptit.rentalmanagement.payment.service;
 
+import java.util.Map;
+
 import com.tamdaptit.rentalmanagement.common.dto.PageResponse;
 import com.tamdaptit.rentalmanagement.payment.dto.request.PaymentRequest;
-import com.tamdaptit.rentalmanagement.payment.dto.response.*;
+import com.tamdaptit.rentalmanagement.payment.dto.response.InvoiceResponse;
+import com.tamdaptit.rentalmanagement.payment.dto.response.PaymentCheckoutResponse;
+import com.tamdaptit.rentalmanagement.payment.dto.response.PaymentQuerySnapshot;
+import com.tamdaptit.rentalmanagement.payment.dto.response.PaymentResponse;
+import com.tamdaptit.rentalmanagement.payment.dto.response.VnPayIpnResponse;
+import com.tamdaptit.rentalmanagement.payment.dto.response.VnPayReturnResponse;
 import org.springframework.util.MultiValueMap;
 
 public interface PaymentService {
-    PaymentCheckoutResponse checkout(String landlordId, PaymentRequest request, String ipAddress);
-    PaymentResponse getById(String userId, String id, boolean admin);
-    InvoiceResponse getInvoice(String userId, String paymentId, boolean admin);
-    PageResponse<PaymentResponse> getHistory(String userId, int page, int size);
+    PaymentCheckoutResponse checkout(
+        String landlordId,
+        PaymentRequest request,
+        String ipAddress
+    );
+
+    PaymentResponse getById(
+        String userId,
+        String id,
+        boolean admin
+    );
+
+    InvoiceResponse getInvoice(
+        String userId,
+        String paymentId,
+        boolean admin
+    );
+
+    PageResponse<PaymentResponse> getHistory(
+        String userId,
+        int page,
+        int size
+    );
+
     PageResponse<PaymentResponse> getAllPayments(int page, int size);
+
     PageResponse<PaymentResponse> getReviewQueue(int page, int size);
+
     VnPayIpnResponse processIpn(MultiValueMap<String, String> parameters);
+
     VnPayReturnResponse verifyReturn(MultiValueMap<String, String> parameters);
-    PaymentQuerySnapshot getQuerySnapshot(String userId, String id, boolean admin);
-    PaymentResponse applyQueryResult(String userId, String id, boolean admin, java.util.Map<String, String> verified);
+
+    PaymentQuerySnapshot getQuerySnapshot(
+        String userId,
+        String id,
+        boolean admin
+    );
+
+    PaymentResponse applyQueryResult(
+        String userId,
+        String id,
+        boolean admin,
+        Map<String, String> verified
+    );
 }

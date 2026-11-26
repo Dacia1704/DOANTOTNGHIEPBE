@@ -12,7 +12,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL) // An cac field bi null khi parse ra JSON
 public class ApiResponse<T> {
-
     @Builder.Default
     private int code = 200;
 

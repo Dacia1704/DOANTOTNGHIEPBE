@@ -1,27 +1,48 @@
 package com.tamdaptit.rentalmanagement.property.service.impl;
 
-import com.tamdaptit.rentalmanagement.address.repository.*;
+import java.math.BigDecimal;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import com.tamdaptit.rentalmanagement.address.repository.ProvinceRepository;
+import com.tamdaptit.rentalmanagement.address.repository.WardRepository;
 import com.tamdaptit.rentalmanagement.common.dto.PageResponse;
-import com.tamdaptit.rentalmanagement.common.exception.*;
+import com.tamdaptit.rentalmanagement.common.exception.AppException;
+import com.tamdaptit.rentalmanagement.common.exception.ErrorCode;
 import com.tamdaptit.rentalmanagement.identity.repository.UserRepository;
-import com.tamdaptit.rentalmanagement.property.dto.request.*;
+import com.tamdaptit.rentalmanagement.property.dto.request.CreatePropertyRequest;
+import com.tamdaptit.rentalmanagement.property.dto.request.PropertyLocationRequest;
 import com.tamdaptit.rentalmanagement.property.dto.response.PropertyResponse;
-import com.tamdaptit.rentalmanagement.property.entity.*;
+import com.tamdaptit.rentalmanagement.property.entity.Property;
+import com.tamdaptit.rentalmanagement.property.entity.PropertyAmenity;
 import com.tamdaptit.rentalmanagement.property.entity.enums.PropertyRentalMode;
 import com.tamdaptit.rentalmanagement.property.mapper.PropertyMapper;
-import com.tamdaptit.rentalmanagement.property.repository.*;
-import com.tamdaptit.rentalmanagement.property.service.*;
-import com.tamdaptit.rentalmanagement.room.entity.*;
+import com.tamdaptit.rentalmanagement.property.repository.PropertyAmenityRepository;
+import com.tamdaptit.rentalmanagement.property.repository.PropertyImageRepository;
+import com.tamdaptit.rentalmanagement.property.repository.PropertyRepository;
+import com.tamdaptit.rentalmanagement.property.repository.PropertyTypeRepository;
+import com.tamdaptit.rentalmanagement.property.service.PropertyService;
+import com.tamdaptit.rentalmanagement.property.service.RoomDefaultsResolver;
+import com.tamdaptit.rentalmanagement.rental.service.impl.RentalAvailabilityService;
+import com.tamdaptit.rentalmanagement.room.entity.Amenity;
+import com.tamdaptit.rentalmanagement.room.entity.Room;
+import com.tamdaptit.rentalmanagement.room.entity.RoomAmenity;
+import com.tamdaptit.rentalmanagement.room.entity.RoomImage;
 import com.tamdaptit.rentalmanagement.room.mapper.RoomMapper;
-import com.tamdaptit.rentalmanagement.room.repository.*;
+import com.tamdaptit.rentalmanagement.room.repository.AmenityRepository;
+import com.tamdaptit.rentalmanagement.room.repository.RoomAmenityRepository;
+import com.tamdaptit.rentalmanagement.room.repository.RoomImageRepository;
+import com.tamdaptit.rentalmanagement.room.repository.RoomRepository;
+import com.tamdaptit.rentalmanagement.room.repository.RoomTypeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.util.*;
-import java.util.stream.Collectors;
-import java.math.BigDecimal;
 
 @Service
 @RequiredArgsConstructor
@@ -41,7 +62,7 @@ public class PropertyServiceImpl implements PropertyService {
     private final WardRepository wards;
     private final PropertyMapper propertyMapper;
     private final RoomMapper roomMapper;
-    private final com.tamdaptit.rentalmanagement.rental.service.RentalAvailabilityService booking;
+    private final RentalAvailabilityService booking;
 
     @Override
     @Transactional
@@ -52,18 +73,25 @@ public class PropertyServiceImpl implements PropertyService {
         property.setName(request.name().trim());
         property.setAddressLine(request.addressLine().trim());
         property.setLandlord(users.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND)));
-        property.setPropertyType(propertyTypes.findById(request.propertyTypeId())
-                .orElseThrow(() -> new AppException(ErrorCode.PROPERTY_TYPE_NOT_FOUND)));
+        property.setPropertyType(
+            propertyTypes.findById(request.propertyTypeId())
+                .orElseThrow(() -> new AppException(ErrorCode.PROPERTY_TYPE_NOT_FOUND))
+        );
         var province = provinces.findById(request.provinceId())
-                .orElseThrow(() -> new AppException(ErrorCode.PROVINCE_NOT_FOUND));
+            .orElseThrow(() -> new AppException(ErrorCode.PROVINCE_NOT_FOUND));
         var ward = wards.findById(request.wardId()).orElseThrow(() -> new AppException(ErrorCode.WARD_NOT_FOUND));
-        if (!ward.getProvince().getId().equals(province.getId()))
+        if (!ward.getProvince().getId().equals(province.getId())) {
             throw new AppException(ErrorCode.INVALID_REQUEST, "Phường không thuộc tỉnh/thành đã chọn");
+        }
+
         property.setProvince(province);
         property.setWard(ward);
         properties.save(property);
-        findAmenities(request.amenityIds()).forEach(a -> propertyAmenities.save(
-                PropertyAmenity.builder().property(property).amenity(a).build()));
+        findAmenities(request.amenityIds()).forEach(
+            a -> propertyAmenities.save(
+                PropertyAmenity.builder().property(property).amenity(a).build()
+            )
+        );
         for (var floor : request.floors()) {
             for (var item : floor.rooms()) {
                 var values = RoomDefaultsResolver.resolve(request.defaultRoom(), item);
@@ -71,13 +99,19 @@ public class PropertyServiceImpl implements PropertyService {
                 room.setProperty(property);
                 room.setRoomNumber(item.roomNumber().trim());
                 room.setFloorNumber(floor.floorNumber());
-                room.setRoomType(roomTypes.findById(values.roomTypeId())
-                        .orElseThrow(() -> new AppException(ErrorCode.ROOM_TYPE_NOT_FOUND)));
+                room.setRoomType(
+                    roomTypes.findById(values.roomTypeId())
+                        .orElseThrow(() -> new AppException(ErrorCode.ROOM_TYPE_NOT_FOUND))
+                );
                 rooms.save(room);
-                findAmenities(item.amenityIds()).forEach(a -> roomAmenities.save(
-                        RoomAmenity.builder().room(room).amenity(a).build()));
+                findAmenities(item.amenityIds()).forEach(
+                    a -> roomAmenities.save(
+                        RoomAmenity.builder().room(room).amenity(a).build()
+                    )
+                );
             }
         }
+
         // Flush all constraints inside the transaction before returning the response.
         properties.flush();
         return response(property);
@@ -85,16 +119,25 @@ public class PropertyServiceImpl implements PropertyService {
 
     @Override
     @Transactional
-    public PropertyResponse updateLocation(String userId, String id, PropertyLocationRequest request) {
+    public PropertyResponse updateLocation(
+        String userId,
+        String id,
+        PropertyLocationRequest request
+    ) {
         Property property = properties.findLockedById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.PROPERTY_NOT_FOUND));
-        if (!property.getLandlord().getId().equals(userId)) throw new AppException(ErrorCode.NOT_PROPERTY_OWNER);
+            .orElseThrow(() -> new AppException(ErrorCode.PROPERTY_NOT_FOUND));
+        if (!property.getLandlord().getId().equals(userId)) {
+            throw new AppException(ErrorCode.NOT_PROPERTY_OWNER);
+        }
+
         validateCoordinates(request.latitude(), request.longitude());
         var province = provinces.findById(request.provinceId())
-                .orElseThrow(() -> new AppException(ErrorCode.PROVINCE_NOT_FOUND));
+            .orElseThrow(() -> new AppException(ErrorCode.PROVINCE_NOT_FOUND));
         var ward = wards.findById(request.wardId()).orElseThrow(() -> new AppException(ErrorCode.WARD_NOT_FOUND));
-        if (!ward.getProvince().getId().equals(province.getId()))
+        if (!ward.getProvince().getId().equals(province.getId())) {
             throw new AppException(ErrorCode.INVALID_REQUEST, "Phường không thuộc tỉnh/thành đã chọn");
+        }
+
         property.setProvince(province);
         property.setWard(ward);
         property.setAddressLine(request.addressLine().trim());
@@ -105,56 +148,104 @@ public class PropertyServiceImpl implements PropertyService {
     }
 
     private void validateCoordinates(BigDecimal latitude, BigDecimal longitude) {
-        if ((latitude == null) != (longitude == null)
-                || (latitude != null && (latitude.abs().compareTo(BigDecimal.valueOf(90)) > 0
-                    || longitude.abs().compareTo(BigDecimal.valueOf(180)) > 0)))
-            throw new AppException(ErrorCode.INVALID_REQUEST, "Vĩ độ và kinh độ phải đi cùng nhau và nằm trong phạm vi hợp lệ");
+        if (
+            (latitude == null) != (longitude == null) ||
+            (latitude != null &&
+                    (latitude.abs().compareTo(BigDecimal.valueOf(90)) > 0 ||
+                        longitude.abs().compareTo(BigDecimal.valueOf(180)) > 0))
+        ) {
+            throw new AppException(
+                ErrorCode.INVALID_REQUEST,
+                "Vĩ độ và kinh độ phải đi cùng nhau và nằm trong phạm vi hợp lệ"
+            );
+        }
     }
 
     private void validateUnits(CreatePropertyRequest request) {
-        if (request.rentalMode() == null || request.floors() == null || request.floors().isEmpty())
+        if (request.rentalMode() == null || request.floors() == null || request.floors().isEmpty()) {
             throw new AppException(ErrorCode.INVALID_REQUEST, "Cơ sở phải có đơn vị cho thuê và hình thức cho thuê");
+        }
+
         Set<String> numbers = new HashSet<>();
         int count = 0;
         for (var floor : request.floors()) {
-            if (floor == null || floor.rooms() == null || floor.rooms().isEmpty()
-                    || (floor.floorNumber() != null && floor.floorNumber() < 0))
+            if (
+                floor == null ||
+                    floor.rooms() == null ||
+                    floor.rooms().isEmpty() ||
+                (floor.floorNumber() != null && floor.floorNumber() < 0)
+            ) {
                 throw new AppException(ErrorCode.INVALID_REQUEST, "Tầng/phòng không hợp lệ");
+            }
+
             for (var room : floor.rooms()) {
-                if (room == null || room.roomNumber() == null || room.roomNumber().isBlank()
-                        || room.roomNumber().trim().length() > 30)
+                if (
+                    room == null ||
+                        room.roomNumber() == null ||
+                        room.roomNumber().isBlank() ||
+                    room.roomNumber().trim().length() > 30
+                ) {
                     throw new AppException(ErrorCode.INVALID_REQUEST, "Số phòng không hợp lệ");
+                }
+
                 // MySQL's default collation compares room numbers case-insensitively.
-                if (!numbers.add(room.roomNumber().trim().toLowerCase(Locale.ROOT)))
+                if (!numbers.add(room.roomNumber().trim().toLowerCase(Locale.ROOT))) {
                     throw new AppException(ErrorCode.DUPLICATE_ROOM_NUMBER);
+                }
+
                 RoomDefaultsResolver.resolve(request.defaultRoom(), room);
                 count++;
             }
         }
-        if (request.rentalMode() == PropertyRentalMode.WHOLE && count != 1)
+
+        if (request.rentalMode() == PropertyRentalMode.WHOLE && count != 1) {
             throw new AppException(ErrorCode.INVALID_REQUEST, "WHOLE phải có đúng một đơn vị cho thuê");
+        }
     }
 
     @Override
     public PropertyResponse get(String userId, String id) {
         Property property = properties.findById(id).orElseThrow(() -> new AppException(ErrorCode.PROPERTY_NOT_FOUND));
-        if (!property.getLandlord().getId().equals(userId)) throw new AppException(ErrorCode.NOT_PROPERTY_OWNER);
+        if (!property.getLandlord().getId().equals(userId)) {
+            throw new AppException(ErrorCode.NOT_PROPERTY_OWNER);
+        }
+
         return response(property);
     }
 
     @Override
-    public PageResponse<PropertyResponse> mine(String userId, int page, int size) {
-        if (page < 0 || size < 1 || size > 100) throw new AppException(ErrorCode.INVALID_REQUEST);
-        var result = properties.findByLandlord_Id(userId, PageRequest.of(page, size, Sort.by("createdAt").descending()));
-        return PageResponse.<PropertyResponse>builder().currentPage(result.getNumber()).pageSize(result.getSize())
-                .totalPages(result.getTotalPages()).totalElements(result.getTotalElements())
-                .data(result.getContent().stream().map(this::response).toList()).build();
+    public PageResponse<PropertyResponse> mine(
+        String userId,
+        int page,
+        int size
+    ) {
+        if (page < 0 || size < 1 || size > 100) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+
+        var result = properties
+            .findByLandlord_Id(userId, PageRequest.of(page, size, Sort.by("createdAt").descending()));
+        return PageResponse.<PropertyResponse>builder()
+            .currentPage(result.getNumber())
+            .pageSize(result.getSize())
+            .totalPages(result.getTotalPages())
+            .totalElements(result.getTotalElements())
+            .data(result.getContent().stream().map(this::response).toList())
+            .build();
     }
 
     private List<Amenity> findAmenities(List<String> ids) {
-        if (ids == null) return List.of();
-        return ids.stream().distinct().map(id -> amenities.findById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.AMENITY_NOT_FOUND))).toList();
+        if (ids == null) {
+            return List.of();
+        }
+
+        return ids.stream()
+            .distinct()
+            .map(
+                id -> amenities.findById(id)
+                    .orElseThrow(() -> new AppException(ErrorCode.AMENITY_NOT_FOUND))
+            )
+            .toList();
     }
 
     private PropertyResponse response(Property property) {
@@ -162,12 +253,25 @@ public class PropertyServiceImpl implements PropertyService {
         booking.enrich(units);
         var ids = units.stream().map(Room::getId).toList();
         var amenitiesByRoom = ids.isEmpty() ? Map.<String, List<RoomAmenity>>of()
-                : roomAmenities.findAllWithAmenityByRoomIds(ids).stream().collect(Collectors.groupingBy(a -> a.getRoom().getId()));
+            : roomAmenities.findAllWithAmenityByRoomIds(ids)
+                .stream()
+                .collect(Collectors.groupingBy(a -> a.getRoom().getId()));
         var imagesByRoom = ids.isEmpty() ? Map.<String, List<RoomImage>>of()
-                : roomImages.findAllByRoomIds(ids).stream().collect(Collectors.groupingBy(i -> i.getRoom().getId()));
-        var responses = units.stream().map(r -> roomMapper.toResponse(r,
-                amenitiesByRoom.getOrDefault(r.getId(), List.of()), imagesByRoom.getOrDefault(r.getId(), List.of()))).toList();
-        return propertyMapper.toResponse(property, propertyAmenities.findAllByProperty_Id(property.getId()),
-                propertyImages.findAllByProperty_IdOrderBySortOrderAsc(property.getId()), responses);
+            : roomImages.findAllByRoomIds(ids).stream().collect(Collectors.groupingBy(i -> i.getRoom().getId()));
+        var responses = units.stream()
+            .map(
+                r -> roomMapper.toResponse(
+                    r,
+                    amenitiesByRoom.getOrDefault(r.getId(), List.of()),
+                    imagesByRoom.getOrDefault(r.getId(), List.of())
+                )
+            )
+            .toList();
+        return propertyMapper.toResponse(
+            property,
+            propertyAmenities.findAllByProperty_Id(property.getId()),
+            propertyImages.findAllByProperty_IdOrderBySortOrderAsc(property.getId()),
+            responses
+        );
     }
 }

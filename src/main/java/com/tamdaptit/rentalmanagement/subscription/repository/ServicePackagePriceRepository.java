@@ -1,8 +1,9 @@
 package com.tamdaptit.rentalmanagement.subscription.repository;
 
-import com.tamdaptit.rentalmanagement.subscription.entity.ServicePackagePrice;
 import java.util.List;
 import java.util.Optional;
+
+import com.tamdaptit.rentalmanagement.subscription.entity.ServicePackagePrice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -13,7 +14,11 @@ public interface ServicePackagePriceRepository extends JpaRepository<ServicePack
 
     boolean existsByPackageEntity_IdAndDurationMonths(String packageId, Integer durationMonths);
 
-    boolean existsByPackageEntity_IdAndDurationMonthsAndIdNot(String packageId, Integer durationMonths, String id);
+    boolean existsByPackageEntity_IdAndDurationMonthsAndIdNot(
+        String packageId,
+        Integer durationMonths,
+        String id
+    );
 
     Optional<ServicePackagePrice> findByIdAndPackageEntity_Id(String id, String packageId);
 

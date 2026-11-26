@@ -1,13 +1,7 @@
 package com.tamdaptit.rentalmanagement.address.entity;
 
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.UuidGenerator;
+import java.math.BigDecimal;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -16,6 +10,14 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.UuidGenerator;
 
 @Entity
 @Table(name = "wards")
@@ -26,7 +28,6 @@ import jakarta.persistence.Table;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class Ward {
-
     @Id
     @UuidGenerator
     @Column(length = 36)
@@ -43,8 +44,8 @@ public class Ward {
     private String name;
 
     @Column(name = "centroid_lat", precision = 10, scale = 8)
-    private java.math.BigDecimal centroidLat;
+    private BigDecimal centroidLat;
 
     @Column(name = "centroid_lng", precision = 11, scale = 8)
-    private java.math.BigDecimal centroidLng;
+    private BigDecimal centroidLng;
 }

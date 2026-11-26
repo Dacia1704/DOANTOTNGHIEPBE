@@ -1,13 +1,18 @@
 package com.tamdaptit.rentalmanagement.property.mapper;
 
+import java.util.List;
+
 import com.tamdaptit.rentalmanagement.property.dto.request.CreatePropertyRequest;
 import com.tamdaptit.rentalmanagement.property.dto.request.DefaultRoomRequest;
 import com.tamdaptit.rentalmanagement.property.dto.response.PropertyResponse;
-import com.tamdaptit.rentalmanagement.property.entity.*;
+import com.tamdaptit.rentalmanagement.property.entity.Property;
+import com.tamdaptit.rentalmanagement.property.entity.PropertyAmenity;
+import com.tamdaptit.rentalmanagement.property.entity.PropertyImage;
 import com.tamdaptit.rentalmanagement.room.dto.response.RoomResponse;
 import com.tamdaptit.rentalmanagement.room.entity.Room;
-import org.mapstruct.*;
-import java.util.List;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.ReportingPolicy;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface PropertyMapper {
@@ -33,12 +38,17 @@ public interface PropertyMapper {
     @Mapping(target = "amenities", source = "amenities")
     @Mapping(target = "images", source = "images")
     @Mapping(target = "rooms", source = "rooms")
-    PropertyResponse toResponse(Property property, List<PropertyAmenity> amenities,
-            List<PropertyImage> images, List<RoomResponse> rooms);
+    PropertyResponse toResponse(
+        Property property,
+        List<PropertyAmenity> amenities,
+        List<PropertyImage> images,
+        List<RoomResponse> rooms
+    );
 
     @Mapping(target = "id", source = "amenity.id")
     @Mapping(target = "name", source = "amenity.name")
     @Mapping(target = "icon", source = "amenity.icon")
     RoomResponse.AmenityResponse toAmenityResponse(PropertyAmenity amenity);
+
     PropertyResponse.PropertyImageResponse toImageResponse(PropertyImage image);
 }

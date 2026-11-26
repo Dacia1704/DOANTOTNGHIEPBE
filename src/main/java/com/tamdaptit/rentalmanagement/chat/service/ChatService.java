@@ -1,13 +1,13 @@
 package com.tamdaptit.rentalmanagement.chat.service;
 
+import java.security.Principal;
+import java.util.List;
+
 import com.tamdaptit.rentalmanagement.chat.dto.request.ChatMessageRequest;
 import com.tamdaptit.rentalmanagement.chat.dto.response.ChatConversationResponse;
 import com.tamdaptit.rentalmanagement.chat.dto.response.ChatMessageResponse;
 import com.tamdaptit.rentalmanagement.chat.dto.response.ChatUserResponse;
 import com.tamdaptit.rentalmanagement.common.dto.PageResponse;
-
-import java.security.Principal;
-import java.util.List;
 
 public interface ChatService {
 
@@ -36,7 +36,12 @@ public interface ChatService {
     /**
      * Lấy lịch sử tin nhắn của conversation (phân trang).
      */
-    PageResponse<ChatMessageResponse> getMessages(String conversationId, String currentUserId, int page, int size);
+    PageResponse<ChatMessageResponse> getMessages(
+        String conversationId,
+        String currentUserId,
+        int page,
+        int size
+    );
 
     /**
      * Đánh dấu đã đọc tất cả tin nhắn trong conversation.

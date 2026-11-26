@@ -5,20 +5,18 @@ package com.tamdaptit.rentalmanagement.storage.service;
  *
  * <p>Khong goi tay duong dan o tung module de tranh sai quy uoc.
  * Moi module lay gia tri cua no bang {@link #forUser}, {@link #forRoom}, ...
- * roi truyen thang cho {@link ImageStorageService}.
+ * roi truyen thang cho {@link FileStorageService}.
  *
  * <p>Chung tao theo mau {@code <ten-module>/<id>}: de xoa theo mot doi tuong
- * thi goi {@link ImageStorageService#deleteByPrefix} mot lan la xong.
+ * thi goi {@link FileStorageService#deleteByPrefix} mot lan la xong.
  */
 public final class StorageFolder {
-
     private static final String USERS = "avatars";
     private static final String ROOMS = "rooms";
     private static final String REPORTS = "report-evidences";
     private static final String AGREEMENTS = "agreements";
 
-    private StorageFolder() {
-    }
+    private StorageFolder() {}
 
     /** Anh dai dien cua nguoi dung. */
     public static String forUser(String userId) {
@@ -44,10 +42,12 @@ public final class StorageFolder {
         if (id == null || id.isBlank()) {
             throw new IllegalArgumentException("Thieu dinh danh doi tuong de tao thu muc luu tru");
         }
+
         String trimmed = id.trim();
         if (trimmed.contains("/") || trimmed.contains("..")) {
             throw new IllegalArgumentException("Dinh danh doi tuong khong hop le: " + id);
         }
+
         return trimmed;
     }
 }

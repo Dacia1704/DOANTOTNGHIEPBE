@@ -1,5 +1,9 @@
 package com.tamdaptit.rentalmanagement.room.controller;
 
+import java.math.BigDecimal;
+import java.security.Principal;
+import java.util.List;
+
 import com.tamdaptit.rentalmanagement.common.dto.ApiResponse;
 import com.tamdaptit.rentalmanagement.common.dto.PageResponse;
 import com.tamdaptit.rentalmanagement.room.dto.request.RoomRequest;
@@ -7,9 +11,6 @@ import com.tamdaptit.rentalmanagement.room.dto.response.RoomResponse;
 import com.tamdaptit.rentalmanagement.room.entity.enums.RoomRentalStatus;
 import com.tamdaptit.rentalmanagement.room.service.RoomService;
 import jakarta.validation.Valid;
-import java.math.BigDecimal;
-import java.security.Principal;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -33,43 +34,75 @@ public class RoomController {
 
     @GetMapping("/filter")
     @PreAuthorize("hasRole('LANDLORD')")
-    public ApiResponse<PageResponse<RoomResponse>> filter(Principal principal,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false) String roomTypeName,
-            @RequestParam(required = false) String provinceId,
-            @RequestParam(required = false) String wardId,
-            @RequestParam(required = false) RoomRentalStatus rentalStatus,
-            @RequestParam(required = false) BigDecimal minPrice,
-            @RequestParam(required = false) BigDecimal maxPrice,
-            @RequestParam(required = false) List<String> amenityNames) {
-        return ApiResponse.success("Lọc phòng thành công",
-                rooms.searchMine(principal.getName(), page, size, roomTypeName, provinceId, wardId, rentalStatus, minPrice, maxPrice, amenityNames));
+    public ApiResponse<PageResponse<RoomResponse>> filter(
+        Principal principal,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size,
+        @RequestParam(required = false) String roomTypeName,
+        @RequestParam(required = false) String provinceId,
+        @RequestParam(required = false) String wardId,
+        @RequestParam(required = false) RoomRentalStatus rentalStatus,
+        @RequestParam(required = false) BigDecimal minPrice,
+        @RequestParam(required = false) BigDecimal maxPrice,
+        @RequestParam(required = false) List<String> amenityNames
+    ) {
+        return ApiResponse.success(
+            "Lọc phòng thành công",
+            rooms.searchMine(
+                principal.getName(),
+                page,
+                size,
+                roomTypeName,
+                provinceId,
+                wardId,
+                rentalStatus,
+                minPrice,
+                maxPrice,
+                amenityNames
+            )
+        );
     }
 
     @GetMapping("/mine")
     @PreAuthorize("hasRole('LANDLORD')")
-    public ApiResponse<PageResponse<RoomResponse>> mine(Principal principal,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        return ApiResponse.success("Lấy danh sách phòng của tôi thành công", rooms.mine(principal.getName(), page, size));
+    public ApiResponse<PageResponse<RoomResponse>> mine(
+        Principal principal,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size
+    ) {
+        return ApiResponse
+            .success("Lấy danh sách phòng của tôi thành công", rooms.mine(principal.getName(), page, size));
     }
 
     @GetMapping("/mine/filter")
     @PreAuthorize("hasRole('LANDLORD')")
-    public ApiResponse<PageResponse<RoomResponse>> filterMine(Principal principal,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "12") int size,
-            @RequestParam(required = false) String roomTypeName,
-            @RequestParam(required = false) String provinceId,
-            @RequestParam(required = false) String wardId,
-            @RequestParam(required = false) RoomRentalStatus rentalStatus,
-            @RequestParam(required = false) BigDecimal minPrice,
-            @RequestParam(required = false) BigDecimal maxPrice,
-            @RequestParam(required = false) List<String> amenityNames) {
-        return ApiResponse.success("Lọc phòng của tôi thành công",
-                rooms.searchMine(principal.getName(), page, size, roomTypeName, provinceId, wardId, rentalStatus,
-                        minPrice, maxPrice, amenityNames));
+    public ApiResponse<PageResponse<RoomResponse>> filterMine(
+        Principal principal,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "12") int size,
+        @RequestParam(required = false) String roomTypeName,
+        @RequestParam(required = false) String provinceId,
+        @RequestParam(required = false) String wardId,
+        @RequestParam(required = false) RoomRentalStatus rentalStatus,
+        @RequestParam(required = false) BigDecimal minPrice,
+        @RequestParam(required = false) BigDecimal maxPrice,
+        @RequestParam(required = false) List<String> amenityNames
+    ) {
+        return ApiResponse.success(
+            "Lọc phòng của tôi thành công",
+            rooms.searchMine(
+                principal.getName(),
+                page,
+                size,
+                roomTypeName,
+                provinceId,
+                wardId,
+                rentalStatus,
+                minPrice,
+                maxPrice,
+                amenityNames
+            )
+        );
     }
 
     @GetMapping("/{id}")
@@ -80,16 +113,21 @@ public class RoomController {
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('LANDLORD')")
-    public ApiResponse<RoomResponse> create(Principal principal,
-            @RequestPart("room") @Valid RoomRequest request,
-            @RequestPart(value = "files", required = false) List<MultipartFile> files) {
+    public ApiResponse<RoomResponse> create(
+        Principal principal,
+        @RequestPart("room") @Valid RoomRequest request,
+        @RequestPart(value = "files", required = false) List<MultipartFile> files
+    ) {
         return ApiResponse.success("Thêm phòng thành công", rooms.create(principal.getName(), request, files));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('LANDLORD')")
-    public ApiResponse<RoomResponse> update(Principal principal, @PathVariable String id,
-            @RequestBody @Valid RoomRequest request) {
+    public ApiResponse<RoomResponse> update(
+        Principal principal,
+        @PathVariable String id,
+        @RequestBody @Valid RoomRequest request
+    ) {
         return ApiResponse.success("Cập nhật phòng thành công", rooms.update(principal.getName(), id, request));
     }
 
@@ -102,14 +140,21 @@ public class RoomController {
 
     @PostMapping(value = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('LANDLORD')")
-    public ApiResponse<List<RoomResponse.RoomImageResponse>> uploadImages(Principal principal, @PathVariable String id,
-            @RequestParam("files") List<MultipartFile> files) {
+    public ApiResponse<List<RoomResponse.RoomImageResponse>> uploadImages(
+        Principal principal,
+        @PathVariable String id,
+        @RequestParam("files") List<MultipartFile> files
+    ) {
         return ApiResponse.success("Tải ảnh phòng thành công", rooms.uploadImages(principal.getName(), id, files));
     }
 
     @DeleteMapping("/{id}/images/{imageId}")
     @PreAuthorize("hasRole('LANDLORD')")
-    public ApiResponse<Void> deleteImage(Principal principal, @PathVariable String id, @PathVariable String imageId) {
+    public ApiResponse<Void> deleteImage(
+        Principal principal,
+        @PathVariable String id,
+        @PathVariable String imageId
+    ) {
         rooms.deleteImage(principal.getName(), id, imageId);
         return ApiResponse.success("Xóa ảnh phòng thành công", null);
     }

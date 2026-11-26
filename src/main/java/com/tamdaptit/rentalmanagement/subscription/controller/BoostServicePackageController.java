@@ -2,7 +2,10 @@ package com.tamdaptit.rentalmanagement.subscription.controller;
 
 import com.tamdaptit.rentalmanagement.common.dto.ApiResponse;
 import com.tamdaptit.rentalmanagement.common.dto.PageResponse;
+import com.tamdaptit.rentalmanagement.subscription.dto.request.BoostServicePackageRequest;
 import com.tamdaptit.rentalmanagement.subscription.dto.request.CatalogStatusRequest;
+import com.tamdaptit.rentalmanagement.subscription.dto.response.BoostServicePackageResponse;
+import com.tamdaptit.rentalmanagement.subscription.service.BoostServicePackageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -17,9 +20,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import com.tamdaptit.rentalmanagement.subscription.dto.request.BoostServicePackageRequest;
-import com.tamdaptit.rentalmanagement.subscription.dto.response.BoostServicePackageResponse;
-import com.tamdaptit.rentalmanagement.subscription.service.BoostServicePackageService;
 
 @RestController
 @RequestMapping("/api/boost-packages")
@@ -32,9 +32,10 @@ public class BoostServicePackageController {
     @PreAuthorize("hasRole('ADMIN') or (hasRole('LANDLORD') and !#includeInactive)")
     @Operation(summary = "Danh sách Boost đang bán; admin có thể xem cả gói ngừng bán")
     public ApiResponse<PageResponse<BoostServicePackageResponse>> getAll(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "false") boolean includeInactive) {
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size,
+        @RequestParam(defaultValue = "false") boolean includeInactive
+    ) {
         return ApiResponse.success(service.getAll(page, size, includeInactive));
     }
 
@@ -42,8 +43,9 @@ public class BoostServicePackageController {
     @PreAuthorize("hasRole('ADMIN') or (hasRole('LANDLORD') and !#includeInactive)")
     @Operation(summary = "Chi tiết gói Boost")
     public ApiResponse<BoostServicePackageResponse> getById(
-            @PathVariable String id,
-            @RequestParam(defaultValue = "false") boolean includeInactive) {
+        @PathVariable String id,
+        @RequestParam(defaultValue = "false") boolean includeInactive
+    ) {
         return ApiResponse.success(service.getById(id, includeInactive));
     }
 
@@ -58,7 +60,9 @@ public class BoostServicePackageController {
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Admin cập nhật danh mục Boost")
     public ApiResponse<BoostServicePackageResponse> update(
-            @PathVariable String id, @RequestBody @Valid BoostServicePackageRequest request) {
+        @PathVariable String id,
+        @RequestBody @Valid BoostServicePackageRequest request
+    ) {
         return ApiResponse.success("Cập nhật gói Boost thành công", service.update(id, request));
     }
 
@@ -66,7 +70,9 @@ public class BoostServicePackageController {
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Admin bật hoặc ngừng bán Boost")
     public ApiResponse<BoostServicePackageResponse> setActive(
-            @PathVariable String id, @RequestBody @Valid CatalogStatusRequest request) {
+        @PathVariable String id,
+        @RequestBody @Valid CatalogStatusRequest request
+    ) {
         return ApiResponse.success("Cập nhật trạng thái Boost thành công", service.setActive(id, request.active()));
     }
 }

@@ -1,76 +1,124 @@
 package com.tamdaptit.rentalmanagement.common.exception;
 
-import com.tamdaptit.rentalmanagement.common.dto.ApiResponse;
-import lombok.extern.slf4j.Slf4j;
-import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.core.NestedExceptionUtils;
-import org.springframework.http.converter.HttpMessageNotWritableException;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.AuthenticationException;
-import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.springframework.web.servlet.resource.NoResourceFoundException;
-import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
-import org.springframework.web.util.DisconnectedClientHelper;
 import java.io.IOException;
 import java.util.stream.Collectors;
+
+import com.tamdaptit.rentalmanagement.common.dto.ApiResponse;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.NestedExceptionUtils;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.http.converter.HttpMessageNotWritableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.util.DisconnectedClientHelper;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-    private static final DisconnectedClientHelper disconnectedClients =
-            new DisconnectedClientHelper(GlobalExceptionHandler.class.getName());
+    private static final DisconnectedClientHelper disconnectedClients = new DisconnectedClientHelper(
+        GlobalExceptionHandler.class.getName()
+    );
 
-    @ExceptionHandler({HttpMessageNotWritableException.class, AsyncRequestNotUsableException.class})
+    @ExceptionHandler({ HttpMessageNotWritableException.class, AsyncRequestNotUsableException.class })
     public ResponseEntity<ApiResponse<Object>> handleResponseWrite(Exception ex, HttpServletResponse response) {
-        if (disconnectedClients.checkAndLogClientDisconnectedException(ex)) return null;
+        if (disconnectedClients.checkAndLogClientDisconnectedException(ex)) {
+            return null;
+        }
 
         // Some Windows servlet write failures arrive without the usual container exception wrapper.
         Throwable cause = NestedExceptionUtils.getMostSpecificCause(ex);
-        if (ex instanceof HttpMessageNotWritableException && ex.getMessage() != null
-                && ex.getMessage().contains("ServletOutputStream failed to write")
-                && cause instanceof IOException && cause.getMessage() != null
-                && cause.getMessage().contains("An established connection was aborted by the software in your host machine")) {
+        if (
+            ex instanceof HttpMessageNotWritableException &&
+                ex.getMessage() != null &&
+                ex.getMessage().contains("ServletOutputStream failed to write") &&
+                cause instanceof IOException &&
+                cause.getMessage() != null &&
+            cause.getMessage()
+                    .contains("An established connection was aborted by the software in your host machine")
+        ) {
             log.debug("Client disconnected while writing the HTTP response");
             return null;
         }
 
         log.error("Failed to write HTTP response", ex);
-        if (response.isCommitted()) return null;
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.builder()
-                .code(500).errorCode("INTERNAL_SERVER_ERROR")
-                .message(ErrorCode.INTERNAL_SERVER_ERROR.getMessage()).build());
+        if (response.isCommitted()) {
+            return null;
+        }
+
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .body(
+                ApiResponse.builder()
+                    .code(500)
+                    .errorCode("INTERNAL_SERVER_ERROR")
+                    .message(ErrorCode.INTERNAL_SERVER_ERROR.getMessage())
+                    .build()
+            );
     }
 
-    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ApiResponse<Object>> handleMethodNotAllowed(Exception ex) {
-        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(ApiResponse.builder()
-                .code(405).errorCode("METHOD_NOT_ALLOWED").message("Phương thức không được hỗ trợ").build());
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+            .body(
+                ApiResponse.builder()
+                    .code(405)
+                    .errorCode("METHOD_NOT_ALLOWED")
+                    .message("Phương thức không được hỗ trợ")
+                    .build()
+            );
     }
 
-    @ExceptionHandler(org.springframework.dao.PessimisticLockingFailureException.class)
+    @ExceptionHandler(PessimisticLockingFailureException.class)
     public ResponseEntity<ApiResponse<Object>> handleRoomBusy(Exception ex) {
-        return ResponseEntity.status(409).body(ApiResponse.builder().code(409)
-                .errorCode("ROOM_BUSY").message(ErrorCode.ROOM_BUSY.getMessage()).build());
+        return ResponseEntity.status(409)
+            .body(
+                ApiResponse.builder()
+                    .code(409)
+                    .errorCode("ROOM_BUSY")
+                    .message(ErrorCode.ROOM_BUSY.getMessage())
+                    .build()
+            );
     }
 
-    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiResponse<Object>> handleUploadTooLarge(Exception ex) {
-        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(ApiResponse.builder()
-                .code(413).message("File tải lên vượt quá dung lượng cho phép").build());
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+            .body(
+                ApiResponse.builder()
+                    .code(413)
+                    .message("File tải lên vượt quá dung lượng cho phép")
+                    .build()
+            );
     }
 
-    @ExceptionHandler({org.springframework.http.converter.HttpMessageNotReadableException.class,
-            org.springframework.web.multipart.support.MissingServletRequestPartException.class,
-            org.springframework.web.bind.MissingServletRequestParameterException.class})
+    @ExceptionHandler(
+        { HttpMessageNotReadableException.class,
+            MissingServletRequestPartException.class,
+            MissingServletRequestParameterException.class }
+    )
     public ResponseEntity<ApiResponse<Object>> handleMalformedRequest(Exception ex) {
-        return ResponseEntity.badRequest().body(ApiResponse.builder()
-                .code(400).message("Dữ liệu không hợp lệ hoặc thiếu trường bắt buộc").build());
+        return ResponseEntity.badRequest()
+            .body(
+                ApiResponse.builder()
+                    .code(400)
+                    .message("Dữ liệu không hợp lệ hoặc thiếu trường bắt buộc")
+                    .build()
+            );
     }
 
     // Bat cac loi nghiep vu chu dong nem ra (AppException)
@@ -78,12 +126,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Object>> handleAppException(AppException ex) {
         ErrorCode errorCode = ex.getErrorCode();
 
-        ApiResponse<Object> response =
-                ApiResponse.builder()
-                        .code(errorCode.getCode().value())
-                        .message(ex.getMessage())
-                        .errorCode(errorCode.name())
-                        .build();
+        ApiResponse<Object> response = ApiResponse.builder()
+            .code(errorCode.getCode().value())
+            .message(ex.getMessage())
+            .errorCode(errorCode.name())
+            .build();
 
         return ResponseEntity.status(errorCode.getCode()).body(response);
     }
@@ -91,25 +138,24 @@ public class GlobalExceptionHandler {
     // 1. Loi Validation (Khi dung @Valid cho DTO nhung client gui sai format)
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Object>> handleValidationException(
-            MethodArgumentNotValidException ex) {
-
+        MethodArgumentNotValidException ex
+    ) {
         String errorMessage = ex.getBindingResult()
-                .getFieldErrors()
-                .stream()
-                .map(fieldError -> fieldError.getDefaultMessage())
-                .distinct()
-                .collect(Collectors.joining("; "));
+            .getFieldErrors()
+            .stream()
+            .map(fieldError -> fieldError.getDefaultMessage())
+            .distinct()
+            .collect(Collectors.joining("; "));
 
         if (errorMessage.isBlank()) {
             errorMessage = "Du lieu gui len khong hop le";
         }
 
-        ApiResponse<Object> response =
-                ApiResponse.builder()
-                        .code(HttpStatus.BAD_REQUEST.value())
-                        .message(errorMessage)
-                        .errorCode("VALIDATION_ERROR")
-                        .build();
+        ApiResponse<Object> response = ApiResponse.builder()
+            .code(HttpStatus.BAD_REQUEST.value())
+            .message(errorMessage)
+            .errorCode("VALIDATION_ERROR")
+            .build();
 
         return ResponseEntity.badRequest().body(response);
     }
@@ -117,13 +163,12 @@ public class GlobalExceptionHandler {
     // 2. Sai kieu du lieu trong path variable / query param
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiResponse<Object>> handleTypeMismatch(
-            MethodArgumentTypeMismatchException ex) {
-
-        ApiResponse<Object> response =
-                ApiResponse.builder()
-                        .code(HttpStatus.BAD_REQUEST.value())
-                        .message("Tham so '" + ex.getName() + "' khong hop le")
-                        .build();
+        MethodArgumentTypeMismatchException ex
+    ) {
+        ApiResponse<Object> response = ApiResponse.builder()
+            .code(HttpStatus.BAD_REQUEST.value())
+            .message("Tham so '" + ex.getName() + "' khong hop le")
+            .build();
 
         return ResponseEntity.badRequest().body(response);
     }
@@ -131,12 +176,10 @@ public class GlobalExceptionHandler {
     // 3. Khong co quyen truy cap (thi du @PreAuthorize that bai)
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Object>> handleAccessDenied(AccessDeniedException ex) {
-
-        ApiResponse<Object> response =
-                ApiResponse.builder()
-                        .code(HttpStatus.FORBIDDEN.value())
-                        .message(ErrorCode.UNAUTHORIZED.getMessage())
-                        .build();
+        ApiResponse<Object> response = ApiResponse.builder()
+            .code(HttpStatus.FORBIDDEN.value())
+            .message(ErrorCode.UNAUTHORIZED.getMessage())
+            .build();
 
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
@@ -144,13 +187,12 @@ public class GlobalExceptionHandler {
     // 4. Loi xac thuc cua Spring Security
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ApiResponse<Object>> handleAuthentication(
-            AuthenticationException ex) {
-
-        ApiResponse<Object> response =
-                ApiResponse.builder()
-                        .code(HttpStatus.UNAUTHORIZED.value())
-                        .message(ErrorCode.UNAUTHENTICATED.getMessage())
-                        .build();
+        AuthenticationException ex
+    ) {
+        ApiResponse<Object> response = ApiResponse.builder()
+            .code(HttpStatus.UNAUTHORIZED.value())
+            .message(ErrorCode.UNAUTHENTICATED.getMessage())
+            .build();
 
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
     }
@@ -158,23 +200,35 @@ public class GlobalExceptionHandler {
     // 5. Vi pham rang buoc du lieu o tang DB (trung email, trung slug, FK khong ton tai...)
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Object>> handleDataIntegrityViolation(
-            DataIntegrityViolationException ex) {
+        DataIntegrityViolationException ex
+    ) {
 
         // SQL exception text can contain personal data. Do not log bound values.
         String constraint = ex.getMostSpecificCause().getMessage();
-        if (constraint != null && (constraint.contains("uk_rr_open_room_tenant")
-                || constraint.contains("uk_rag_occupied_room") || constraint.contains("uk_rag_request"))) {
-            String code = constraint.contains("uk_rr_open_room_tenant") ? "REQUEST_ALREADY_PENDING" : "ROOM_UNAVAILABLE";
-            return ResponseEntity.status(409).body(ApiResponse.builder().code(409).errorCode(code)
-                    .message("Phòng hoặc yêu cầu đã được xử lý, vui lòng tải lại").build());
+        if (
+            constraint != null &&
+            (constraint.contains("uk_rr_open_room_tenant") ||
+                    constraint.contains("uk_rag_occupied_room") ||
+                    constraint.contains("uk_rag_request"))
+        ) {
+            String code = constraint.contains("uk_rr_open_room_tenant") ? "REQUEST_ALREADY_PENDING"
+                : "ROOM_UNAVAILABLE";
+            return ResponseEntity.status(409)
+                .body(
+                    ApiResponse.builder()
+                        .code(409)
+                        .errorCode(code)
+                        .message("Phòng hoặc yêu cầu đã được xử lý, vui lòng tải lại")
+                        .build()
+                );
         }
+
         log.warn("Data integrity constraint rejected a write");
 
-        ApiResponse<Object> response =
-                ApiResponse.builder()
-                        .code(HttpStatus.BAD_REQUEST.value())
-                        .message("Du lieu bi trung hoac khong hop le")
-                        .build();
+        ApiResponse<Object> response = ApiResponse.builder()
+            .code(HttpStatus.BAD_REQUEST.value())
+            .message("Du lieu bi trung hoac khong hop le")
+            .build();
 
         return ResponseEntity.badRequest().body(response);
     }
@@ -184,25 +238,23 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Object>> handleRuntimeException(RuntimeException ex) {
         log.error("Runtime exception", ex);
 
-        ApiResponse<Object> response =
-                ApiResponse.builder()
-                        .code(HttpStatus.BAD_REQUEST.value())
-                        .message(ex.getMessage())
-                        .build();
+        ApiResponse<Object> response = ApiResponse.builder()
+            .code(HttpStatus.BAD_REQUEST.value())
+            .message(ex.getMessage())
+            .build();
 
         return ResponseEntity.badRequest().body(response);
     }
 
     // 7. Loi trang thai HTTP khong xu ly duoc
-    @ExceptionHandler({NoResourceFoundException.class, org.springframework.web.servlet.NoHandlerFoundException.class})
+    @ExceptionHandler({ NoResourceFoundException.class, NoHandlerFoundException.class })
     public ResponseEntity<ApiResponse<Object>> handleNoResourceFound(
-            Exception ex) {
-
-        ApiResponse<Object> response =
-                ApiResponse.builder()
-                        .code(HttpStatus.NOT_FOUND.value())
-                        .message(ErrorCode.NOT_FOUND.getMessage())
-                        .build();
+        Exception ex
+    ) {
+        ApiResponse<Object> response = ApiResponse.builder()
+            .code(HttpStatus.NOT_FOUND.value())
+            .message(ErrorCode.NOT_FOUND.getMessage())
+            .build();
 
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
@@ -212,11 +264,10 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Object>> handleGeneralException(Exception ex) {
         log.error("Unhandled exception", ex);
 
-        ApiResponse<Object> response =
-                ApiResponse.builder()
-                        .code(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                        .message(ErrorCode.INTERNAL_SERVER_ERROR.getMessage())
-                        .build();
+        ApiResponse<Object> response = ApiResponse.builder()
+            .code(HttpStatus.INTERNAL_SERVER_ERROR.value())
+            .message(ErrorCode.INTERNAL_SERVER_ERROR.getMessage())
+            .build();
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }

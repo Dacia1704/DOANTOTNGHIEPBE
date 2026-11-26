@@ -1,20 +1,19 @@
 package com.tamdaptit.rentalmanagement.identity.repository;
 
+import java.util.List;
+import java.util.Optional;
+
 import com.tamdaptit.rentalmanagement.identity.entity.User;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import jakarta.persistence.LockModeType;
-import java.util.List;
-import java.util.Optional;
-
 
 @Repository
 public interface UserRepository extends JpaRepository<User, String>, JpaSpecificationExecutor<User> {
-
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT u FROM User u WHERE u.id = :id")
     Optional<User> findByIdForUpdate(@Param("id") String id);
@@ -62,6 +61,7 @@ public interface UserRepository extends JpaRepository<User, String>, JpaSpecific
             WHERE LOWER(u.email) = LOWER(:email)
             """)
     Optional<User> findByEmailWithRolesAndPermissions(@Param("email") String email);
+
     @Query("""
             SELECT DISTINCT u
             FROM User u

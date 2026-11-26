@@ -1,12 +1,12 @@
 package com.tamdaptit.rentalmanagement.auth.service;
 
-import com.tamdaptit.rentalmanagement.identity.entity.User;
-import io.jsonwebtoken.Claims;
 import java.time.LocalDateTime;
 import java.util.List;
 
-public interface JwtTokenService {
+import com.tamdaptit.rentalmanagement.identity.entity.User;
+import io.jsonwebtoken.Claims;
 
+public interface JwtTokenService {
     String generateAccessToken(User user);
 
     String generateRefreshToken(User user);

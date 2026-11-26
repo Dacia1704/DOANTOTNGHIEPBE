@@ -1,5 +1,12 @@
 package com.tamdaptit.rentalmanagement.report;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
 import com.tamdaptit.rentalmanagement.common.exception.AppException;
 import com.tamdaptit.rentalmanagement.common.exception.ErrorCode;
 import com.tamdaptit.rentalmanagement.identity.entity.Permission;
@@ -33,22 +40,14 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("Phần 2: Trao đổi, thông báo & Quản trị bổ trợ - ReportService")
 class ReportServiceTest {
-
     @Mock
     private ReportRepository reports;
 
@@ -80,7 +79,15 @@ class ReportServiceTest {
     @BeforeEach
     void setUp() {
         reportService = new ReportServiceImpl(
-                reports, evidences, users, listings, agreements, notifications, mapper, clock, jdbc
+            reports,
+            evidences,
+            users,
+            listings,
+            agreements,
+            notifications,
+            mapper,
+            clock,
+            jdbc
         );
     }
 
@@ -96,9 +103,9 @@ class ReportServiceTest {
         assertThat(landlordReasons).allMatch(r -> r.supports(ReportTargetType.LANDLORD));
 
         assertThatThrownBy(() -> reportService.reasons(null))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.INVALID_REQUEST);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.INVALID_REQUEST);
     }
 
     @Test
@@ -126,13 +133,16 @@ class ReportServiceTest {
         when(users.findByIdWithRolesAndPermissions(actor)).thenReturn(Optional.of(tenant));
 
         ReportCreateRequest body = new ReportCreateRequest(
-                ReportTargetType.LANDLORD, "landlord-1", ReportReason.INVALID_PRICE, "Giá không hợp lệ"
+            ReportTargetType.LANDLORD,
+            "landlord-1",
+            ReportReason.INVALID_PRICE,
+            "Giá không hợp lệ"
         );
 
         assertThatThrownBy(() -> reportService.create(actor, body))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.INVALID_REQUEST);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.INVALID_REQUEST);
     }
 
     @Test
@@ -153,13 +163,16 @@ class ReportServiceTest {
         when(users.findByIdWithRolesAndPermissions(actor)).thenReturn(Optional.of(tenant));
 
         ReportCreateRequest body = new ReportCreateRequest(
-                ReportTargetType.LISTING, "listing-1", ReportReason.SCAM, "Mô tả"
+            ReportTargetType.LISTING,
+            "listing-1",
+            ReportReason.SCAM,
+            "Mô tả"
         );
 
         assertThatThrownBy(() -> reportService.create(actor, body))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.UNAUTHORIZED);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.UNAUTHORIZED);
     }
 
     private User createAdminWithPermission(String id, String permissionCode) {
@@ -190,9 +203,9 @@ class ReportServiceTest {
 
         // Outcome là PENDING không hợp lệ khi đóng
         assertThatThrownBy(() -> reportService.close("admin-1", "rep-1", ReportStatus.PENDING, req))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.INVALID_REQUEST);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.INVALID_REQUEST);
     }
 
     @Test
@@ -207,9 +220,9 @@ class ReportServiceTest {
         ReportResolutionRequest req = new ReportResolutionRequest("Ghi chú", null);
 
         assertThatThrownBy(() -> reportService.close("user-no-perm", "rep-1", ReportStatus.RESOLVED, req))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.UNAUTHORIZED);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.UNAUTHORIZED);
     }
 
     @Test
@@ -225,9 +238,9 @@ class ReportServiceTest {
         when(reports.lock("rep-1")).thenReturn(Optional.of(report));
 
         assertThatThrownBy(() -> reportService.assign("admin-1", "rep-1"))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.REPORT_INVALID_TRANSITION);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.REPORT_INVALID_TRANSITION);
     }
 
     @Test
@@ -253,9 +266,9 @@ class ReportServiceTest {
         when(evidences.countByReport_Id("rep-1")).thenReturn(5L);
 
         assertThatThrownBy(() -> reportService.checkUpload("tenant-1", "rep-1"))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.IMAGE_TOO_MANY);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.IMAGE_TOO_MANY);
     }
 
     @Test
@@ -283,9 +296,9 @@ class ReportServiceTest {
         when(reports.findById("rep-1")).thenReturn(Optional.of(report));
 
         assertThatThrownBy(() -> reportService.checkUpload("tenant-other", "rep-1"))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.UNAUTHORIZED);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.UNAUTHORIZED);
     }
 
     @Test
@@ -310,8 +323,8 @@ class ReportServiceTest {
         when(reports.findById("rep-1")).thenReturn(Optional.of(report));
 
         assertThatThrownBy(() -> reportService.checkUpload("tenant-1", "rep-1"))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.REPORT_NOT_PENDING);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.REPORT_NOT_PENDING);
     }
 }

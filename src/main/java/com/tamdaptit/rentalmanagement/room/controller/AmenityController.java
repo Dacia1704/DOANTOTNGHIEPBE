@@ -33,17 +33,19 @@ public class AmenityController {
     @GetMapping
     @Operation(summary = "Lấy danh sách tiện ích")
     public ApiResponse<PageResponse<Amenity>> getAll(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size
+    ) {
         return ApiResponse.success("Lấy danh sách tiện ích thành công", amenityService.getAll(page, size));
     }
 
     @GetMapping("/filter")
     @Operation(summary = "Lọc tiện ích theo tên")
     public ApiResponse<PageResponse<Amenity>> filter(
-            @RequestParam(required = false) String name,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+        @RequestParam(required = false) String name,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size
+    ) {
         return ApiResponse.success("Lọc tiện ích thành công", amenityService.filter(name, page, size));
     }
 

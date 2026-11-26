@@ -1,7 +1,21 @@
 package com.tamdaptit.rentalmanagement.room.entity;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
 import com.tamdaptit.rentalmanagement.property.entity.Property;
 import com.tamdaptit.rentalmanagement.room.entity.enums.RoomRentalStatus;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -12,21 +26,15 @@ import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "rooms", uniqueConstraints = @jakarta.persistence.UniqueConstraint(
-        name = "uk_rooms_property_room_number", columnNames = {"property_id", "room_number"}))
+@Table(
+    name = "rooms",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_rooms_property_room_number",
+        columnNames = { "property_id", "room_number" }
+    )
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -34,10 +42,12 @@ import java.time.LocalDateTime;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class Room {
-
-    @jakarta.persistence.Transient
+    @Transient
     private String bookingAvailability;
-    public String getBookingAvailability() { return bookingAvailability == null ? rentalStatus.name() : bookingAvailability; }
+
+    public String getBookingAvailability() {
+        return bookingAvailability == null ? rentalStatus.name() : bookingAvailability;
+    }
 
     @Id
     @UuidGenerator
@@ -92,5 +102,4 @@ public class Room {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
-
 }

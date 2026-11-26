@@ -1,13 +1,13 @@
 package com.tamdaptit.rentalmanagement.chat.repository;
 
+import java.util.List;
+import java.util.Optional;
+
 import com.tamdaptit.rentalmanagement.chat.entity.ChatConversationParticipant;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-
-import java.util.Optional;
-import java.util.List;
 
 @Repository
 public interface ChatConversationParticipantRepository extends JpaRepository<ChatConversationParticipant, String> {
@@ -27,7 +27,7 @@ public interface ChatConversationParticipantRepository extends JpaRepository<Cha
               AND p.user.id <> :userId
             """)
     Optional<ChatConversationParticipant> findOtherParticipant(
-            @Param("conversationId") String conversationId,
-            @Param("userId") String userId
+        @Param("conversationId") String conversationId,
+        @Param("userId") String userId
     );
 }

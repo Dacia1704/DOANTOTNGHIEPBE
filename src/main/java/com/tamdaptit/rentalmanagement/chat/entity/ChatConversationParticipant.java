@@ -1,5 +1,7 @@
 package com.tamdaptit.rentalmanagement.chat.entity;
 
+import java.time.LocalDateTime;
+
 import com.tamdaptit.rentalmanagement.identity.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -19,17 +21,15 @@ import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
-import java.time.LocalDateTime;
-
 @Entity
 @Table(
-        name = "chat_conversation_participants",
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uk_ccp_conversation_user",
-                        columnNames = {"conversation_id", "user_id"}
-                )
-        }
+    name = "chat_conversation_participants",
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_ccp_conversation_user",
+            columnNames = { "conversation_id", "user_id" }
+        )
+    }
 )
 @Getter
 @Setter
@@ -38,7 +38,6 @@ import java.time.LocalDateTime;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class ChatConversationParticipant {
-
     @Id
     @UuidGenerator
     @Column(length = 36)

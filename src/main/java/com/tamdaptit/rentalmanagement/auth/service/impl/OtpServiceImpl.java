@@ -1,5 +1,8 @@
 package com.tamdaptit.rentalmanagement.auth.service.impl;
 
+import java.security.SecureRandom;
+import java.time.Duration;
+
 import com.tamdaptit.rentalmanagement.auth.entity.enums.OtpPurpose;
 import com.tamdaptit.rentalmanagement.auth.service.OtpService;
 import com.tamdaptit.rentalmanagement.common.exception.AppException;
@@ -8,9 +11,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
-
-import java.security.SecureRandom;
-import java.time.Duration;
 
 @Service
 @RequiredArgsConstructor
@@ -21,8 +21,8 @@ public class OtpServiceImpl implements OtpService {
      *   otp:{PURPOSE}:{email}       → gia tri OTP
      *   otp:cooldown:{PURPOSE}:{email} → marker cooldown (khong co value, chi TTL)
      */
-    private static final String OTP_KEY_PREFIX      = "otp:";
-    private static final String COOLDOWN_KEY_PREFIX  = "otp:cooldown:";
+    private static final String OTP_KEY_PREFIX = "otp:";
+    private static final String COOLDOWN_KEY_PREFIX = "otp:cooldown:";
 
     private final StringRedisTemplate redisTemplate;
     private final SecureRandom secureRandom = new SecureRandom();
@@ -47,19 +47,28 @@ public class OtpServiceImpl implements OtpService {
         // ghi de OTP cu (neu co); reset TTL
         redisTemplate.opsForValue().set(key, otp, Duration.ofSeconds(expirationSeconds));
         // danh dau cooldown
-        redisTemplate.opsForValue().set(
-                cooldownKey(purpose, email), "1", Duration.ofSeconds(cooldownSeconds));
+        redisTemplate.opsForValue()
+            .set(
+                cooldownKey(purpose, email),
+                "1",
+                Duration.ofSeconds(cooldownSeconds)
+            );
         return otp;
     }
 
     @Override
-    public void verify(String email, String otp, OtpPurpose purpose) {
+    public void verify(
+        String email,
+        String otp,
+        OtpPurpose purpose
+    ) {
         String key = otpKey(purpose, email);
         String stored = redisTemplate.opsForValue().get(key);
 
         if (stored == null || !stored.equals(otp)) {
             throw new AppException(ErrorCode.OTP_INVALID);
         }
+
         // Xoa OTP ngay sau khi xac thuc thanh cong (one-time use)
         redisTemplate.delete(key);
     }

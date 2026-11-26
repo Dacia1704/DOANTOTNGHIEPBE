@@ -8,9 +8,26 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("Phần 1: Quản lý cộng đồng & Kiểm duyệt - ContentMatcher Deterministic Token Matching")
 class ContentMatcherTest {
-
-    private Rule createRule(String id, String pattern, String matchType, boolean accentInsensitive) {
-        return new Rule(id, pattern, matchType, "HIDE", accentInsensitive, true, true, true, true, true, "Vi phạm từ ngữ", 1L);
+    private Rule createRule(
+        String id,
+        String pattern,
+        String matchType,
+        boolean accentInsensitive
+    ) {
+        return new Rule(
+            id,
+            pattern,
+            matchType,
+            "HIDE",
+            accentInsensitive,
+            true,
+            true,
+            true,
+            true,
+            true,
+            "Vi phạm từ ngữ",
+            1L
+        );
     }
 
     @Test

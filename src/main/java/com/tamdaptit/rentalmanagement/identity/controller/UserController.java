@@ -1,8 +1,7 @@
 package com.tamdaptit.rentalmanagement.identity.controller;
 
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import java.security.Principal;
+
 import com.tamdaptit.rentalmanagement.common.dto.ApiResponse;
 import com.tamdaptit.rentalmanagement.common.dto.PageResponse;
 import com.tamdaptit.rentalmanagement.identity.dto.request.ChangePasswordRequest;
@@ -13,6 +12,8 @@ import com.tamdaptit.rentalmanagement.identity.dto.response.UserResponse;
 import com.tamdaptit.rentalmanagement.identity.entity.enums.UserStatus;
 import com.tamdaptit.rentalmanagement.identity.service.UserService;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -37,10 +38,12 @@ import org.springframework.web.multipart.MultipartFile;
 public class UserController {
     private final UserService service;
 
-    @GetMapping({"/me", "/get/me"})
-    public ApiResponse<UserResponse> me(Principal principal) { return ApiResponse.success(service.get(principal.getName())); }
+    @GetMapping({ "/me", "/get/me" })
+    public ApiResponse<UserResponse> me(Principal principal) {
+        return ApiResponse.success(service.get(principal.getName()));
+    }
 
-    @RequestMapping(path = {"/me", "/update/me"}, method = {RequestMethod.PUT, RequestMethod.PATCH})
+    @RequestMapping(path = { "/me", "/update/me" }, method = { RequestMethod.PUT, RequestMethod.PATCH })
     public ApiResponse<UserResponse> updateMe(Principal principal, @RequestBody @Valid UpdateProfileRequest request) {
         return ApiResponse.success(service.updateProfile(principal.getName(), request));
     }
@@ -51,25 +54,36 @@ public class UserController {
         return ApiResponse.success("Đổi mật khẩu thành công. Vui lòng đăng nhập lại.", null);
     }
 
-    @RequestMapping(path = "/me/avatar", method = {RequestMethod.PUT, RequestMethod.POST}, consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @RequestMapping(
+        path = "/me/avatar",
+        method = { RequestMethod.PUT, RequestMethod.POST },
+        consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+    )
     public ApiResponse<UserResponse> updateAvatar(Principal principal, @RequestParam("file") MultipartFile file) {
         return ApiResponse.success(service.updateAvatar(principal.getName(), file));
     }
 
     @DeleteMapping("/me/avatar")
-    public ApiResponse<UserResponse> deleteAvatar(Principal principal) { return ApiResponse.success(service.deleteAvatar(principal.getName())); }
+    public ApiResponse<UserResponse> deleteAvatar(Principal principal) {
+        return ApiResponse.success(service.deleteAvatar(principal.getName()));
+    }
 
     @GetMapping
     @PreAuthorize("hasAuthority('USER_READ')")
-    public ApiResponse<PageResponse<UserResponse>> list(@RequestParam(required = false) String q,
-            @RequestParam(required = false) UserStatus status,
-            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+    public ApiResponse<PageResponse<UserResponse>> list(
+        @RequestParam(required = false) String q,
+        @RequestParam(required = false) UserStatus status,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size
+    ) {
         return ApiResponse.success(service.list(q, status, page, size));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('USER_READ')")
-    public ApiResponse<UserResponse> get(@PathVariable String id) { return ApiResponse.success(service.get(id)); }
+    public ApiResponse<UserResponse> get(@PathVariable String id) {
+        return ApiResponse.success(service.get(id));
+    }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -78,7 +92,7 @@ public class UserController {
         return ApiResponse.<UserResponse>builder().code(201).message("Created").data(service.create(request)).build();
     }
 
-    @RequestMapping(path = "/{id}", method = {RequestMethod.PUT, RequestMethod.PATCH})
+    @RequestMapping(path = "/{id}", method = { RequestMethod.PUT, RequestMethod.PATCH })
     @PreAuthorize("hasRole('ADMIN') and hasAuthority('USER_MANAGE')")
     public ApiResponse<UserResponse> update(@PathVariable String id, @RequestBody @Valid UpdateUserRequest request) {
         return ApiResponse.success(service.update(id, request));

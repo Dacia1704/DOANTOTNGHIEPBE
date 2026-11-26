@@ -1,5 +1,7 @@
 package com.tamdaptit.rentalmanagement.chat.entity;
 
+import java.time.LocalDateTime;
+
 import com.tamdaptit.rentalmanagement.chat.entity.enums.MessageType;
 import com.tamdaptit.rentalmanagement.identity.entity.User;
 import jakarta.persistence.Column;
@@ -22,21 +24,19 @@ import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
-import java.time.LocalDateTime;
-
 @Entity
 @Table(
-        name = "chat_messages",
-        indexes = {
-                @Index(
-                        name = "ix_cm_conversation_created",
-                        columnList = "conversation_id, created_at"
-                ),
-                @Index(
-                        name = "ix_cm_sender_id",
-                        columnList = "sender_id"
-                )
-        }
+    name = "chat_messages",
+    indexes = {
+        @Index(
+            name = "ix_cm_conversation_created",
+            columnList = "conversation_id, created_at"
+        ),
+        @Index(
+            name = "ix_cm_sender_id",
+            columnList = "sender_id"
+        )
+    }
 )
 @Getter
 @Setter
@@ -45,7 +45,6 @@ import java.time.LocalDateTime;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class ChatMessage {
-
     @Id
     @UuidGenerator
     @Column(length = 36)

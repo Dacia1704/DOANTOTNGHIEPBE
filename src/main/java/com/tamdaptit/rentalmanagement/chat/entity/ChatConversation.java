@@ -1,5 +1,9 @@
 package com.tamdaptit.rentalmanagement.chat.entity;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
 import com.tamdaptit.rentalmanagement.listing.entity.Listing;
 import com.tamdaptit.rentalmanagement.rental.entity.RentalRequest;
 import jakarta.persistence.Column;
@@ -21,10 +25,6 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-
 @Entity
 @Table(name = "chat_conversations")
 @Getter
@@ -34,7 +34,6 @@ import java.util.List;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class ChatConversation {
-
     @Id
     @UuidGenerator
     @Column(length = 36)

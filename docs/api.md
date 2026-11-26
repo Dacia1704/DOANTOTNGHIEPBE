@@ -1754,12 +1754,14 @@ GET /api/admin/role-permissions/audit?page=0&size=20: ADMIN có ROLE_PERMISSION_
 
 Các response dùng ApiResponse/PageResponse hiện có; lỗi bổ sung `errorCode` mà vẫn giữ code/message.
 
-- Public `GET /api/listings/{id}/bookable-rooms`: RoomResponse kèm bookingAvailability.
+- Public `GET /api/listings/{id}/bookable-rooms`: RoomResponse kèm bookingAvailability (`AVAILABLE`, `PENDING_APPROVAL`, `HELD`, `RENTED`, `MAINTENANCE`). `PENDING_APPROVAL` báo phòng đã có người đặt chỗ, chờ chủ trọ duyệt; `HELD` báo chờ khách xác nhận hợp đồng. Các trạng thái ngoài `AVAILABLE` không cho đặt mới.
 - TENANT `POST /api/rental-requests`, `GET /api/rental-requests/my`, `POST /api/rental-requests/{id}/cancel`.
 - LANDLORD `GET /api/landlord/rental-requests` (status/propertyId/roomId/page/size), `POST .../{id}/accept`, `POST .../{id}/reject` (reason optional).
 - Party/admin `GET /api/rental-requests/{id}`, `GET /api/rental-agreements/{id}`, `GET /api/rental-agreements/{id}/pdf?download=true`.
 - TENANT `GET /api/rental-agreements/my`, `POST /api/rental-agreements/{id}/confirm`, `POST .../{id}/decline`.
 - LANDLORD `GET /api/landlord/rental-agreements`, `POST .../{id}/checkout` với handoverConfirmed=true.
+
+`POST /api/rental-requests` giữ chỗ ngay khi tạo yêu cầu `PENDING` còn hạn. Khách khác gửi yêu cầu cho cùng phòng nhận HTTP 409 với `errorCode=ROOM_UNAVAILABLE`, kể cả khi gửi đồng thời (Room được khóa `PESSIMISTIC_WRITE` trước khi kiểm tra). Cùng khách gửi lại payload giống hệt vẫn nhận yêu cầu cũ; payload khác nhận 409 `REQUEST_ALREADY_PENDING`. Yêu cầu bị hủy, từ chối hoặc hết hạn 7 ngày không còn giữ phòng. Chủ trọ vẫn có thể duyệt yêu cầu đang giữ chỗ để chuyển sang hợp đồng `PENDING_CONFIRMATION`.
 
 Chi tiết `GET /api/rental-requests/{id}` trả thêm `roomDetails` gồm tiêu đề tin, tên chủ trọ, loại hình thuê, loại phòng/tầng/diện tích/sức chứa, `fullAddress`, `latitude`, `longitude`, `price`, `deposit`, `electricityPrice`, `waterPrice`, `serviceFee` và `priceSource`. `priceSource=AGREEMENT` lấy giá/phí đã chốt từ hợp đồng; `CURRENT_ROOM` lấy giá/phí hiện tại của phòng. Danh sách yêu cầu không tải `roomDetails`. API chi tiết vẫn áp dụng kiểm tra các bên tham gia/admin, xem được khi tin đăng đã ẩn; CCCD chỉ trả dạng che số. Frontend dùng dữ liệu này cho modal **Chi tiết yêu cầu thuê**, bao gồm bản đồ/chỉ đường và thông tin yêu cầu.
 
@@ -1886,7 +1888,7 @@ Endpoint chỉ tổng hợp bằng SQL trong transaction đọc; không tải to
 
 - `from`, `to`: ISO date bao gồm hai đầu, bỏ cả hai mặc định 7 ngày. Truyền thiếu một đầu, đảo ngày, quá 366 ngày hoặc vượt hôm nay theo `Asia/Ho_Chi_Minh` trả 400 `INVALID_REQUEST`. Cận cuối SQL là đầu ngày kế tiếp, loại trừ.
 - `current`: hiện tại, không phụ thuộc khoảng chọn: `properties`, `rooms`, `wholeUnits`, `activeAgreements` (ACTIVE và đang trong start/end date), `pendingAgreements` (DRAFT/PENDING_CONFIRMATION), `endingAgreements` (ACTIVE, end_date từ hôm nay đến 30 ngày tới).
-- `roomStatuses`: RENTED, AVAILABLE, HELD, MAINTENANCE, các nhóm loại trừ nhau. Bảo trì ưu tiên trước; sau đó RENTED hoặc có hợp đồng ACTIVE; sau đó có DRAFT/PENDING_CONFIRMATION là giữ chỗ; còn lại AVAILABLE. Phòng trống khớp quy tắc không có hợp đồng chiếm phòng của RentalAvailabilityService. WHOLE có một Room đại diện.
+- `roomStatuses`: RENTED, AVAILABLE, HELD, MAINTENANCE, các nhóm loại trừ nhau. Bảo trì ưu tiên trước; sau đó RENTED hoặc có hợp đồng ACTIVE; sau đó có DRAFT/PENDING_CONFIRMATION hoặc yêu cầu thuê PENDING còn hạn là giữ chỗ; còn lại AVAILABLE. Dashboard gộp PENDING_APPROVAL vào HELD. Phòng trống khớp quy tắc của RentalAvailabilityService. WHOLE có một Room đại diện.
 - `listingStatuses`: PUBLISHED, PENDING, HIDDEN, EXPIRED, REJECTED; tin hiển thị/chờ duyệt hết hạn được tính EXPIRED ngay khi đọc.
 - `period`, `previous`: số phát sinh kỳ chọn và kỳ liền trước cùng số ngày. `requests` theo created_at; `acceptedRequests`, `respondedRequests` là tập con yêu cầu tạo trong kỳ theo trạng thái/đã phản hồi đang lưu. `confirmedAgreements` theo thời điểm muộn hơn của hai xác nhận, có cả hai xác nhận và trạng thái ACTIVE/EXPIRED/TERMINATED. `endedAgreements` là hợp đồng EXPIRED có end_date trong kỳ, không hàm ý đã hoàn cọc.
 - `views`, `contacts` lấy SUM từ `listing_daily_stats` theo stat_date, join Listing → Property để giới hạn chủ sở hữu. Đây là số đếm thống kê đã lưu; không suy diễn thành số cuộc gọi hoặc số người duy nhất. `serviceSpend`, `boostSpend`, `spend` lấy payments theo paid_at, chỉ SUCCESS, requires_review=0, hai loại SERVICE_PACKAGE/BOOST_PACKAGE. Không tính tiền thuê, REFUNDED hay giao dịch cần đối soát.

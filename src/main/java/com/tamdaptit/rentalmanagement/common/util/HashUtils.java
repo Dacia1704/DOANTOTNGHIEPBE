@@ -15,11 +15,9 @@ import java.util.HexFormat;
  * o day. Ket qua luon co 64 ky tu hex, nen cot {@code token} chi can VARCHAR(64).
  */
 public final class HashUtils {
-
     private static final HexFormat HEX = HexFormat.of();
 
-    private HashUtils() {
-    }
+    private HashUtils() {}
 
     /**
      * @return 64 ky tu hex cua SHA-256, hoac {@code null} neu input null/blank
@@ -28,6 +26,7 @@ public final class HashUtils {
         if (raw == null || raw.isBlank()) {
             return null;
         }
+
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             return HEX.formatHex(digest.digest(raw.getBytes(StandardCharsets.UTF_8)));

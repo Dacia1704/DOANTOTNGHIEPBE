@@ -1,20 +1,14 @@
 package com.tamdaptit.rentalmanagement.identity.entity;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
 import com.tamdaptit.rentalmanagement.address.entity.Province;
 import com.tamdaptit.rentalmanagement.address.entity.Ward;
 import com.tamdaptit.rentalmanagement.identity.entity.enums.TenantType;
 import com.tamdaptit.rentalmanagement.identity.entity.enums.TopPriority;
 import com.tamdaptit.rentalmanagement.room.entity.RoomType;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
-import org.hibernate.annotations.UuidGenerator;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -25,9 +19,16 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.UuidGenerator;
 
 /**
  * 1-1 voi users: user_id vua la khoa chinh vua la khoa ngoai.
@@ -45,7 +46,6 @@ import java.time.LocalDateTime;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class TenantProfile {
-
     @Id
     @UuidGenerator
     @Column(length = 36)
@@ -102,17 +102,23 @@ public class TenantProfile {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "desired_province_id")
     private Province desiredProvince;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "desired_ward_id")
     private Ward desiredWard;
+
     @Column(name = "price_min", precision = 12, scale = 2)
     private BigDecimal priceMin;
+
     @Column(name = "price_max", precision = 12, scale = 2)
     private BigDecimal priceMax;
+
     @Column(name = "area_min", precision = 8, scale = 2)
     private BigDecimal areaMin;
+
     @Column(name = "area_max", precision = 8, scale = 2)
     private BigDecimal areaMax;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "desired_room_type_id")
     private RoomType desiredRoomType;

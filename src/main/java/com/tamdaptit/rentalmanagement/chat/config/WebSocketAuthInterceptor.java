@@ -1,5 +1,7 @@
 package com.tamdaptit.rentalmanagement.chat.config;
 
+import java.util.List;
+
 import com.tamdaptit.rentalmanagement.auth.service.JwtTokenService;
 import com.tamdaptit.rentalmanagement.chat.repository.ChatConversationParticipantRepository;
 import com.tamdaptit.rentalmanagement.identity.entity.enums.UserStatus;
@@ -13,14 +15,12 @@ import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
-
-import java.util.List;
 
 /**
  * Xác thực JWT khi client gửi STOMP CONNECT.
@@ -32,7 +32,6 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class WebSocketAuthInterceptor implements ChannelInterceptor {
-
     private final JwtTokenService jwtTokenService;
     private final UserRepository userRepository;
     private final ChatConversationParticipantRepository participantRepository;
@@ -40,7 +39,8 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(
-                message, StompHeaderAccessor.class
+            message,
+            StompHeaderAccessor.class
         );
 
         if (accessor == null) {
@@ -82,20 +82,22 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
                 }
 
                 // Build authorities
-                List<SimpleGrantedAuthority> authorities =
-                        jwtTokenService.buildAuthorities(user).stream()
-                                .map(SimpleGrantedAuthority::new)
-                                .toList();
+                List<SimpleGrantedAuthority> authorities = jwtTokenService.buildAuthorities(user)
+                    .stream()
+                    .map(SimpleGrantedAuthority::new)
+                    .toList();
 
                 // Tạo Authentication, principal.getName() = userId
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(userId, null, authorities);
+                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                    userId,
+                    null,
+                    authorities
+                );
 
                 // Gán vào STOMP accessor -> WebSocket session sẽ có Principal
                 accessor.setUser(authentication);
 
                 log.debug("WebSocket CONNECT: authenticated userId={}", userId);
-
             } catch (Exception e) {
                 log.warn("WebSocket CONNECT: JWT validation failed - {}", e.getMessage());
                 throw new BadCredentialsException("Không xác thực được kết nối trò chuyện. Vui lòng đăng nhập lại.", e);
@@ -106,14 +108,26 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
             if (!(accessor.getUser() instanceof Authentication authentication) || !authentication.isAuthenticated()) {
                 throw new BadCredentialsException("Vui lòng đăng nhập để trò chuyện.");
             }
+
             String destination = accessor.getDestination();
             if (StompCommand.SEND.equals(accessor.getCommand())) {
-                if (!"/app/chat.send".equals(destination)) throw new AccessDeniedException("Không thể gửi tới địa chỉ này.");
-            } else if (!"/user/queue/messages".equals(destination) && !"/user/queue/errors".equals(destination)
-                    && !"/user/queue/notifications".equals(destination)) {
+                if (!"/app/chat.send".equals(destination)) {
+                    throw new AccessDeniedException("Không thể gửi tới địa chỉ này.");
+                }
+            } else if (
+                !"/user/queue/messages".equals(destination) &&
+                    !"/user/queue/errors".equals(destination) &&
+                    !"/user/queue/notifications".equals(destination)
+            ) {
                 String prefix = "/topic/conversations/";
-                if (destination == null || !destination.startsWith(prefix)
-                        || !participantRepository.existsByConversationIdAndUserId(destination.substring(prefix.length()), authentication.getName())) {
+                if (
+                    destination == null ||
+                        !destination.startsWith(prefix) ||
+                    !participantRepository.existsByConversationIdAndUserId(
+                            destination.substring(prefix.length()),
+                            authentication.getName()
+                        )
+                ) {
                     throw new AccessDeniedException("Bạn không tham gia cuộc trò chuyện này.");
                 }
             }

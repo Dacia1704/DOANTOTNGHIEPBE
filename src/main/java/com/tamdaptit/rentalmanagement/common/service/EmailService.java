@@ -11,5 +11,9 @@ public interface EmailService {
      * @param otp     ma OTP 6 chu so
      * @param purpose muc dich (xac thuc email hoac quen mat khau)
      */
-    void sendOtpEmail(String to, String otp, OtpPurpose purpose);
+    void sendOtpEmail(
+        String to,
+        String otp,
+        OtpPurpose purpose
+    );
 }

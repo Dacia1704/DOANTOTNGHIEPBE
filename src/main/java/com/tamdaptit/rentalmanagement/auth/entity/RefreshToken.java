@@ -1,6 +1,19 @@
 package com.tamdaptit.rentalmanagement.auth.entity;
 
+import java.time.LocalDateTime;
+import java.util.UUID;
+
 import com.tamdaptit.rentalmanagement.identity.entity.User;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,24 +22,16 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.UuidGenerator;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.Table;
-import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Entity
-@Table(name = "refresh_tokens", indexes = {
-        @jakarta.persistence.Index(name = "IX_refresh_tokens_token", columnList = "token"),
-        @jakarta.persistence.Index(name = "IX_refresh_tokens_user_id", columnList = "user_id"),
-        @jakarta.persistence.Index(name = "IX_refresh_tokens_expires_at", columnList = "expires_at")
-})
+@Table(
+    name = "refresh_tokens",
+    indexes = {
+        @Index(name = "IX_refresh_tokens_token", columnList = "token"),
+        @Index(name = "IX_refresh_tokens_user_id", columnList = "user_id"),
+        @Index(name = "IX_refresh_tokens_expires_at", columnList = "expires_at")
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -34,7 +39,6 @@ import java.util.UUID;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class RefreshToken {
-
     @Id
     @GeneratedValue
     @UuidGenerator(style = UuidGenerator.Style.AUTO)
@@ -64,8 +68,16 @@ public class RefreshToken {
 
     @PrePersist
     protected void onCreate() {
-        if (id == null) id = UUID.randomUUID().toString();
-        if (createdAt == null) createdAt = LocalDateTime.now();
-        if (revoked == null) revoked = false;
+        if (id == null) {
+            id = UUID.randomUUID().toString();
+        }
+
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+
+        if (revoked == null) {
+            revoked = false;
+        }
     }
 }

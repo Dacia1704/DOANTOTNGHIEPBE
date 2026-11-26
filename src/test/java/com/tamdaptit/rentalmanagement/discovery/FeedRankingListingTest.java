@@ -1,17 +1,5 @@
 package com.tamdaptit.rentalmanagement.discovery;
 
-import com.tamdaptit.rentalmanagement.discovery.FeedRanking.Item;
-import com.tamdaptit.rentalmanagement.discovery.FeedRanking.Preferences;
-import com.tamdaptit.rentalmanagement.listing.dto.request.ListingSearchRequest;
-import com.tamdaptit.rentalmanagement.listing.dto.response.ListingResponse;
-import com.tamdaptit.rentalmanagement.listing.entity.enums.ListingStatus;
-import com.tamdaptit.rentalmanagement.property.dto.response.PropertyResponse;
-import com.tamdaptit.rentalmanagement.property.entity.enums.PropertyRentalMode;
-import com.tamdaptit.rentalmanagement.room.dto.response.RoomResponse;
-import com.tamdaptit.rentalmanagement.room.entity.enums.RoomRentalStatus;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -21,11 +9,23 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import com.tamdaptit.rentalmanagement.discovery.FeedRanking.Item;
+import com.tamdaptit.rentalmanagement.discovery.FeedRanking.Preferences;
+import com.tamdaptit.rentalmanagement.listing.dto.request.ListingSearchRequest;
+import com.tamdaptit.rentalmanagement.listing.dto.response.ListingResponse;
+import com.tamdaptit.rentalmanagement.listing.entity.enums.ListingStatus;
+import com.tamdaptit.rentalmanagement.property.dto.response.PropertyResponse;
+import com.tamdaptit.rentalmanagement.property.entity.enums.PropertyRentalMode;
+import com.tamdaptit.rentalmanagement.room.dto.response.RoomResponse;
+import com.tamdaptit.rentalmanagement.room.entity.enums.RoomRentalStatus;
+import org.assertj.core.data.Offset;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("Phần 3: Tìm kiếm & Gợi ý phòng trọ - FeedRanking Listing & Discovery")
 class FeedRankingListingTest {
-
     private final Instant fixedNow = Instant.parse("2026-11-20T10:00:00Z");
     private final Clock clock = Clock.fixed(fixedNow, ZoneId.of("Asia/Ho_Chi_Minh"));
 
@@ -33,9 +33,9 @@ class FeedRankingListingTest {
     @DisplayName("Chuẩn hóa tiếng Việt bỏ dấu và ký tự đặc biệt")
     void testNormalize() {
         assertThat(FeedRanking.normalize("Phường Dịch Vọng Hậu, Cầu Giấy!"))
-                .isEqualTo("phuong dich vong hau cau giay");
+            .isEqualTo("phuong dich vong hau cau giay");
         assertThat(FeedRanking.normalize("Hà Nội #phongtro_2026"))
-                .isEqualTo("ha noi #phongtro_2026");
+            .isEqualTo("ha noi #phongtro_2026");
         assertThat(FeedRanking.normalize(null)).isEmpty();
     }
 
@@ -44,8 +44,16 @@ class FeedRankingListingTest {
     void testLocationScoring() {
         // Hồ sơ tenant muốn tìm ở phường Cầu Giấy (wardId = "ward-cg", provinceId = "hn")
         Preferences prefs = new Preferences(
-                "hn", "Hà Nội", List.of("ward-cg"), List.of("Phường Cầu Giấy"),
-                null, null, null, null, "", true
+            "hn",
+            "Hà Nội",
+            List.of("ward-cg"),
+            List.of("Phường Cầu Giấy"),
+            null,
+            null,
+            null,
+            null,
+            "",
+            true
         );
 
         // Khớp đúng phường mong muốn -> điểm 1.0
@@ -98,6 +106,7 @@ class FeedRankingListingTest {
         for (int i = 1; i <= 5; i++) {
             items.add(new Item("greedy-" + i, "greedy-landlord", 2, 0.99 - i * 0.001, 0.9, 5));
         }
+
         // Các chủ nhà khác có tin VIP điểm thấp hơn
         for (int i = 1; i <= 10; i++) {
             items.add(new Item("other-" + i, "other-landlord-" + i, 2, 0.80 - i * 0.01, 0.8, 10));
@@ -108,9 +117,10 @@ class FeedRankingListingTest {
         List<String> ranking = FeedRanking.interleave(items, true);
 
         // Trong 10 vị trí đầu tiên, "greedy-landlord" chỉ được xuất hiện tối đa 2 lần
-        long greedyCountInFirst10 = ranking.subList(0, 10).stream()
-                .filter(id -> id.startsWith("greedy-"))
-                .count();
+        long greedyCountInFirst10 = ranking.subList(0, 10)
+            .stream()
+            .filter(id -> id.startsWith("greedy-"))
+            .count();
 
         assertThat(greedyCountInFirst10).isLessThanOrEqualTo(2);
     }
@@ -125,6 +135,7 @@ class FeedRankingListingTest {
             items.add(new Item("boost-" + i, "owner-b" + i, 1, 0.7, 0.5, 300));
             items.add(new Item("normal-" + i, "owner-n" + i, 0, 0.5, 0.5, 200));
         }
+
         // Thêm một tin mới (fresh cao = 1.0) và chưa ai xem (exposure = 0)
         Item newDiscoveryItem = new Item("fresh-discovery", "owner-fresh", 1, 0.3, 1.0, 0);
         items.add(newDiscoveryItem);
@@ -139,21 +150,72 @@ class FeedRankingListingTest {
     @Test
     @DisplayName("Lọc phòng khớp tiêu chí giá và trạng thái còn trống (matchingRooms)")
     void testMatchingRooms_PriceAndAvailability() {
-        RoomResponse availableRoom = createRoom("r1", new BigDecimal("2500000"), new BigDecimal("25"),
-                RoomRentalStatus.AVAILABLE, "AVAILABLE", 2, 1, List.of());
-        RoomResponse occupiedRoom = createRoom("r2", new BigDecimal("2000000"), new BigDecimal("20"),
-                RoomRentalStatus.RENTED, "RENTED", 1, 1, List.of());
-        RoomResponse expensiveRoom = createRoom("r3", new BigDecimal("4500000"), new BigDecimal("35"),
-                RoomRentalStatus.AVAILABLE, "AVAILABLE", 2, 2, List.of());
+        RoomResponse availableRoom = createRoom(
+            "r1",
+            new BigDecimal("2500000"),
+            new BigDecimal("25"),
+            RoomRentalStatus.AVAILABLE,
+            "AVAILABLE",
+            2,
+            1,
+            List.of()
+        );
+        RoomResponse occupiedRoom = createRoom(
+            "r2",
+            new BigDecimal("2000000"),
+            new BigDecimal("20"),
+            RoomRentalStatus.RENTED,
+            "RENTED",
+            1,
+            1,
+            List.of()
+        );
+        RoomResponse expensiveRoom = createRoom(
+            "r3",
+            new BigDecimal("4500000"),
+            new BigDecimal("35"),
+            RoomRentalStatus.AVAILABLE,
+            "AVAILABLE",
+            2,
+            2,
+            List.of()
+        );
 
-        ListingResponse listing = createListing("l1", "prop1", List.of(availableRoom, occupiedRoom, expensiveRoom), List.of());
+        ListingResponse listing = createListing(
+            "l1",
+            "prop1",
+            List.of(availableRoom, occupiedRoom, expensiveRoom),
+            List.of()
+        );
 
         // Lọc phòng trống có giá từ 2.000.000 đến 3.000.000
         ListingSearchRequest searchReq = new ListingSearchRequest(
-                null, null, null, null,
-                new BigDecimal("2000000"), new BigDecimal("3000000"),
-                null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null, null, null, null
+            null,
+            null,
+            null,
+            null,
+            new BigDecimal("2000000"),
+            new BigDecimal("3000000"),
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
         );
 
         List<RoomResponse> matched = FeedRanking.matchingRooms(listing, searchReq, true);
@@ -168,22 +230,57 @@ class FeedRankingListingTest {
         RoomResponse.AmenityResponse wifi = new RoomResponse.AmenityResponse("a1", "WiFi", "wifi-icon");
         RoomResponse.AmenityResponse ac = new RoomResponse.AmenityResponse("a2", "Điều hòa", "ac-icon");
 
-        RoomResponse smallRoom = createRoom("r1", new BigDecimal("2000000"), new BigDecimal("15"),
-                RoomRentalStatus.AVAILABLE, "AVAILABLE", 1, 1, List.of(wifi));
-        RoomResponse spaciousRoomWithAc = createRoom("r2", new BigDecimal("3500000"), new BigDecimal("30"),
-                RoomRentalStatus.AVAILABLE, "AVAILABLE", 3, 2, List.of(wifi, ac));
+        RoomResponse smallRoom = createRoom(
+            "r1",
+            new BigDecimal("2000000"),
+            new BigDecimal("15"),
+            RoomRentalStatus.AVAILABLE,
+            "AVAILABLE",
+            1,
+            1,
+            List.of(wifi)
+        );
+        RoomResponse spaciousRoomWithAc = createRoom(
+            "r2",
+            new BigDecimal("3500000"),
+            new BigDecimal("30"),
+            RoomRentalStatus.AVAILABLE,
+            "AVAILABLE",
+            3,
+            2,
+            List.of(wifi, ac)
+        );
 
         ListingResponse listing = createListing("l2", "prop2", List.of(smallRoom, spaciousRoomWithAc), List.of());
 
         // Tìm phòng diện tích >= 20m2, ở được >= 2 người, có Điều hòa
         ListingSearchRequest searchReq = new ListingSearchRequest(
-                null, null, null, null,
-                null, null,
-                List.of("Điều hòa"),
-                null, null, null, null, null, null, null,
-                null, null, null,
-                new BigDecimal("20"), new BigDecimal("40"),
-                2, null, null, null, null, null, null
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            List.of("Điều hòa"),
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            new BigDecimal("20"),
+            new BigDecimal("40"),
+            2,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
         );
 
         List<RoomResponse> matched = FeedRanking.matchingRooms(listing, searchReq, false);
@@ -234,7 +331,7 @@ class FeedRankingListingTest {
 
         assertThat(freshNow).isEqualTo(1.0);
         assertThat(fresh1Day).isLessThan(freshNow).isGreaterThan(fresh30Days);
-        assertThat(fresh30Days).isCloseTo(Math.exp(-1.0), org.assertj.core.data.Offset.offset(0.01));
+        assertThat(fresh30Days).isCloseTo(Math.exp(-1.0), Offset.offset(0.01));
     }
 
     @Test
@@ -253,48 +350,128 @@ class FeedRankingListingTest {
     }
 
     // Helper builders
-    private RoomResponse createRoom(String id, BigDecimal price, BigDecimal area,
-                                    RoomRentalStatus rentalStatus, String bookingAvailability,
-                                    int maxOccupants, int floorNumber,
-                                    List<RoomResponse.AmenityResponse> amenities) {
+    private RoomResponse createRoom(
+        String id,
+        BigDecimal price,
+        BigDecimal area,
+        RoomRentalStatus rentalStatus,
+        String bookingAvailability,
+        int maxOccupants,
+        int floorNumber,
+        List<RoomResponse.AmenityResponse> amenities
+    ) {
         return new RoomResponse(
-                id, "prop1", "101", floorNumber, "landlord1", "type1", "Phòng trọ khép kín",
-                price, new BigDecimal("3500"), new BigDecimal("25000"),
-                BigDecimal.ZERO, price, area,
-                maxOccupants, "hn", "Hà Nội", "ward1", "Dịch Vọng", "123 Cầu Giấy",
-                new BigDecimal("21.03"), new BigDecimal("105.78"), rentalStatus, bookingAvailability,
-                amenities, List.of(), LocalDateTime.now(), LocalDateTime.now()
+            id,
+            "prop1",
+            "101",
+            floorNumber,
+            "landlord1",
+            "type1",
+            "Phòng trọ khép kín",
+            price,
+            new BigDecimal("3500"),
+            new BigDecimal("25000"),
+            BigDecimal.ZERO,
+            price,
+            area,
+            maxOccupants,
+            "hn",
+            "Hà Nội",
+            "ward1",
+            "Dịch Vọng",
+            "123 Cầu Giấy",
+            new BigDecimal("21.03"),
+            new BigDecimal("105.78"),
+            rentalStatus,
+            bookingAvailability,
+            amenities,
+            List.of(),
+            LocalDateTime.now(),
+            LocalDateTime.now()
         );
     }
 
-    private ListingResponse createListing(String id, String propertyId, List<RoomResponse> rooms,
-                                          List<RoomResponse.AmenityResponse> propAmenities) {
+    private ListingResponse createListing(
+        String id,
+        String propertyId,
+        List<RoomResponse> rooms,
+        List<RoomResponse.AmenityResponse> propAmenities
+    ) {
         PropertyResponse property = new PropertyResponse(
-                propertyId, "landlord1", "Nhà trọ Thăng Long",
-                "ptype1", "Nhà riêng", PropertyRentalMode.BY_ROOM, 5,
-                "hn", "Hà Nội", "ward1", "Dịch Vọng", "123 Cầu Giấy",
-                new BigDecimal("21.03"), new BigDecimal("105.78"),
-                propAmenities, List.of(), rooms,
-                LocalDateTime.now(), LocalDateTime.now()
+            propertyId,
+            "landlord1",
+            "Nhà trọ Thăng Long",
+            "ptype1",
+            "Nhà riêng",
+            PropertyRentalMode.BY_ROOM,
+            5,
+            "hn",
+            "Hà Nội",
+            "ward1",
+            "Dịch Vọng",
+            "123 Cầu Giấy",
+            new BigDecimal("21.03"),
+            new BigDecimal("105.78"),
+            propAmenities,
+            List.of(),
+            rooms,
+            LocalDateTime.now(),
+            LocalDateTime.now()
         );
 
         return new ListingResponse(
-                id, propertyId, "landlord1", "Phòng trọ cao cấp Dịch Vọng Cầu Giấy", "phong-tro-cao-cap",
-                "Phòng trọ đầy đủ tiện nghi, có điều hòa, nóng lạnh, an ninh tốt, gần đại học Quốc Gia",
-                ListingStatus.PUBLISHED, null, 1, 1,
-                LocalDateTime.now(), LocalDateTime.now().plusDays(30),
-                LocalDateTime.now(), LocalDateTime.now().plusDays(30),
-                LocalDateTime.now(), property, "Nhà trọ Thăng Long",
-                PropertyRentalMode.BY_ROOM, "Nguyễn Văn Landlord", false, null
+            id,
+            propertyId,
+            "landlord1",
+            "Phòng trọ cao cấp Dịch Vọng Cầu Giấy",
+            "phong-tro-cao-cap",
+            "Phòng trọ đầy đủ tiện nghi, có điều hòa, nóng lạnh, an ninh tốt, gần đại học Quốc Gia",
+            ListingStatus.PUBLISHED,
+            null,
+            1,
+            1,
+            LocalDateTime.now(),
+            LocalDateTime.now().plusDays(30),
+            LocalDateTime.now(),
+            LocalDateTime.now().plusDays(30),
+            LocalDateTime.now(),
+            property,
+            "Nhà trọ Thăng Long",
+            PropertyRentalMode.BY_ROOM,
+            "Nguyễn Văn Landlord",
+            false,
+            null
         );
     }
 
     private ListingSearchRequest createSearchWithKeyword(String keyword) {
         return new ListingSearchRequest(
-                null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null,
-                keyword, null, null, null, null, null, null, null,
-                null, null, null, null
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            keyword,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
         );
     }
 }

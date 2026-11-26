@@ -12,7 +12,12 @@ import org.springframework.web.multipart.MultipartFile;
 public interface UserService {
     UserResponse get(String id);
 
-    PageResponse<UserResponse> list(String q, UserStatus status, int page, int size);
+    PageResponse<UserResponse> list(
+        String q,
+        UserStatus status,
+        int page,
+        int size
+    );
 
     UserResponse create(CreateUserRequest request);
 
@@ -27,5 +32,4 @@ public interface UserService {
     UserResponse deleteAvatar(String id);
 
     void delete(String id);
-
 }

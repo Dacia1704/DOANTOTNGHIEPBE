@@ -12,7 +12,6 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @EnableWebSocketMessageBroker
 @RequiredArgsConstructor
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
-
     private final WebSocketAuthInterceptor webSocketAuthInterceptor;
 
     /**
@@ -41,12 +40,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*")
-                .withSockJS();
+            .setAllowedOriginPatterns("*")
+            .withSockJS();
 
         // Hỗ trợ cả raw WebSocket endpoint không qua SockJS fallback
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*");
+            .setAllowedOriginPatterns("*");
     }
 
     /**

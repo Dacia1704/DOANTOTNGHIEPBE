@@ -39,7 +39,7 @@ Ngoài phạm vi phiên bản đầu: story, nhóm, repost, video, nhắn tin m�
 | `Report` hiện gắn `tenant_id`, `listing_id`, `landlord_id`; `ReportTargetType` chỉ có LISTING/LANDLORD | Dùng bảng report nội dung riêng cho cộng đồng và đánh giá; tránh mở rộng sai quyền của report cũ |
 | `NotificationPublisher` ghi `notification_outbox` | Ghi thông báo cùng giao dịch nghiệp vụ, giữ relay/consumer hiện có |
 | `/ws`, STOMP và `WebSocketAuthInterceptor` | Mở rộng allowlist và kiểm tra quyền subscription; hiện interceptor chưa cho topic bài cộng đồng |
-| `ImageStorageService`, Cloudinary | Tái sử dụng adapter lưu ảnh; thêm nghiệp vụ upload ảnh cộng đồng và kiểm tra người sở hữu |
+| `FileStorageService`, Cloudinary | Tái sử dụng adapter lưu ảnh; thêm nghiệp vụ upload ảnh cộng đồng và kiểm tra người sở hữu |
 | `BoostAllocation` gắn với listing; `ServicePackage` có các slot ưu tiên | Quyền quảng bá cộng đồng cần tính riêng; không mặc định mọi boost đều thuộc mọi bài của chủ trọ |
 | UUID được lưu dưới dạng `varchar(36)` | Bảng mới dùng cùng kiểu và collation cho khóa ngoại |
 

@@ -1,0 +1,145 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="app.diagrams.net" agent="Codex" version="26.0.0">
+  <diagram id="rental-usecases" name="Yêu cầu thuê và hợp đồng">
+    <mxGraphModel dx="1560" dy="1460" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1560" pageHeight="1460" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="cell-1" value="USE CASE QUẢN LÝ YÊU CẦU THUÊ VÀ HỢP ĐỒNG" style="text;html=0;align=center;verticalAlign=middle;fontSize=25;fontStyle=1;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="150" y="12" width="1260" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="cell-2" value="" style="rounded=0;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#777777;" vertex="1" parent="1">
+          <mxGeometry x="250" y="90" width="1060" height="1170" as="geometry" />
+        </mxCell>
+        <mxCell id="cell-3" value="Hệ thống cho thuê trọ" style="text;html=0;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=21;fontStyle=1;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="260" y="96" width="1040" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="cell-4" value="" style="rounded=0;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#777777;" vertex="1" parent="1">
+          <mxGeometry x="285" y="145" width="990" height="410" as="geometry" />
+        </mxCell>
+        <mxCell id="cell-5" value="Quản lý yêu cầu thuê" style="text;html=0;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=21;fontStyle=1;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="295" y="151" width="970" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="cell-6" value="" style="rounded=0;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#777777;" vertex="1" parent="1">
+          <mxGeometry x="285" y="600" width="990" height="610" as="geometry" />
+        </mxCell>
+        <mxCell id="cell-7" value="Quản lý hợp đồng" style="text;html=0;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=21;fontStyle=1;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="295" y="606" width="970" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="tenant-send" value="" edge="1" parent="1" source="tenant-requests" target="TH01" style="html=0;rounded=0;endArrow=none;strokeColor=#333333;strokeWidth=1.65;fontSize=18;fontFamily=Arial;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tenant-follow" value="" edge="1" parent="1" source="tenant-requests" target="TH02" style="html=0;rounded=0;endArrow=none;strokeColor=#333333;strokeWidth=1.65;fontSize=18;fontFamily=Arial;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tenant-cancel" value="" edge="1" parent="1" source="tenant-requests" target="TH03" style="html=0;rounded=0;endArrow=none;strokeColor=#333333;strokeWidth=1.65;fontSize=18;fontFamily=Arial;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="owner-process" value="" edge="1" parent="1" source="owner-requests" target="TH04" style="html=0;rounded=0;endArrow=none;strokeColor=#333333;strokeWidth=1.65;fontSize=18;fontFamily=Arial;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="admin-request" value="" edge="1" parent="1" source="admin-requests" target="request-detail" style="html=0;rounded=0;endArrow=none;strokeColor=#333333;strokeWidth=1.65;fontSize=18;fontFamily=Arial;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tenant-view-pdf" value="" edge="1" parent="1" source="tenant-agreements" target="TH05" style="html=0;rounded=0;endArrow=none;strokeColor=#333333;strokeWidth=1.65;fontSize=18;fontFamily=Arial;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="240" y="740" />
+              <mxPoint x="775" y="740" />
+              <mxPoint x="775" y="900" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tenant-confirm" value="" edge="1" parent="1" source="tenant-agreements" target="TH06" style="html=0;rounded=0;endArrow=none;strokeColor=#333333;strokeWidth=1.65;fontSize=18;fontFamily=Arial;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tenant-decline" value="" edge="1" parent="1" source="tenant-agreements" target="TH07" style="html=0;rounded=0;endArrow=none;strokeColor=#333333;strokeWidth=1.65;fontSize=18;fontFamily=Arial;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="owner-view" value="" edge="1" parent="1" source="owner-agreements" target="TH05" style="html=0;rounded=0;endArrow=none;strokeColor=#333333;strokeWidth=1.65;fontSize=18;fontFamily=Arial;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="owner-checkout" value="" edge="1" parent="1" source="owner-agreements" target="TH08" style="html=0;rounded=0;endArrow=none;strokeColor=#333333;strokeWidth=1.65;fontSize=18;fontFamily=Arial;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="admin-contract" value="" edge="1" parent="1" source="admin-agreements" target="TH05" style="html=0;rounded=0;endArrow=none;strokeColor=#333333;strokeWidth=1.65;fontSize=18;fontFamily=Arial;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="storage-pdf" value="" edge="1" parent="1" source="storage" target="TH05" style="html=0;rounded=0;endArrow=none;strokeColor=#333333;strokeWidth=1.65;fontSize=18;fontFamily=Arial;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="include-pdf-validation" value="«include»" edge="1" parent="1" source="TH06" target="check-pdf" style="html=0;rounded=0;endArrow=open;endFill=0;dashed=1;strokeColor=#333333;strokeWidth=1.65;fontSize=18;fontFamily=Arial;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="740" y="840" />
+              <mxPoint x="740" y="1080" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="TH01" value="TH01&#10;Gửi yêu cầu thuê phòng" style="ellipse;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#2B2B2B;strokeWidth=1.6;fontColor=#171717;fontSize=20;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="345" y="207" width="310" height="86" as="geometry" />
+        </mxCell>
+        <mxCell id="TH02" value="TH02&#10;Theo dõi yêu cầu thuê&#10;của mình" style="ellipse;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#2B2B2B;strokeWidth=1.6;fontColor=#171717;fontSize=20;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="345" y="318" width="310" height="104" as="geometry" />
+        </mxCell>
+        <mxCell id="TH03" value="TH03&#10;Hủy yêu cầu thuê" style="ellipse;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#2B2B2B;strokeWidth=1.6;fontColor=#171717;fontSize=20;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="345" y="442" width="310" height="86" as="geometry" />
+        </mxCell>
+        <mxCell id="TH04" value="TH04&#10;Tiếp nhận và xử lý&#10;yêu cầu thuê" style="ellipse;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#2B2B2B;strokeWidth=1.6;fontColor=#171717;fontSize=20;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="835" y="215" width="370" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="request-detail" value="Xem chi tiết&#10;yêu cầu thuê" style="ellipse;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#2B2B2B;strokeWidth=1.6;fontColor=#171717;fontSize=20;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="850" y="405" width="340" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="TH05" value="TH05&#10;Xem và tải hợp đồng PDF" style="ellipse;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#2B2B2B;strokeWidth=1.6;fontColor=#171717;fontSize=20;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="830" y="855" width="370" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="TH06" value="TH06&#10;Xác nhận đồng ý&#10;hợp đồng" style="ellipse;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#2B2B2B;strokeWidth=1.6;fontColor=#171717;fontSize=20;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="345" y="790" width="330" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="TH07" value="TH07&#10;Từ chối hợp đồng&#10;chờ xác nhận" style="ellipse;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#2B2B2B;strokeWidth=1.6;fontColor=#171717;fontSize=20;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="345" y="1030" width="330" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="TH08" value="TH08&#10;Xác nhận bàn giao&#10;và kết thúc thuê" style="ellipse;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#2B2B2B;strokeWidth=1.6;fontColor=#171717;fontSize=20;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="830" y="650" width="370" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="check-pdf" value="Kiểm tra phiên bản /&#10;toàn vẹn PDF" style="ellipse;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#2B2B2B;strokeWidth=1.6;fontColor=#171717;fontSize=20;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="830" y="1037" width="370" height="86" as="geometry" />
+        </mxCell>
+        <mxCell id="tenant-requests" value="Người thuê" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fillColor=#FFFFFF;strokeColor=#262626;strokeWidth=1.8;fontSize=21;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="70" y="285" width="60" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="owner-requests" value="Chủ trọ" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fillColor=#FFFFFF;strokeColor=#262626;strokeWidth=1.8;fontSize=21;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="1420" y="200" width="60" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="admin-requests" value="Quản trị viên" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fillColor=#FFFFFF;strokeColor=#262626;strokeWidth=1.8;fontSize=21;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="1420" y="390" width="60" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="tenant-agreements" value="Người thuê" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fillColor=#FFFFFF;strokeColor=#262626;strokeWidth=1.8;fontSize=21;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="70" y="840" width="60" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="owner-agreements" value="Chủ trọ" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fillColor=#FFFFFF;strokeColor=#262626;strokeWidth=1.8;fontSize=21;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="1420" y="640" width="60" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="admin-agreements" value="Quản trị viên" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fillColor=#FFFFFF;strokeColor=#262626;strokeWidth=1.8;fontSize=21;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="1420" y="840" width="60" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="storage" value="Dịch vụ lưu trữ&#10;Cloudinary" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fillColor=#FFFFFF;strokeColor=#262626;strokeWidth=1.8;fontSize=21;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="1420" y="1040" width="60" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="cell-25" value="TH04: Chấp nhận → tạo hợp đồng chờ xác nhận, giữ phòng 48 giờ và tự tạo PDF; từ chối → ghi nhận lý do." style="text;html=0;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=18;fontFamily=Arial;fontColor=#404040;" vertex="1" parent="1">
+          <mxGeometry x="250" y="1303" width="1060" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="cell-26" value="TH06: Xác nhận thành công → hợp đồng có hiệu lực, phòng chuyển sang đã thuê." style="text;html=0;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=18;fontFamily=Arial;fontColor=#404040;" vertex="1" parent="1">
+          <mxGeometry x="250" y="1332" width="1060" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="cell-27" value="Quản trị viên chỉ đọc chi tiết yêu cầu và hợp đồng/PDF. Người thuê, chủ trọ truy cập dữ liệu theo quyền." style="text;html=0;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=18;fontFamily=Arial;fontColor=#404040;" vertex="1" parent="1">
+          <mxGeometry x="250" y="1361" width="1060" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="cell-28" value="«include» là hành vi bắt buộc. Đăng nhập là tiền điều kiện. Các hình cùng tên biểu diễn cùng một tác nhân." style="text;html=0;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=18;fontFamily=Arial;fontColor=#404040;" vertex="1" parent="1">
+          <mxGeometry x="250" y="1390" width="1060" height="27" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

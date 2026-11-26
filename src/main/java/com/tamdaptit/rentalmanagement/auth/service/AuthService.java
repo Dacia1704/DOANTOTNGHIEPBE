@@ -13,7 +13,6 @@ import com.tamdaptit.rentalmanagement.auth.dto.response.RefreshTokenResponse;
 import com.tamdaptit.rentalmanagement.auth.dto.response.RegisterResponse;
 
 public interface AuthService {
-
     RegisterResponse register(RegisterRequest request);
 
     LoginResponse login(LoginRequest request);

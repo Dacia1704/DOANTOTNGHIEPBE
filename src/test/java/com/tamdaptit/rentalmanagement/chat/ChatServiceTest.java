@@ -1,5 +1,9 @@
 package com.tamdaptit.rentalmanagement.chat;
 
+import java.security.Principal;
+import java.time.LocalDateTime;
+import java.util.Optional;
+
 import com.tamdaptit.rentalmanagement.chat.dto.request.ChatMessageRequest;
 import com.tamdaptit.rentalmanagement.chat.entity.ChatConversation;
 import com.tamdaptit.rentalmanagement.chat.entity.ChatConversationParticipant;
@@ -27,19 +31,14 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
-import java.security.Principal;
-import java.time.LocalDateTime;
-import java.util.Optional;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("Phần 2: Trao đổi, thông báo & Quản trị bổ trợ - ChatService")
 class ChatServiceTest {
-
     @Mock
     private ChatConversationRepository conversationRepository;
 
@@ -63,12 +62,12 @@ class ChatServiceTest {
     @BeforeEach
     void setUp() {
         chatService = new ChatServiceImpl(
-                conversationRepository,
-                participantRepository,
-                messageRepository,
-                userRepository,
-                listingRepository,
-                messagingTemplate
+            conversationRepository,
+            participantRepository,
+            messageRepository,
+            userRepository,
+            listingRepository,
+            messagingTemplate
         );
     }
 
@@ -93,9 +92,9 @@ class ChatServiceTest {
         when(userRepository.findByIdForUpdate(landlordId)).thenReturn(Optional.of(landlord));
 
         assertThatThrownBy(() -> chatService.getOrCreateListingConversation("listing-1", landlordId))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.CANNOT_CHAT_WITH_SELF);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.CANNOT_CHAT_WITH_SELF);
     }
 
     @Test
@@ -109,9 +108,9 @@ class ChatServiceTest {
         when(listingRepository.findByIdWithPropertyAndLandlord("expired-1")).thenReturn(Optional.of(expiredListing));
 
         assertThatThrownBy(() -> chatService.getOrCreateListingConversation("expired-1", "user-1"))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.LISTING_NOT_FOUND);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.LISTING_NOT_FOUND);
     }
 
     @Test
@@ -125,12 +124,12 @@ class ChatServiceTest {
 
         when(conversationRepository.findById(conversationId)).thenReturn(Optional.of(conversation));
         when(participantRepository.existsByConversationIdAndUserId(conversationId, strangerId))
-                .thenReturn(false);
+            .thenReturn(false);
 
         assertThatThrownBy(() -> chatService.getConversation(conversationId, strangerId))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.NOT_CONVERSATION_PARTY);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.NOT_CONVERSATION_PARTY);
     }
 
     @Test
@@ -142,9 +141,9 @@ class ChatServiceTest {
         when(conversationRepository.findById(conversationId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> chatService.getConversation(conversationId, userId))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.CHAT_CONVERSATION_NOT_FOUND);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.CHAT_CONVERSATION_NOT_FOUND);
     }
 
     @Test
@@ -154,12 +153,12 @@ class ChatServiceTest {
         String conversationId = "conv-1";
 
         when(participantRepository.existsByConversationIdAndUserId(conversationId, strangerId))
-                .thenReturn(false);
+            .thenReturn(false);
 
         assertThatThrownBy(() -> chatService.markAsRead(conversationId, strangerId))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.NOT_CONVERSATION_PARTY);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.NOT_CONVERSATION_PARTY);
     }
 
     @Test
@@ -170,9 +169,9 @@ class ChatServiceTest {
         request.setContent("Xin chào");
 
         assertThatThrownBy(() -> chatService.sendMessage(request, null))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.UNAUTHENTICATED);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.UNAUTHENTICATED);
     }
 
     @Test
@@ -184,9 +183,9 @@ class ChatServiceTest {
         request.setContent("Nội dung tin nhắn");
 
         assertThatThrownBy(() -> chatService.sendMessage(request, principal))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.INVALID_CHAT_MESSAGE);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.INVALID_CHAT_MESSAGE);
     }
 
     @Test
@@ -200,9 +199,9 @@ class ChatServiceTest {
         emptyRequest.setContent("   ");
 
         assertThatThrownBy(() -> chatService.sendMessage(emptyRequest, principal))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.INVALID_CHAT_MESSAGE);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.INVALID_CHAT_MESSAGE);
 
         // Tin nhắn quá dài (>4000 chars)
         ChatMessageRequest longRequest = new ChatMessageRequest();
@@ -210,9 +209,9 @@ class ChatServiceTest {
         longRequest.setContent("x".repeat(4001));
 
         assertThatThrownBy(() -> chatService.sendMessage(longRequest, principal))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.INVALID_CHAT_MESSAGE);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.INVALID_CHAT_MESSAGE);
     }
 
     @Test
@@ -227,9 +226,9 @@ class ChatServiceTest {
         when(conversationRepository.findById("conv-not-found")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> chatService.sendMessage(request, principal))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.CHAT_CONVERSATION_NOT_FOUND);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.CHAT_CONVERSATION_NOT_FOUND);
     }
 
     @Test
@@ -242,8 +241,8 @@ class ChatServiceTest {
         when(userRepository.findByIdForUpdate("user-inactive")).thenReturn(Optional.of(inactiveUser));
 
         assertThatThrownBy(() -> chatService.getOrCreateSupportConversation("user-inactive"))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.USER_INACTIVE);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.USER_INACTIVE);
     }
 }

@@ -1,63 +1,84 @@
 package com.tamdaptit.rentalmanagement.listing.repository;
 
 import java.math.BigDecimal;
-import com.tamdaptit.rentalmanagement.room.entity.enums.RoomRentalStatus;
-import com.tamdaptit.rentalmanagement.listing.entity.Listing;
-import com.tamdaptit.rentalmanagement.listing.dto.response.ListingPriceStatisticsResponse;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
-
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
+
+import com.tamdaptit.rentalmanagement.listing.dto.response.ListingPriceStatisticsResponse;
+import com.tamdaptit.rentalmanagement.listing.entity.Listing;
 import com.tamdaptit.rentalmanagement.listing.entity.enums.ListingStatus;
+import com.tamdaptit.rentalmanagement.room.entity.enums.RoomRentalStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
 @Repository
 public interface ListingRepository extends JpaRepository<Listing, String> {
-    @Query("select l from Listing l where " + PUBLIC_CONDITION + " and lower(l.title) like lower(concat('%', :query, '%')) order by l.publishedAt desc,l.id")
-    List<Listing> findForCommunity(@Param("time") LocalDateTime time,@Param("query") String query,org.springframework.data.domain.Pageable pageable);
+    @Query(
+        "select l from Listing l where " + PUBLIC_CONDITION
+            + " and lower(l.title) like lower(concat('%', :query, '%')) order by l.publishedAt desc,l.id"
+    )
+    List<Listing> findForCommunity(
+        @Param("time") LocalDateTime time,
+        @Param("query") String query,
+        Pageable pageable
+    );
+
     List<Listing> findAllByProperty_Landlord_IdOrderByCreatedAtDesc(String landlordId);
+
     String PRICE_STATISTICS_FROM = """
             from Room r join r.property p join p.province province join p.ward ward
             where r.price > 0 and r.rentalStatus = 'AVAILABLE'
             and exists (select l.id from Listing l where l.property = p and
             """ + ListingRepository.PUBLIC_CONDITION + ") ";
 
-    @Query("select new com.tamdaptit.rentalmanagement.listing.dto.response.ListingPriceStatisticsResponse("
+    @Query(
+        "select new com.tamdaptit.rentalmanagement.listing.dto.response.ListingPriceStatisticsResponse("
             + "province.id, province.name, avg(r.price), count(r.id)) " + PRICE_STATISTICS_FROM
-            + "group by province.id, province.name order by count(r.id) desc, province.name")
+            + "group by province.id, province.name order by count(r.id) desc, province.name"
+    )
     List<ListingPriceStatisticsResponse> priceStatisticsByProvince(
-            @Param("time") LocalDateTime time);
+        @Param("time") LocalDateTime time
+    );
 
-    @Query("select new com.tamdaptit.rentalmanagement.listing.dto.response.ListingPriceStatisticsResponse("
+    @Query(
+        "select new com.tamdaptit.rentalmanagement.listing.dto.response.ListingPriceStatisticsResponse("
             + "ward.id, ward.name, avg(r.price), count(r.id)) " + PRICE_STATISTICS_FROM
             + "and province.id = :provinceId and (:wardId is null or ward.id = :wardId) "
-            + "group by ward.id, ward.name order by count(r.id) desc, ward.name")
+            + "group by ward.id, ward.name order by count(r.id) desc, ward.name"
+    )
     List<ListingPriceStatisticsResponse> priceStatisticsByWard(
-            @Param("time") LocalDateTime time, @Param("provinceId") String provinceId, @Param("wardId") String wardId);
+        @Param("time") LocalDateTime time,
+        @Param("provinceId") String provinceId,
+        @Param("wardId") String wardId
+    );
+
     @Query("""
             select l from Listing l join fetch l.property p join fetch p.landlord
             where l.id = :id and l.status = 'PUBLISHED' and l.property.landlord.status = 'ACTIVE' and l.expiresAt > :time
             """)
     Optional<Listing> findPublishedContact(@Param("id") String id, @Param("time") LocalDateTime time);
 
-    @org.springframework.data.jpa.repository.Modifying
+    @Modifying
     @Query("update Listing l set l.contactCount = coalesce(l.contactCount, 0) + 1 where l.id = :id")
     int incrementContactCount(@Param("id") String id);
 
-    @Query("select l from Listing l join fetch l.property p join fetch p.landlord where l.id=:id and " + ListingRepository.PUBLIC_CONDITION)
+    @Query(
+        "select l from Listing l join fetch l.property p join fetch p.landlord where l.id=:id and "
+            + ListingRepository.PUBLIC_CONDITION
+    )
     Optional<Listing> findPublicForReview(@Param("id") String id, @Param("time") LocalDateTime time);
 
     @Query("select count(l)>0 from Listing l where l.property.landlord.id=:landlordId and " + PUBLIC_CONDITION)
     boolean hasPublicListing(@Param("landlordId") String landlordId, @Param("time") LocalDateTime time);
+
     String EFFECTIVE_PRIORITY = """
             case when l.prioritySuppressed = true then 0 when exists (select a.id from BoostAllocation a join a.subscription b
                 where a.listing = l and a.active = true and a.priorityLevel = 2 and b.status = 'ACTIVE' and b.startAt <= :time and b.endAt > :time) then 2
@@ -90,13 +111,16 @@ public interface ListingRepository extends JpaRepository<Listing, String> {
                 and (newer.publishedAt > l.publishedAt or (newer.publishedAt = l.publishedAt and newer.id > l.id)))
             """;
 
-    @Query(value = "select l from Listing l where " + PUBLIC_CONDITION + " order by "
+    @Query(
+        value = "select l from Listing l where " + PUBLIC_CONDITION + " order by "
             + EFFECTIVE_PRIORITY + " desc, l.publishedAt desc, l.id",
-            countQuery = "select count(l) from Listing l where " + PUBLIC_CONDITION)
+        countQuery = "select count(l) from Listing l where " + PUBLIC_CONDITION
+    )
     Page<Listing> findPublished(LocalDateTime time, Pageable pageable);
 
     // Haversine uses twice the mean Earth radius (6371.0088 km), clamped for rounding near antipodes.
-    String PUBLIC_FILTER = "from Listing l where " + PUBLIC_CONDITION + """
+    String PUBLIC_FILTER = "from Listing l where " + PUBLIC_CONDITION
+        + """
               and (:provinceId is null or l.property.province.id = :provinceId)
               and (:wardId is null or l.property.ward.id = :wardId)
               and (:radiusKm is null or (l.property.latitude is not null and l.property.longitude is not null
@@ -119,13 +143,29 @@ public interface ListingRepository extends JpaRepository<Listing, String> {
                         or exists (select pa.id from PropertyAmenity pa where pa.property = l.property and pa.amenity = a))) = :amenityCount))
             """;
 
-    @Query(value = "select l " + PUBLIC_FILTER + " order by " + EFFECTIVE_PRIORITY + " desc, l.publishedAt desc, l.id",
-            countQuery = "select count(l) " + PUBLIC_FILTER)
-    Page<Listing> searchPublished(LocalDateTime time, String typeName, String provinceId, String wardId,
-            RoomRentalStatus rentalStatus, BigDecimal minPrice, BigDecimal maxPrice,
-            List<String> amenityNames, long amenityCount,
-            BigDecimal latitude, BigDecimal longitude, BigDecimal radiusKm,
-            BigDecimal south, BigDecimal north, BigDecimal west, BigDecimal east, Pageable pageable);
+    @Query(
+        value = "select l " + PUBLIC_FILTER + " order by " + EFFECTIVE_PRIORITY + " desc, l.publishedAt desc, l.id",
+        countQuery = "select count(l) " + PUBLIC_FILTER
+    )
+    Page<Listing> searchPublished(
+        LocalDateTime time,
+        String typeName,
+        String provinceId,
+        String wardId,
+        RoomRentalStatus rentalStatus,
+        BigDecimal minPrice,
+        BigDecimal maxPrice,
+        List<String> amenityNames,
+        long amenityCount,
+        BigDecimal latitude,
+        BigDecimal longitude,
+        BigDecimal radiusKm,
+        BigDecimal south,
+        BigDecimal north,
+        BigDecimal west,
+        BigDecimal east,
+        Pageable pageable
+    );
 
     @Query("""
             select l from Listing l where (:status is null or
@@ -133,11 +173,19 @@ public interface ListingRepository extends JpaRepository<Listing, String> {
                         or (l.status = 'PENDING' and l.pendingExpiresAt <= :time)
                  then 'EXPIRED' else cast(l.status as string) end) = :status)
             """)
-    Page<Listing> findForAdmin(String status, LocalDateTime time, Pageable pageable);
+    Page<Listing> findForAdmin(
+        String status,
+        LocalDateTime time,
+        Pageable pageable
+    );
 
     Page<Listing> findByProperty_Landlord_Id(String landlordId, Pageable pageable);
 
-    Page<Listing> findByStatusAndPendingExpiresAtGreaterThan(ListingStatus status, LocalDateTime time, Pageable pageable);
+    Page<Listing> findByStatusAndPendingExpiresAtGreaterThan(
+        ListingStatus status,
+        LocalDateTime time,
+        Pageable pageable
+    );
 
     @Query("select distinct l.property.landlord.id from Listing l where l.status in ('PENDING','PUBLISHED')")
     List<String> findLiveLandlordIds();

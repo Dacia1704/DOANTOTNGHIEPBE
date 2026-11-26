@@ -1,28 +1,40 @@
 package com.tamdaptit.rentalmanagement.room.service.impl;
 
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+
 import com.tamdaptit.rentalmanagement.common.dto.PageResponse;
 import com.tamdaptit.rentalmanagement.common.exception.AppException;
 import com.tamdaptit.rentalmanagement.common.exception.ErrorCode;
 import com.tamdaptit.rentalmanagement.property.entity.enums.PropertyRentalMode;
 import com.tamdaptit.rentalmanagement.property.repository.PropertyRepository;
+import com.tamdaptit.rentalmanagement.rental.repository.RentalAgreementRepository;
+import com.tamdaptit.rentalmanagement.rental.service.impl.RentalAvailabilityService;
 import com.tamdaptit.rentalmanagement.room.dto.request.RoomRequest;
 import com.tamdaptit.rentalmanagement.room.dto.response.RoomResponse;
-import com.tamdaptit.rentalmanagement.room.entity.*;
+import com.tamdaptit.rentalmanagement.room.entity.Room;
+import com.tamdaptit.rentalmanagement.room.entity.RoomAmenity;
+import com.tamdaptit.rentalmanagement.room.entity.RoomImage;
 import com.tamdaptit.rentalmanagement.room.entity.enums.RoomRentalStatus;
-import com.tamdaptit.rentalmanagement.room.repository.*;
 import com.tamdaptit.rentalmanagement.room.mapper.RoomMapper;
+import com.tamdaptit.rentalmanagement.room.repository.AmenityRepository;
+import com.tamdaptit.rentalmanagement.room.repository.RoomAmenityRepository;
+import com.tamdaptit.rentalmanagement.room.repository.RoomImageRepository;
+import com.tamdaptit.rentalmanagement.room.repository.RoomRepository;
+import com.tamdaptit.rentalmanagement.room.repository.RoomTypeRepository;
 import com.tamdaptit.rentalmanagement.room.service.RoomService;
-import com.tamdaptit.rentalmanagement.storage.service.ImageStorageService;
+import com.tamdaptit.rentalmanagement.storage.service.FileStorageService;
 import com.tamdaptit.rentalmanagement.storage.service.StorageFolder;
-
-import java.math.BigDecimal;
-import java.util.List;
-
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
@@ -36,59 +48,153 @@ public class RoomServiceImpl implements RoomService {
     private final RoomAmenityRepository roomAmenities;
     private final RoomImageRepository images;
     private final PropertyRepository properties;
-    private final ImageStorageService storage;
-    private final com.tamdaptit.rentalmanagement.rental.service.RentalAvailabilityService booking;
-    private final com.tamdaptit.rentalmanagement.rental.repository.RentalAgreementRepository agreements;
+    private final FileStorageService storage;
+    private final RentalAvailabilityService booking;
+    private final RentalAgreementRepository agreements;
 
     @Override
-    public PageResponse<RoomResponse> search(int page, int size, String typeName, String provinceId, String wardId,
-                                             RoomRentalStatus status, BigDecimal minPrice, BigDecimal maxPrice, List<String> amenityNames) {
+    public PageResponse<RoomResponse> search(
+        int page,
+        int size,
+        String typeName,
+        String provinceId,
+        String wardId,
+        RoomRentalStatus status,
+        BigDecimal minPrice,
+        BigDecimal maxPrice,
+        List<String> amenityNames
+    ) {
         return searchForOwner(null, page, size, typeName, provinceId, wardId, status, minPrice, maxPrice, amenityNames);
     }
 
     @Override
-    public PageResponse<RoomResponse> searchMine(String userId, int page, int size, String typeName, String provinceId,
-            String wardId, RoomRentalStatus status, BigDecimal minPrice, BigDecimal maxPrice, List<String> amenityNames) {
-        return searchForOwner(userId, page, size, typeName, provinceId, wardId, status, minPrice, maxPrice, amenityNames);
+    public PageResponse<RoomResponse> searchMine(
+        String userId,
+        int page,
+        int size,
+        String typeName,
+        String provinceId,
+        String wardId,
+        RoomRentalStatus status,
+        BigDecimal minPrice,
+        BigDecimal maxPrice,
+        List<String> amenityNames
+    ) {
+        return searchForOwner(
+            userId,
+            page,
+            size,
+            typeName,
+            provinceId,
+            wardId,
+            status,
+            minPrice,
+            maxPrice,
+            amenityNames
+        );
     }
 
-    private PageResponse<RoomResponse> searchForOwner(String ownerId, int page, int size, String typeName,
-            String provinceId, String wardId, RoomRentalStatus status, BigDecimal minPrice, BigDecimal maxPrice,
-            List<String> amenityNames) {
+    private PageResponse<RoomResponse> searchForOwner(
+        String ownerId,
+        int page,
+        int size,
+        String typeName,
+        String provinceId,
+        String wardId,
+        RoomRentalStatus status,
+        BigDecimal minPrice,
+        BigDecimal maxPrice,
+        List<String> amenityNames
+    ) {
         validatePage(page, size);
-        if (minPrice != null && maxPrice != null && minPrice.compareTo(maxPrice) > 0)
+        if (minPrice != null && maxPrice != null && minPrice.compareTo(maxPrice) > 0) {
             throw new AppException(ErrorCode.INVALID_REQUEST, "minPrice không được lớn hơn maxPrice");
-        List<String> selectedAmenityNames = amenityNames == null ? List.of() : amenityNames.stream()
-                .filter(name -> name != null && !name.isBlank()).map(String::trim).distinct().toList();
+        }
+
+        List<String> selectedAmenityNames = amenityNames == null ? List.of()
+            : amenityNames.stream()
+                .filter(name -> name != null && !name.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
         var pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         var result = selectedAmenityNames.isEmpty()
-                ? rooms.searchByTypeName(ownerId, typeName, provinceId, wardId, status, minPrice, maxPrice, pageable)
-                : rooms.searchWithAmenityNames(ownerId, typeName, provinceId, wardId, status, minPrice, maxPrice,
-                        selectedAmenityNames.stream().map(String::toLowerCase).toList(), selectedAmenityNames.size(), pageable);
+            ? rooms.searchByTypeName(ownerId, typeName, provinceId, wardId, status, minPrice, maxPrice, pageable)
+            : rooms.searchWithAmenityNames(
+                ownerId,
+                typeName,
+                provinceId,
+                wardId,
+                status,
+                minPrice,
+                maxPrice,
+                selectedAmenityNames.stream().map(String::toLowerCase).toList(),
+                selectedAmenityNames.size(),
+                pageable
+            );
         return page(result);
     }
 
     @Override
-    public PageResponse<RoomResponse> searchByIds(int page, int size, String typeId, String provinceId, String wardId,
-            RoomRentalStatus status, BigDecimal minPrice, BigDecimal maxPrice, List<String> amenityIds) {
+    public PageResponse<RoomResponse> searchByIds(
+        int page,
+        int size,
+        String typeId,
+        String provinceId,
+        String wardId,
+        RoomRentalStatus status,
+        BigDecimal minPrice,
+        BigDecimal maxPrice,
+        List<String> amenityIds
+    ) {
         validatePage(page, size);
-        if (minPrice != null && maxPrice != null && minPrice.compareTo(maxPrice) > 0)
+        if (minPrice != null && maxPrice != null && minPrice.compareTo(maxPrice) > 0) {
             throw new AppException(ErrorCode.INVALID_REQUEST, "minPrice không được lớn hơn maxPrice");
-        List<String> selectedIds = amenityIds == null ? List.of() : amenityIds.stream()
-                .filter(id -> id != null && !id.isBlank()).map(String::trim).distinct().toList();
+        }
+
+        List<String> selectedIds = amenityIds == null ? List.of()
+            : amenityIds.stream()
+                .filter(id -> id != null && !id.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
         var pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         var result = selectedIds.isEmpty()
-                ? rooms.search(null, typeId, provinceId, wardId, status, minPrice, maxPrice, pageable)
-                : rooms.searchWithAmenities(null, typeId, provinceId, wardId, status, minPrice, maxPrice,
-                        selectedIds, selectedIds.size(), pageable);
+            ? rooms.search(null, typeId, provinceId, wardId, status, minPrice, maxPrice, pageable)
+            : rooms.searchWithAmenities(
+                null,
+                typeId,
+                provinceId,
+                wardId,
+                status,
+                minPrice,
+                maxPrice,
+                selectedIds,
+                selectedIds.size(),
+                pageable
+            );
         return page(result);
     }
 
     @Override
-    public PageResponse<RoomResponse> mine(String userId, int page, int size) {
+    public PageResponse<RoomResponse> mine(
+        String userId,
+        int page,
+        int size
+    ) {
         validatePage(page, size);
-        return page(rooms.search(userId, null, null, null, null, null, null,
-                PageRequest.of(page, size, Sort.by("createdAt").descending())));
+        return page(
+            rooms.search(
+                userId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                PageRequest.of(page, size, Sort.by("createdAt").descending())
+            )
+        );
     }
 
     @Override
@@ -98,35 +204,71 @@ public class RoomServiceImpl implements RoomService {
 
     @Override
     @Transactional
-    public RoomResponse create(String userId, RoomRequest request, List<MultipartFile> files) {
+    public RoomResponse create(
+        String userId,
+        RoomRequest request,
+        List<MultipartFile> files
+    ) {
         Room room = new Room();
         var property = properties.findLockedById(request.propertyId())
-                .orElseThrow(() -> new AppException(ErrorCode.PROPERTY_NOT_FOUND));
-        if (!property.getLandlord().getId().equals(userId)) throw new AppException(ErrorCode.NOT_PROPERTY_OWNER);
-        if (property.getRentalMode() == PropertyRentalMode.WHOLE)
+            .orElseThrow(() -> new AppException(ErrorCode.PROPERTY_NOT_FOUND));
+        if (!property.getLandlord().getId().equals(userId)) {
+            throw new AppException(ErrorCode.NOT_PROPERTY_OWNER);
+        }
+
+        if (property.getRentalMode() == PropertyRentalMode.WHOLE) {
             throw new AppException(ErrorCode.INVALID_REQUEST, "WHOLE đã có một đơn vị cho thuê");
+        }
+
         room.setProperty(property);
         apply(room, request);
         rooms.saveAndFlush(room);
         setAmenities(room, request.amenityIds());
         if (files != null && !files.isEmpty()) {
-            if (files.size() > 10) throw new AppException(ErrorCode.IMAGE_TOO_MANY);
+            if (files.size() > 10) {
+                throw new AppException(ErrorCode.IMAGE_TOO_MANY);
+            }
+
             var stored = storage.uploadAll(StorageFolder.forRoom(room.getId()), files);
-            var order = new java.util.concurrent.atomic.AtomicInteger(0);
-            stored.forEach(file -> images.save(RoomImage.builder().room(room).url(file.url())
-                    .publicId(file.publicId()).sortOrder(order.getAndIncrement()).build()));
+            var order = new AtomicInteger(0);
+            stored.forEach(
+                file -> images.save(
+                    RoomImage.builder()
+                        .room(room)
+                        .url(file.url())
+                        .publicId(file.publicId())
+                        .sortOrder(order.getAndIncrement())
+                        .build()
+                )
+            );
         }
+
         return responses(List.of(room)).get(0);
     }
 
     @Override
     @Transactional
-    public RoomResponse update(String userId, String id, RoomRequest request) {
+    public RoomResponse update(
+        String userId,
+        String id,
+        RoomRequest request
+    ) {
         Room room = rooms.findByIdForUpdate(id).orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
-        if (!room.getProperty().getLandlord().getId().equals(userId)) throw new AppException(ErrorCode.NOT_ROOM_OWNER);
-        if (request.rentalStatus() != null && request.rentalStatus() != room.getRentalStatus()
-                && agreements.existsByRoom_IdAndStatusIn(id, agreements.OCCUPIED))
-            throw new AppException(ErrorCode.ROOM_UNAVAILABLE, "Hãy xử lý hợp đồng và bàn giao trước khi đổi trạng thái phòng");
+        if (!room.getProperty().getLandlord().getId().equals(userId)) {
+            throw new AppException(ErrorCode.NOT_ROOM_OWNER);
+        }
+
+        if (
+            request.rentalStatus() != null &&
+                request.rentalStatus() != room.getRentalStatus() &&
+            agreements.existsByRoom_IdAndStatusIn(id, agreements.OCCUPIED)
+        ) {
+            throw new AppException(
+                ErrorCode.ROOM_UNAVAILABLE,
+                "Hãy xử lý hợp đồng và bàn giao trước khi đổi trạng thái phòng"
+            );
+        }
+
         properties.findLockedById(room.getProperty().getId()).orElseThrow();
         apply(room, request);
         setAmenities(room, request.amenityIds());
@@ -137,40 +279,78 @@ public class RoomServiceImpl implements RoomService {
     @Transactional
     public void delete(String userId, String id) {
         Room room = rooms.findByIdForUpdate(id).orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
-        if (!room.getProperty().getLandlord().getId().equals(userId)) throw new AppException(ErrorCode.NOT_ROOM_OWNER);
-        if (agreements.existsByRoom_IdAndStatusIn(id, agreements.OCCUPIED)) throw new AppException(ErrorCode.ROOM_UNAVAILABLE);
-        if (agreements.existsByRoom_Id(id)) throw new AppException(ErrorCode.ROOM_HAS_RENTAL_HISTORY);
+        if (!room.getProperty().getLandlord().getId().equals(userId)) {
+            throw new AppException(ErrorCode.NOT_ROOM_OWNER);
+        }
+
+        if (agreements.existsByRoom_IdAndStatusIn(id, agreements.OCCUPIED)) {
+            throw new AppException(ErrorCode.ROOM_UNAVAILABLE);
+        }
+
+        if (agreements.existsByRoom_Id(id)) {
+            throw new AppException(ErrorCode.ROOM_HAS_RENTAL_HISTORY);
+        }
+
         var property = properties.findLockedById(room.getProperty().getId()).orElseThrow();
-        if (rooms.countByProperty_Id(property.getId()) <= 1)
+        if (rooms.countByProperty_Id(property.getId()) <= 1) {
             throw new AppException(ErrorCode.INVALID_REQUEST, "Cơ sở phải có ít nhất một đơn vị cho thuê");
+        }
+
         rooms.delete(room);
-        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
-                new org.springframework.transaction.support.TransactionSynchronization() {
-                    @Override public void afterCommit() { storage.deleteByPrefix(StorageFolder.forRoom(id)); }
-                });
+        TransactionSynchronizationManager.registerSynchronization(
+            new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    storage.deleteByPrefix(StorageFolder.forRoom(id));
+                }
+            }
+        );
     }
 
     @Override
     @Transactional
-    public List<RoomResponse.RoomImageResponse> uploadImages(String userId, String id, List<MultipartFile> files) {
+    public List<RoomResponse.RoomImageResponse> uploadImages(
+        String userId,
+        String id,
+        List<MultipartFile> files
+    ) {
         Room room = owned(userId, id);
-        if (files == null || files.isEmpty() || files.size() > 10)
+        if (files == null || files.isEmpty() || files.size() > 10) {
             throw new AppException(ErrorCode.IMAGE_TOO_MANY);
+        }
+
         var stored = storage.uploadAll(StorageFolder.forRoom(id), files);
-        var order = new java.util.concurrent.atomic.AtomicInteger(images.findAllByRoom_IdOrderBySortOrderAsc(id).size());
-        return stored.stream().map(file -> images.save(RoomImage.builder().room(room).url(file.url())
-                .publicId(file.publicId()).sortOrder(order.getAndIncrement()).build()))
-                .map(roomMapper::toImageResponse).toList();
+        var order = new AtomicInteger(images.findAllByRoom_IdOrderBySortOrderAsc(id).size());
+        return stored.stream()
+            .map(
+                file -> images.save(
+                    RoomImage.builder()
+                        .room(room)
+                        .url(file.url())
+                        .publicId(file.publicId())
+                        .sortOrder(order.getAndIncrement())
+                        .build()
+                )
+            )
+            .map(roomMapper::toImageResponse)
+            .toList();
     }
 
     @Override
     @Transactional
-    public void deleteImage(String userId, String id, String imageId) {
+    public void deleteImage(
+        String userId,
+        String id,
+        String imageId
+    ) {
         owned(userId, id);
-        RoomImage image = images.findById(imageId).filter(i -> i.getRoom().getId().equals(id))
-                .orElseThrow(() -> new AppException(ErrorCode.ROOM_IMAGE_NOT_FOUND));
+        RoomImage image = images.findById(imageId)
+            .filter(i -> i.getRoom().getId().equals(id))
+            .orElseThrow(() -> new AppException(ErrorCode.ROOM_IMAGE_NOT_FOUND));
         images.delete(image);
-        if (image.getPublicId() != null) storage.delete(image.getPublicId());
+        if (image.getPublicId() != null) {
+            storage.delete(image.getPublicId());
+        }
     }
 
     private Room find(String id) {
@@ -179,50 +359,90 @@ public class RoomServiceImpl implements RoomService {
 
     private Room owned(String userId, String id) {
         Room room = find(id);
-        if (!room.getProperty().getLandlord().getId().equals(userId)) throw new AppException(ErrorCode.NOT_ROOM_OWNER);
+        if (!room.getProperty().getLandlord().getId().equals(userId)) {
+            throw new AppException(ErrorCode.NOT_ROOM_OWNER);
+        }
+
         return room;
     }
 
     private void apply(Room room, RoomRequest request) {
-        if (!room.getProperty().getId().equals(request.propertyId()))
+        if (!room.getProperty().getId().equals(request.propertyId())) {
             throw new AppException(ErrorCode.INVALID_REQUEST, "Không được chuyển phòng sang cơ sở khác");
+        }
+
         String number = request.roomNumber().trim();
-        if (rooms.existsByProperty_IdAndRoomNumberAndIdNot(request.propertyId(), number,
-                room.getId() == null ? "" : room.getId()))
+        if (
+            rooms.existsByProperty_IdAndRoomNumberAndIdNot(
+                request.propertyId(),
+                number,
+                room.getId() == null ? "" : room.getId()
+            )
+        ) {
             throw new AppException(ErrorCode.DUPLICATE_ROOM_NUMBER);
+        }
+
         roomMapper.updateFromRequest(request, room);
-        room.setRoomType(types.findById(request.roomTypeId()).orElseThrow(() -> new AppException(ErrorCode.ROOM_TYPE_NOT_FOUND)));
+        room.setRoomType(
+            types.findById(request.roomTypeId()).orElseThrow(() -> new AppException(ErrorCode.ROOM_TYPE_NOT_FOUND))
+        );
         room.setRoomNumber(number);
     }
 
     private void setAmenities(Room room, List<String> ids) {
         roomAmenities.deleteAll(roomAmenities.findAllByRoom_Id(room.getId()));
         roomAmenities.flush();
-        if (ids == null) return;
-        ids.stream().distinct().map(id -> amenities.findById(id).orElseThrow(() -> new AppException(ErrorCode.AMENITY_NOT_FOUND)))
-                .forEach(amenity -> roomAmenities.save(RoomAmenity.builder().room(room).amenity(amenity).build()));
+        if (ids == null) {
+            return;
+        }
+
+        ids.stream()
+            .distinct()
+            .map(id -> amenities.findById(id).orElseThrow(() -> new AppException(ErrorCode.AMENITY_NOT_FOUND)))
+            .forEach(amenity -> roomAmenities.save(RoomAmenity.builder().room(room).amenity(amenity).build()));
     }
 
-    private PageResponse<RoomResponse> page(org.springframework.data.domain.Page<Room> p) {
-        return PageResponse.<RoomResponse>builder().currentPage(p.getNumber()).pageSize(p.getSize()).totalPages(p.getTotalPages())
-                .totalElements(p.getTotalElements()).data(responses(p.getContent())).build();
+    private PageResponse<RoomResponse> page(Page<Room> p) {
+        return PageResponse.<RoomResponse>builder()
+            .currentPage(p.getNumber())
+            .pageSize(p.getSize())
+            .totalPages(p.getTotalPages())
+            .totalElements(p.getTotalElements())
+            .data(responses(p.getContent()))
+            .build();
     }
 
     private List<RoomResponse> responses(List<Room> roomList) {
-        if (roomList.isEmpty()) return List.of();
+        if (roomList.isEmpty()) {
+            return List.of();
+        }
+
         booking.enrich(roomList);
         var ids = roomList.stream().map(Room::getId).toList();
-        var amenitiesByRoom = roomAmenities.findAllWithAmenityByRoomIds(ids).stream().collect(
-                java.util.stream.Collectors.groupingBy(a -> a.getRoom().getId()));
-        var imagesByRoom = images.findAllByRoomIds(ids).stream().collect(
-                java.util.stream.Collectors.groupingBy(i -> i.getRoom().getId()));
-        return roomList.stream().map(room -> roomMapper.toResponse(room,
-                amenitiesByRoom.getOrDefault(room.getId(), List.of()),
-                imagesByRoom.getOrDefault(room.getId(), List.of()))).toList();
+        var amenitiesByRoom = roomAmenities.findAllWithAmenityByRoomIds(ids)
+            .stream()
+            .collect(
+                Collectors.groupingBy(a -> a.getRoom().getId())
+            );
+        var imagesByRoom = images.findAllByRoomIds(ids)
+            .stream()
+            .collect(
+                Collectors.groupingBy(i -> i.getRoom().getId())
+            );
+        return roomList.stream()
+            .map(
+                room -> roomMapper.toResponse(
+                    room,
+                    amenitiesByRoom.getOrDefault(room.getId(), List.of()),
+                    imagesByRoom.getOrDefault(room.getId(), List.of())
+                )
+            )
+            .toList();
     }
 
     private void validatePage(int page, int size) {
-        if (page < 0 || size < 1 || size > 100)
+        if (page < 0 || size < 1 || size > 100) {
             throw new AppException(ErrorCode.INVALID_REQUEST, "page phải >= 0 và size từ 1 đến 100");
+        }
     }
 }

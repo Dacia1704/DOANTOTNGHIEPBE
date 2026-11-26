@@ -11,9 +11,13 @@ try {
     }
     $selectedJdk = $null
     foreach ($candidate in $jdkCandidates) {
-        if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
+        if ([string]::IsNullOrWhiteSpace($candidate)) {
+            continue
+        }
         $releaseFile = Join-Path $candidate 'release'
-        if (!(Test-Path -LiteralPath $releaseFile) -or !(Test-Path -LiteralPath (Join-Path $candidate 'bin\javac.exe'))) { continue }
+        if (!(Test-Path -LiteralPath $releaseFile) -or !(Test-Path -LiteralPath (Join-Path $candidate 'bin\javac.exe'))) {
+            continue
+        }
         $release = Get-Content -LiteralPath $releaseFile -Raw
         if ($release -match '(?m)^JAVA_VERSION="(\d+)' -and [int]$Matches[1] -eq $requiredJava) {
             $selectedJdk = $candidate
@@ -27,7 +31,9 @@ try {
     $env:PATH = "$(Join-Path $selectedJdk 'bin');$originalPath"
     Write-Host "Using JDK ${requiredJava}: $selectedJdk"
     & .\mvnw.cmd spring-boot:run '-Dspring-boot.run.arguments=--app.address-sync.enabled=true --spring.main.web-application-type=none --spring.main.keep-alive=false --spring.jpa.hibernate.ddl-auto=validate'
-    if ($LASTEXITCODE -ne 0) { throw "Administrative sync failed (exit code $LASTEXITCODE)." }
+    if ($LASTEXITCODE -ne 0) {
+        throw "Administrative sync failed (exit code $LASTEXITCODE)."
+    }
 } finally {
     $env:JAVA_HOME = $originalJavaHome
     $env:PATH = $originalPath

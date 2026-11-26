@@ -22,7 +22,11 @@ public interface OtpService {
      * @param otp     OTP nguoi dung nhap
      * @param purpose muc dich su dung OTP
      */
-    void verify(String email, String otp, OtpPurpose purpose);
+    void verify(
+        String email,
+        String otp,
+        OtpPurpose purpose
+    );
 
     /**
      * Kiem tra cooldown (gioi han gui lai OTP).

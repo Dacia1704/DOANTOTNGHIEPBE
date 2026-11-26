@@ -1,19 +1,29 @@
 package com.tamdaptit.rentalmanagement.subscription.repository;
 
-import com.tamdaptit.rentalmanagement.subscription.entity.BoostAllocation;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.jpa.repository.Lock;
-import jakarta.persistence.LockModeType;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+
+import com.tamdaptit.rentalmanagement.subscription.entity.BoostAllocation;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
 
 public interface BoostAllocationRepository extends JpaRepository<BoostAllocation, String> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<BoostAllocation> findByListing_IdAndActiveTrue(String listingId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    Optional<BoostAllocation> findByListing_IdAndSubscription_IdAndPriorityLevel(String listingId, String subscriptionId, int priorityLevel);
+    Optional<BoostAllocation> findByListing_IdAndSubscription_IdAndPriorityLevel(
+        String listingId,
+        String subscriptionId,
+        int priorityLevel
+    );
+
     List<BoostAllocation> findAllByListing_Id(String listingId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<BoostAllocation> findBySubscription_Id(String subscriptionId);
 

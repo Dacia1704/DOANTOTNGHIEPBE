@@ -13,7 +13,10 @@ public interface PaymentMapper {
     @Mapping(target = "id", source = "payment.id")
     @Mapping(target = "type", source = "payment.type")
     @Mapping(target = "invoiceId", source = "invoice.id")
-    @Mapping(target = "targetId", expression = "java(payment.getServiceSubscriptionOrder() != null ? payment.getServiceSubscriptionOrder().getId() : payment.getBoostSubscription().getId())")
+    @Mapping(
+        target = "targetId",
+        expression = "java(payment.getServiceSubscriptionOrder() != null ? payment.getServiceSubscriptionOrder().getId() : payment.getBoostSubscription().getId())"
+    )
     PaymentResponse toResponse(Payment payment, Invoice invoice);
 
     InvoiceResponse toResponse(Invoice invoice);

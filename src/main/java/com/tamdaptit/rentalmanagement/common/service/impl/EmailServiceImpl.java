@@ -15,7 +15,6 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class EmailServiceImpl implements EmailService {
-
     private final JavaMailSender mailSender;
 
     @Value("${app.mail.from:noreply@rental.local}")
@@ -26,7 +25,11 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     @Async
-    public void sendOtpEmail(String to, String otp, OtpPurpose purpose) {
+    public void sendOtpEmail(
+        String to,
+        String otp,
+        OtpPurpose purpose
+    ) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
@@ -38,11 +41,14 @@ public class EmailServiceImpl implements EmailService {
 
             mailSender.send(message);
             log.info("[EmailService] Gui OTP email thanh cong: to={}, purpose={}", to, purpose);
-
         } catch (Exception e) {
             // Ghi log loi nhung khong throw de tranh anh huong den luong chinh
-            log.error("[EmailService] Gui OTP email that bai: to={}, purpose={}, error={}",
-                    to, purpose, e.getMessage());
+            log.error(
+                "[EmailService] Gui OTP email that bai: to={}, purpose={}, error={}",
+                to,
+                purpose,
+                e.getMessage()
+            );
         }
     }
 
@@ -52,16 +58,16 @@ public class EmailServiceImpl implements EmailService {
 
     private String buildSubject(OtpPurpose purpose) {
         return switch (purpose) {
-            case EMAIL_VERIFY   -> "[Rental] Xac thuc dia chi email";
-            case FORGOT_PASSWORD -> "[Rental] Dat lai mat khau";
+        case EMAIL_VERIFY -> "[Rental] Xac thuc dia chi email";
+        case FORGOT_PASSWORD -> "[Rental] Dat lai mat khau";
         };
     }
 
     private String buildBody(String otp, OtpPurpose purpose) {
         long minutesValid = expirationSeconds / 60;
         String action = switch (purpose) {
-            case EMAIL_VERIFY    -> "xac thuc dia chi email";
-            case FORGOT_PASSWORD -> "dat lai mat khau";
+        case EMAIL_VERIFY -> "xac thuc dia chi email";
+        case FORGOT_PASSWORD -> "dat lai mat khau";
         };
 
         return String.format("""

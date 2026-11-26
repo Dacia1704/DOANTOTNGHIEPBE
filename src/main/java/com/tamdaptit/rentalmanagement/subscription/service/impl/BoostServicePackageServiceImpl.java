@@ -1,5 +1,8 @@
 package com.tamdaptit.rentalmanagement.subscription.service.impl;
 
+import java.util.Locale;
+import java.util.Set;
+
 import com.tamdaptit.rentalmanagement.common.dto.PageResponse;
 import com.tamdaptit.rentalmanagement.common.exception.AppException;
 import com.tamdaptit.rentalmanagement.common.exception.ErrorCode;
@@ -14,8 +17,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.util.Locale;
-import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -25,23 +26,41 @@ public class BoostServicePackageServiceImpl implements BoostServicePackageServic
     private final BoostServicePackageMapper mapper;
 
     @Override
-    public PageResponse<BoostServicePackageResponse> getAll(int page, int size, boolean includeInactive) {
-        var result = repository.findCatalog(includeInactive, PageRequest.of(
-                Math.max(page, 0), Math.clamp(size, 1, 100), Sort.by("durationMonths", "code", "id")));
+    public PageResponse<BoostServicePackageResponse> getAll(
+        int page,
+        int size,
+        boolean includeInactive
+    ) {
+        var result = repository.findCatalog(
+            includeInactive,
+            PageRequest.of(
+                Math.max(page, 0),
+                Math.clamp(size, 1, 100),
+                Sort.by("durationMonths", "code", "id")
+            )
+        );
         return PageResponse.<BoostServicePackageResponse>builder()
-                .currentPage(result.getNumber()).pageSize(result.getSize())
-                .totalPages(result.getTotalPages()).totalElements(result.getTotalElements())
-                .data(result.getContent().stream().map(mapper::toResponse).toList()).build();
+            .currentPage(result.getNumber())
+            .pageSize(result.getSize())
+            .totalPages(result.getTotalPages())
+            .totalElements(result.getTotalElements())
+            .data(result.getContent().stream().map(mapper::toResponse).toList())
+            .build();
     }
 
     @Override
     public BoostServicePackageResponse getById(String id, boolean includeInactive) {
         BoostServicePackage entity = find(id);
-        if (!includeInactive && (!entity.getActive() || entity.getDurationMonths() == null
-                || !Set.of(1, 3, 6).contains(entity.getDurationMonths())
-                || (entity.getHighPrioritySlots() == 0 && entity.getLowPrioritySlots() == 0))) {
+        if (
+            !includeInactive &&
+            (!entity.getActive() ||
+                    entity.getDurationMonths() == null ||
+                    !Set.of(1, 3, 6).contains(entity.getDurationMonths()) ||
+                    (entity.getHighPrioritySlots() == 0 && entity.getLowPrioritySlots() == 0))
+        ) {
             throw new AppException(ErrorCode.BOOST_PACKAGE_NOT_FOUND);
         }
+
         return mapper.toResponse(entity);
     }
 
@@ -52,6 +71,7 @@ public class BoostServicePackageServiceImpl implements BoostServicePackageServic
         if (repository.existsByCodeIgnoreCase(code)) {
             throw new AppException(ErrorCode.BOOST_PACKAGE_CODE_EXISTS);
         }
+
         validateDuration(request.durationMonths());
         validateSlots(request.highPrioritySlots(), request.lowPrioritySlots());
         BoostServicePackage entity = mapper.toEntity(request);
@@ -68,6 +88,7 @@ public class BoostServicePackageServiceImpl implements BoostServicePackageServic
         if (repository.existsByCodeIgnoreCaseAndIdNot(code, id)) {
             throw new AppException(ErrorCode.BOOST_PACKAGE_CODE_EXISTS);
         }
+
         validateDuration(request.durationMonths());
         validateSlots(request.highPrioritySlots(), request.lowPrioritySlots());
         mapper.update(request, entity);
@@ -84,6 +105,7 @@ public class BoostServicePackageServiceImpl implements BoostServicePackageServic
             validateDuration(entity.getDurationMonths());
             validateSlots(entity.getHighPrioritySlots(), entity.getLowPrioritySlots());
         }
+
         entity.setActive(active);
         return mapper.toResponse(repository.saveAndFlush(entity));
     }

@@ -1,16 +1,21 @@
 package com.tamdaptit.rentalmanagement.room.service;
 
+import java.util.List;
+
 import com.tamdaptit.rentalmanagement.common.dto.PageResponse;
 import com.tamdaptit.rentalmanagement.room.dto.request.RoomTypeRequest;
 import com.tamdaptit.rentalmanagement.room.dto.response.RoomTypeCategoryResponse;
 import com.tamdaptit.rentalmanagement.room.dto.response.RoomTypeResponse;
-import java.util.List;
 
 public interface RoomTypeService {
-
     PageResponse<RoomTypeResponse> getAll(int page, int size);
 
-    PageResponse<RoomTypeResponse> filter(String name, String parentId, int page, int size);
+    PageResponse<RoomTypeResponse> filter(
+        String name,
+        String parentId,
+        int page,
+        int size
+    );
 
     RoomTypeResponse getById(String id);
 

@@ -5,10 +5,13 @@ import com.tamdaptit.rentalmanagement.room.dto.request.AmenityRequest;
 import com.tamdaptit.rentalmanagement.room.entity.Amenity;
 
 public interface AmenityService {
-
     PageResponse<Amenity> getAll(int page, int size);
 
-    PageResponse<Amenity> filter(String name, int page, int size);
+    PageResponse<Amenity> filter(
+        String name,
+        int page,
+        int size
+    );
 
     Amenity getById(String id);
 

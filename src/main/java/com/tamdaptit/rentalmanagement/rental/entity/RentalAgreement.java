@@ -1,19 +1,14 @@
 package com.tamdaptit.rentalmanagement.rental.entity;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
 import com.tamdaptit.rentalmanagement.identity.entity.User;
+import com.tamdaptit.rentalmanagement.rental.entity.enums.ContractPdfStatus;
 import com.tamdaptit.rentalmanagement.rental.entity.enums.CreatedByRole;
 import com.tamdaptit.rentalmanagement.rental.entity.enums.RentalAgreementStatus;
 import com.tamdaptit.rentalmanagement.room.entity.Room;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
-import org.hibernate.annotations.UuidGenerator;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -24,9 +19,18 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.type.SqlTypes;
 
 /**
  * Hop dong thue. SNAPSHOT gia va dieu khan tai thoi diem ky.
@@ -39,30 +43,39 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class RentalAgreement {
-
     @Column(name = "confirmation_expires_at")
     private LocalDateTime confirmationExpiresAt;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "pdf_status", nullable = false)
     @Builder.Default
-    private com.tamdaptit.rentalmanagement.rental.entity.enums.ContractPdfStatus pdfStatus = com.tamdaptit.rentalmanagement.rental.entity.enums.ContractPdfStatus.PENDING;
+    private ContractPdfStatus pdfStatus = ContractPdfStatus.PENDING;
+
     @Column(name = "pdf_error", length = 500)
     private String pdfError;
+
     @Column(name = "pdf_generated_at")
     private LocalDateTime pdfGeneratedAt;
+
     @Column(name = "pdf_sha256", length = 64)
     private String pdfSha256;
-    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "contract_snapshot", columnDefinition = "json")
     private String contractSnapshot;
+
     @Column(name = "pdf_attempt_count", nullable = false)
     private int pdfAttemptCount;
+
     @Column(name = "pdf_next_retry_at")
     private LocalDateTime pdfNextRetryAt;
+
     @Column(name = "pdf_lease_until")
     private LocalDateTime pdfLeaseUntil;
+
     @Column(name = "pdf_claim_token", length = 36)
     private String pdfClaimToken;
+
     @Column(name = "cancel_reason", length = 500)
     private String cancelReason;
 

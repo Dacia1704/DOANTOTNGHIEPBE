@@ -1,18 +1,12 @@
 package com.tamdaptit.rentalmanagement.rental.entity;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
 import com.tamdaptit.rentalmanagement.identity.entity.User;
 import com.tamdaptit.rentalmanagement.listing.entity.Listing;
 import com.tamdaptit.rentalmanagement.rental.entity.enums.RentalRequestStatus;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
-import org.hibernate.annotations.UuidGenerator;
+import com.tamdaptit.rentalmanagement.room.entity.Room;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -23,8 +17,16 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.UuidGenerator;
 
 /**
  * Yeu cau thue phong. landlord_id la SNAPSHOT cua chu tro tai thoi diem tao.
@@ -38,24 +40,31 @@ import java.time.LocalDateTime;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class RentalRequest {
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "room_id")
-    private com.tamdaptit.rentalmanagement.room.entity.Room room;
+    private Room room;
+
     @Column(name = "tenant_full_name", length = 100)
     private String tenantFullName;
+
     @Column(name = "tenant_phone", length = 20)
     private String tenantPhone;
+
     @Column(name = "tenant_email", length = 255)
     private String tenantEmail;
+
     @Column(name = "tenant_citizen_id", length = 20)
     private String tenantCitizenId;
+
     @Column(name = "tenant_permanent_address", length = 500)
     private String tenantPermanentAddress;
+
     @Column(name = "occupant_count")
     private Integer occupantCount;
+
     @Column(name = "duration_months")
     private Integer durationMonths;
+
     @Column(name = "resolution_reason", length = 500)
     private String resolutionReason;
 
@@ -103,5 +112,4 @@ public class RentalRequest {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
-
 }

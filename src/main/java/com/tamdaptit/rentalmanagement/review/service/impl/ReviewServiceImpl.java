@@ -1,40 +1,88 @@
 package com.tamdaptit.rentalmanagement.review.service.impl;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.function.Function;
+
 import com.tamdaptit.rentalmanagement.common.dto.PageResponse;
-import com.tamdaptit.rentalmanagement.common.exception.*;
+import com.tamdaptit.rentalmanagement.common.exception.AppException;
+import com.tamdaptit.rentalmanagement.common.exception.ErrorCode;
 import com.tamdaptit.rentalmanagement.identity.entity.User;
-import com.tamdaptit.rentalmanagement.identity.entity.enums.*;
+import com.tamdaptit.rentalmanagement.identity.entity.enums.RoleCode;
+import com.tamdaptit.rentalmanagement.identity.entity.enums.UserStatus;
 import com.tamdaptit.rentalmanagement.identity.repository.UserRepository;
 import com.tamdaptit.rentalmanagement.listing.entity.Listing;
 import com.tamdaptit.rentalmanagement.listing.repository.ListingRepository;
+import com.tamdaptit.rentalmanagement.moderation.service.ContentModerationService;
 import com.tamdaptit.rentalmanagement.rental.entity.RentalAgreement;
 import com.tamdaptit.rentalmanagement.rental.entity.enums.RentalAgreementStatus;
 import com.tamdaptit.rentalmanagement.rental.repository.RentalAgreementRepository;
-import com.tamdaptit.rentalmanagement.review.dto.request.*;
-import com.tamdaptit.rentalmanagement.review.dto.response.*;
-import com.tamdaptit.rentalmanagement.review.entity.*;
+import com.tamdaptit.rentalmanagement.review.dto.request.ReviewCreateRequest;
+import com.tamdaptit.rentalmanagement.review.dto.request.ReviewReplyRequest;
+import com.tamdaptit.rentalmanagement.review.dto.request.ReviewVisibilityRequest;
+import com.tamdaptit.rentalmanagement.review.dto.response.ReceivedReviewResponse;
+import com.tamdaptit.rentalmanagement.review.dto.response.ReviewDetailResponse;
+import com.tamdaptit.rentalmanagement.review.dto.response.ReviewEligibilityResponse;
+import com.tamdaptit.rentalmanagement.review.dto.response.ReviewResponse;
+import com.tamdaptit.rentalmanagement.review.dto.response.ReviewSummaryResponse;
+import com.tamdaptit.rentalmanagement.review.entity.LandlordReview;
+import com.tamdaptit.rentalmanagement.review.entity.ReviewEntry;
+import com.tamdaptit.rentalmanagement.review.entity.RoomReview;
+import com.tamdaptit.rentalmanagement.review.entity.TenantReview;
 import com.tamdaptit.rentalmanagement.review.entity.enums.ReviewType;
 import com.tamdaptit.rentalmanagement.review.mapper.ReviewMapper;
-import com.tamdaptit.rentalmanagement.review.repository.*;
+import com.tamdaptit.rentalmanagement.review.repository.LandlordReviewRepository;
+import com.tamdaptit.rentalmanagement.review.repository.RatingCount;
+import com.tamdaptit.rentalmanagement.review.repository.RoomReviewRepository;
+import com.tamdaptit.rentalmanagement.review.repository.TenantReviewRepository;
 import com.tamdaptit.rentalmanagement.review.service.ReviewService;
+import com.tamdaptit.rentalmanagement.room.repository.RoomRepository;
 import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.*;
-import java.math.*;
-import java.time.*;
-import java.util.*;
-import java.util.function.Function;
-import static com.tamdaptit.rentalmanagement.common.exception.ErrorCode.*;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
+
+import static com.tamdaptit.rentalmanagement.common.exception.ErrorCode.CANNOT_REVIEW_SELF;
+import static com.tamdaptit.rentalmanagement.common.exception.ErrorCode.INVALID_RATING;
+import static com.tamdaptit.rentalmanagement.common.exception.ErrorCode.INVALID_REQUEST;
+import static com.tamdaptit.rentalmanagement.common.exception.ErrorCode.LANDLORD_REVIEW_EXISTED;
+import static com.tamdaptit.rentalmanagement.common.exception.ErrorCode.LANDLORD_REVIEW_NOT_FOUND;
+import static com.tamdaptit.rentalmanagement.common.exception.ErrorCode.LISTING_NOT_FOUND;
+import static com.tamdaptit.rentalmanagement.common.exception.ErrorCode.NOT_AGREEMENT_PARTY;
+import static com.tamdaptit.rentalmanagement.common.exception.ErrorCode.RENTAL_AGREEMENT_NOT_FOUND;
+import static com.tamdaptit.rentalmanagement.common.exception.ErrorCode.REVIEW_HIDDEN;
+import static com.tamdaptit.rentalmanagement.common.exception.ErrorCode.REVIEW_NOT_ELIGIBLE;
+import static com.tamdaptit.rentalmanagement.common.exception.ErrorCode.ROOM_NOT_FOUND;
+import static com.tamdaptit.rentalmanagement.common.exception.ErrorCode.ROOM_REVIEW_EXISTED;
+import static com.tamdaptit.rentalmanagement.common.exception.ErrorCode.ROOM_REVIEW_NOT_FOUND;
+import static com.tamdaptit.rentalmanagement.common.exception.ErrorCode.TENANT_REVIEW_EXISTED;
+import static com.tamdaptit.rentalmanagement.common.exception.ErrorCode.TENANT_REVIEW_NOT_FOUND;
+import static com.tamdaptit.rentalmanagement.common.exception.ErrorCode.UNAUTHORIZED;
+import static com.tamdaptit.rentalmanagement.common.exception.ErrorCode.USER_NOT_FOUND;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly=true)
+@Transactional(readOnly = true)
 public class ReviewServiceImpl implements ReviewService {
     private static final List<RentalAgreementStatus> CONFIRMED = List.of(
-        RentalAgreementStatus.ACTIVE, RentalAgreementStatus.EXPIRED, RentalAgreementStatus.TERMINATED);
+        RentalAgreementStatus.ACTIVE,
+        RentalAgreementStatus.EXPIRED,
+        RentalAgreementStatus.TERMINATED
+    );
+
     private final RoomReviewRepository rooms;
     private final LandlordReviewRepository landlords;
     private final TenantReviewRepository tenants;
@@ -43,246 +91,422 @@ public class ReviewServiceImpl implements ReviewService {
     private final UserRepository users;
     private final ReviewMapper mapper;
     private final Clock clock;
-    private final com.tamdaptit.rentalmanagement.moderation.service.ContentModerationService moderation;
-    private final com.tamdaptit.rentalmanagement.room.repository.RoomRepository roomRepository;
+    private final ContentModerationService moderation;
+    private final RoomRepository roomRepository;
 
     @Override
-    @Transactional(isolation=Isolation.READ_COMMITTED)
-    public ReviewResponse create(String actor, ReviewType type, ReviewCreateRequest body) {
-        user(actor, type==ReviewType.TENANT ? RoleCode.LANDLORD : RoleCode.TENANT);
-        if (body.rating()==null || body.rating()<1 || body.rating()>5) throw new AppException(INVALID_RATING);
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public ReviewResponse create(
+        String actor,
+        ReviewType type,
+        ReviewCreateRequest body
+    ) {
+        user(actor, type == ReviewType.TENANT ? RoleCode.LANDLORD : RoleCode.TENANT);
+        if (body.rating() == null || body.rating() < 1 || body.rating() > 5) {
+            throw new AppException(INVALID_RATING);
+        }
+
         // Match rental's room -> agreement lock order; avoid deadlock with checkout/deletion.
-        String roomId=agreements.roomId(body.rentalAgreementId()).orElseThrow(()->new AppException(RENTAL_AGREEMENT_NOT_FOUND));
-        roomRepository.findByIdForUpdate(roomId).orElseThrow(()->new AppException(ROOM_NOT_FOUND));
-        var agreement=agreements.lock(body.rentalAgreementId()).orElseThrow(()->new AppException(RENTAL_AGREEMENT_NOT_FOUND));
-        requireAuthor(actor,type,agreement);
-        if (!eligible(agreement)) throw new AppException(REVIEW_NOT_ELIGIBLE);
-        if (existing(type,agreement.getId())!=null) throw new AppException(duplicate(type));
-        String comment=text(body.comment(),2000);
-        var evaluation=moderation.evaluate(type.name()+"_REVIEW_TEXT",comment);
-        ReviewEntry saved = switch(type) {
-            case ROOM -> rooms.saveAndFlush(RoomReview.builder().rentalAgreement(agreement)
-                .tenant(agreement.getTenant()).room(agreement.getRoom()).rating(body.rating()).comment(comment).textStatus(evaluation.status()).build());
-            case LANDLORD -> landlords.saveAndFlush(LandlordReview.builder().rentalAgreement(agreement)
-                .tenant(agreement.getTenant()).landlord(agreement.getLandlord()).rating(body.rating()).comment(comment).textStatus(evaluation.status()).build());
-            case TENANT -> tenants.saveAndFlush(TenantReview.builder().rentalAgreement(agreement)
-                .tenant(agreement.getTenant()).landlord(agreement.getLandlord()).rating(body.rating()).comment(comment).build());
+        String roomId = agreements.roomId(body.rentalAgreementId())
+            .orElseThrow(() -> new AppException(RENTAL_AGREEMENT_NOT_FOUND));
+        roomRepository.findByIdForUpdate(roomId).orElseThrow(() -> new AppException(ROOM_NOT_FOUND));
+        var agreement = agreements.lock(body.rentalAgreementId())
+            .orElseThrow(() -> new AppException(RENTAL_AGREEMENT_NOT_FOUND));
+        requireAuthor(actor, type, agreement);
+        if (!eligible(agreement)) {
+            throw new AppException(REVIEW_NOT_ELIGIBLE);
+        }
+
+        if (existing(type, agreement.getId()) != null) {
+            throw new AppException(duplicate(type));
+        }
+
+        String comment = text(body.comment(), 2000);
+        var evaluation = moderation.evaluate(type.name() + "_REVIEW_TEXT", comment);
+        ReviewEntry saved = switch (type) {
+        case ROOM -> rooms.saveAndFlush(
+            RoomReview.builder()
+                .rentalAgreement(agreement)
+                .tenant(agreement.getTenant())
+                .room(agreement.getRoom())
+                .rating(body.rating())
+                .comment(comment)
+                .textStatus(evaluation.status())
+                .build()
+        );
+        case LANDLORD -> landlords.saveAndFlush(
+            LandlordReview.builder()
+                .rentalAgreement(agreement)
+                .tenant(agreement.getTenant())
+                .landlord(agreement.getLandlord())
+                .rating(body.rating())
+                .comment(comment)
+                .textStatus(evaluation.status())
+                .build()
+        );
+        case TENANT -> tenants.saveAndFlush(
+            TenantReview.builder()
+                .rentalAgreement(agreement)
+                .tenant(agreement.getTenant())
+                .landlord(agreement.getLandlord())
+                .rating(body.rating())
+                .comment(comment)
+                .build()
+        );
         };
-        moderation.record(type.name()+"_REVIEW_TEXT",saved.getId(),actor,1,comment,evaluation);
+        moderation.record(type.name() + "_REVIEW_TEXT", saved.getId(), actor, 1, comment, evaluation);
         return response(saved);
     }
 
     @Override
     public ReviewEligibilityResponse eligibility(String actor, String agreementId) {
-        var viewer=user(actor,null);
-        var agreement=agreements.findById(agreementId).orElseThrow(()->new AppException(RENTAL_AGREEMENT_NOT_FOUND));
-        if (!actor.equals(agreement.getTenant().getId()) && !actor.equals(agreement.getLandlord().getId()))
+        var viewer = user(actor, null);
+        var agreement = agreements.findById(agreementId)
+            .orElseThrow(() -> new AppException(RENTAL_AGREEMENT_NOT_FOUND));
+        if (!actor.equals(agreement.getTenant().getId()) && !actor.equals(agreement.getLandlord().getId())) {
             throw new AppException(NOT_AGREEMENT_PARTY);
-        return new ReviewEligibilityResponse(option(viewer,agreement,ReviewType.ROOM),
-            option(viewer,agreement,ReviewType.LANDLORD),option(viewer,agreement,ReviewType.TENANT));
+        }
+
+        return new ReviewEligibilityResponse(
+            option(viewer, agreement, ReviewType.ROOM),
+            option(viewer, agreement, ReviewType.LANDLORD),
+            option(viewer, agreement, ReviewType.TENANT)
+        );
     }
 
-    private ReviewEligibilityResponse.Eligibility option(User viewer,RentalAgreement agreement,ReviewType type) {
-        String id=existing(type,agreement.getId());
-        boolean author=viewer.getId().equals(type==ReviewType.TENANT?agreement.getLandlord().getId():agreement.getTenant().getId());
-        RoleCode role=type==ReviewType.TENANT?RoleCode.LANDLORD:RoleCode.TENANT;
-        String reason=!author || !hasRole(viewer,role) ? "NOT_REVIEW_AUTHOR"
+    private ReviewEligibilityResponse.Eligibility option(
+        User viewer,
+        RentalAgreement agreement,
+        ReviewType type
+    ) {
+        String id = existing(type, agreement.getId());
+        boolean author = viewer.getId()
+            .equals(type == ReviewType.TENANT ? agreement.getLandlord().getId() : agreement.getTenant().getId());
+        RoleCode role = type == ReviewType.TENANT ? RoleCode.LANDLORD : RoleCode.TENANT;
+        String reason = !author || !hasRole(viewer, role) ? "NOT_REVIEW_AUTHOR"
             : agreement.getTenant().getId().equals(agreement.getLandlord().getId()) ? "CANNOT_REVIEW_SELF"
-            : !eligible(agreement) ? "REVIEW_NOT_ELIGIBLE" : id!=null ? duplicate(type).name() : null;
+                : !eligible(agreement) ? "REVIEW_NOT_ELIGIBLE" : id != null ? duplicate(type).name() : null;
         // Never disclose the other party's hidden review ID through eligibility.
-        return new ReviewEligibilityResponse.Eligibility(reason==null,author?id:null,reason);
+        return new ReviewEligibilityResponse.Eligibility(reason == null, author ? id : null, reason);
     }
 
     @Override
-    public PageResponse<ReviewDetailResponse> mine(String actor, ReviewType type,int page,int size) {
-        user(actor,null);
-        var pageable=pageable(page,size);
-        return switch(type) {
-            case ROOM -> page(rooms.findAll(filter(null,"tenant",actor),pageable),this::detail);
-            case LANDLORD -> page(landlords.findAll(filter(null,"tenant",actor),pageable),this::detail);
-            case TENANT -> page(tenants.findAll(filter(null,"landlord",actor),pageable),this::detail);
+    public PageResponse<ReviewDetailResponse> mine(
+        String actor,
+        ReviewType type,
+        int page,
+        int size
+    ) {
+        user(actor, null);
+        var pageable = pageable(page, size);
+        return switch (type) {
+        case ROOM -> page(rooms.findAll(filter(null, "tenant", actor), pageable), this::detail);
+        case LANDLORD -> page(landlords.findAll(filter(null, "tenant", actor), pageable), this::detail);
+        case TENANT -> page(tenants.findAll(filter(null, "landlord", actor), pageable), this::detail);
         };
     }
 
     @Override
-    public PageResponse<ReceivedReviewResponse> received(String actor,ReviewType type,int page,int size) {
-        user(actor,RoleCode.LANDLORD);
-        var pageable=pageable(page,size);
-        return switch(type) {
-            case ROOM -> page(rooms.findAll(filter(false,"rentalAgreement.landlord",actor),pageable),
-                entry->receivedResponse(entry,actor));
-            case LANDLORD -> page(landlords.findAll(filter(false,"rentalAgreement.landlord",actor),pageable),
-                entry->receivedResponse(entry,actor));
-            case TENANT -> throw new AppException(INVALID_REQUEST);
+    public PageResponse<ReceivedReviewResponse> received(
+        String actor,
+        ReviewType type,
+        int page,
+        int size
+    ) {
+        user(actor, RoleCode.LANDLORD);
+        var pageable = pageable(page, size);
+        return switch (type) {
+        case ROOM -> page(
+            rooms.findAll(filter(false, "rentalAgreement.landlord", actor), pageable),
+            entry -> receivedResponse(entry, actor)
+        );
+        case LANDLORD -> page(
+            landlords.findAll(filter(false, "rentalAgreement.landlord", actor), pageable),
+            entry -> receivedResponse(entry, actor)
+        );
+        case TENANT -> throw new AppException(INVALID_REQUEST);
         };
     }
 
-    private ReceivedReviewResponse receivedResponse(ReviewEntry entry,String actor) {
-        var agreement=entry.getRentalAgreement();
-        var room=agreement.getRoom();
-        var property=room.getProperty();
-        return new ReceivedReviewResponse(response(entry),targetId(entry),targetName(entry),
-            agreement.getId(),agreement.getAgreementCode(),room.getId(),room.getRoomNumber(),
-            property.getId(),property.getName(),
-            !Boolean.TRUE.equals(entry.getHidden()) && actor.equals(agreement.getLandlord().getId()));
+    private ReceivedReviewResponse receivedResponse(ReviewEntry entry, String actor) {
+        var agreement = entry.getRentalAgreement();
+        var room = agreement.getRoom();
+        var property = room.getProperty();
+        return new ReceivedReviewResponse(
+            response(entry),
+            targetId(entry),
+            targetName(entry),
+            agreement.getId(),
+            agreement.getAgreementCode(),
+            room.getId(),
+            room.getRoomNumber(),
+            property.getId(),
+            property.getName(),
+            !Boolean.TRUE.equals(entry.getHidden()) && actor.equals(agreement.getLandlord().getId())
+        );
     }
 
     @Override
-    public PageResponse<ReviewResponse> listing(String listingId,String roomId,int page,int size) {
-        Listing listing=publicListing(listingId);
-        requireRoom(listing,roomId);
-        Specification<RoomReview> spec=roomId==null?filter(false,"room.property",listing.getProperty().getId()):filter(false,"room",roomId);
-        return page(rooms.findAll(spec,pageable(page,size)),this::response);
+    public PageResponse<ReviewResponse> listing(
+        String listingId,
+        String roomId,
+        int page,
+        int size
+    ) {
+        Listing listing = publicListing(listingId);
+        requireRoom(listing, roomId);
+        Specification<RoomReview> spec = roomId == null ? filter(false, "room.property", listing.getProperty().getId())
+            : filter(false, "room", roomId);
+        return page(rooms.findAll(spec, pageable(page, size)), this::response);
     }
 
     @Override
-    public ReviewSummaryResponse listingSummary(String listingId,String roomId) {
-        Listing listing=publicListing(listingId);
-        requireRoom(listing,roomId);
-        return summary(rooms.ratings(roomId,listing.getProperty().getId()));
+    public ReviewSummaryResponse listingSummary(String listingId, String roomId) {
+        Listing listing = publicListing(listingId);
+        requireRoom(listing, roomId);
+        return summary(rooms.ratings(roomId, listing.getProperty().getId()));
     }
 
-    private void requireRoom(Listing listing,String roomId) {
-        if (roomId!=null && !roomsBelongToProperty(roomId,listing.getProperty().getId()))
+    private void requireRoom(Listing listing, String roomId) {
+        if (roomId != null && !roomsBelongToProperty(roomId, listing.getProperty().getId())) {
             throw new AppException(ROOM_NOT_FOUND);
+        }
     }
 
-    private boolean roomsBelongToProperty(String roomId,String propertyId) {
-        return roomRepository.existsByIdAndProperty_Id(roomId,propertyId);
+    private boolean roomsBelongToProperty(String roomId, String propertyId) {
+        return roomRepository.existsByIdAndProperty_Id(roomId, propertyId);
     }
 
     private Listing publicListing(String id) {
-        return listings.findPublicForReview(id,LocalDateTime.now(clock)).orElseThrow(()->new AppException(LISTING_NOT_FOUND));
+        return listings.findPublicForReview(id, LocalDateTime.now(clock))
+            .orElseThrow(() -> new AppException(LISTING_NOT_FOUND));
     }
 
     @Override
-    public PageResponse<ReviewResponse> landlord(String landlordId,int page,int size) {
+    public PageResponse<ReviewResponse> landlord(
+        String landlordId,
+        int page,
+        int size
+    ) {
         publicLandlord(landlordId);
-        return page(landlords.findAll(filter(false,"landlord",landlordId),pageable(page,size)),this::response);
+        return page(landlords.findAll(filter(false, "landlord", landlordId), pageable(page, size)), this::response);
     }
+
     @Override
     public ReviewSummaryResponse landlordSummary(String landlordId) {
         publicLandlord(landlordId);
         return summary(landlords.ratings(landlordId));
     }
+
     private void publicLandlord(String id) {
-        if (!listings.hasPublicListing(id,LocalDateTime.now(clock))) throw new AppException(USER_NOT_FOUND);
+        if (!listings.hasPublicListing(id, LocalDateTime.now(clock))) {
+            throw new AppException(USER_NOT_FOUND);
+        }
     }
 
     @Override
-    public PageResponse<ReviewResponse> tenant(String actor,String tenantId,int page,int size) {
-        tenantAccess(actor,tenantId);
-        return page(tenants.findAll(filter(false,"tenant",tenantId),pageable(page,size)),this::response);
+    public PageResponse<ReviewResponse> tenant(
+        String actor,
+        String tenantId,
+        int page,
+        int size
+    ) {
+        tenantAccess(actor, tenantId);
+        return page(tenants.findAll(filter(false, "tenant", tenantId), pageable(page, size)), this::response);
     }
+
     @Override
-    public ReviewSummaryResponse tenantSummary(String actor,String tenantId) {
-        tenantAccess(actor,tenantId);
+    public ReviewSummaryResponse tenantSummary(String actor, String tenantId) {
+        tenantAccess(actor, tenantId);
         return summary(tenants.ratings(tenantId));
     }
-    private void tenantAccess(String actor,String tenantId) {
-        var viewer=user(actor,null);
-        if (!actor.equals(tenantId) && !hasRole(viewer,RoleCode.ADMIN)
-            && !hasRole(viewer,RoleCode.LANDLORD))
+
+    private void tenantAccess(String actor, String tenantId) {
+        var viewer = user(actor, null);
+        if (!actor.equals(tenantId) && !hasRole(viewer, RoleCode.ADMIN) && !hasRole(viewer, RoleCode.LANDLORD)) {
             throw new AppException(UNAUTHORIZED);
-        if (!users.existsById(tenantId)) throw new AppException(USER_NOT_FOUND);
+        }
+
+        if (!users.existsById(tenantId)) {
+            throw new AppException(USER_NOT_FOUND);
+        }
     }
 
     @Override
     @Transactional
-    public ReviewResponse reply(String actor,ReviewType type,String id,ReviewReplyRequest body) {
-        user(actor,RoleCode.LANDLORD);
-        if (type==ReviewType.TENANT) throw new AppException(INVALID_REQUEST);
-        var entry=locked(type,id);
-        if (!actor.equals(entry.getRentalAgreement().getLandlord().getId())) throw new AppException(UNAUTHORIZED);
-        if (Boolean.TRUE.equals(entry.getHidden())) throw new AppException(REVIEW_HIDDEN);
-        String reply=required(body.reply(),2000);
-        var evaluation=moderation.evaluate(type.name()+"_REVIEW_REPLY",reply);
-        if (entry instanceof RoomReview review) {review.setLandlordReply(reply);review.setReplyStatus(evaluation.status());}
-        else {var review=(LandlordReview)entry;review.setLandlordReply(reply);review.setReplyStatus(evaluation.status());}
-        moderation.record(type.name()+"_REVIEW_REPLY",id,actor,1,reply,evaluation);
+    public ReviewResponse reply(
+        String actor,
+        ReviewType type,
+        String id,
+        ReviewReplyRequest body
+    ) {
+        user(actor, RoleCode.LANDLORD);
+        if (type == ReviewType.TENANT) {
+            throw new AppException(INVALID_REQUEST);
+        }
+
+        var entry = locked(type, id);
+        if (!actor.equals(entry.getRentalAgreement().getLandlord().getId())) {
+            throw new AppException(UNAUTHORIZED);
+        }
+
+        if (Boolean.TRUE.equals(entry.getHidden())) {
+            throw new AppException(REVIEW_HIDDEN);
+        }
+
+        String reply = required(body.reply(), 2000);
+        var evaluation = moderation.evaluate(type.name() + "_REVIEW_REPLY", reply);
+        if (entry instanceof RoomReview review) {
+            review.setLandlordReply(reply);
+            review.setReplyStatus(evaluation.status());
+        } else {
+            var review = (LandlordReview) entry;
+            review.setLandlordReply(reply);
+            review.setReplyStatus(evaluation.status());
+        }
+
+        moderation.record(type.name() + "_REVIEW_REPLY", id, actor, 1, reply, evaluation);
         // Flush before mapping so updatedAt in the response reflects the mutation.
-        if (type==ReviewType.ROOM) rooms.flush(); else landlords.flush();
+        if (type == ReviewType.ROOM) {
+            rooms.flush();
+        } else {
+            landlords.flush();
+        }
+
         return response(entry);
     }
 
     @Override
-    public PageResponse<ReviewDetailResponse> admin(String actor,ReviewType type,Boolean hidden,String targetId,int page,int size) {
-        permission(actor,"REVIEW_READ");
-        var pageable=pageable(page,size);
-        return switch(type) {
-            case ROOM -> page(rooms.findAll(filter(hidden,"room",targetId),pageable),this::detail);
-            case LANDLORD -> page(landlords.findAll(filter(hidden,"landlord",targetId),pageable),this::detail);
-            case TENANT -> page(tenants.findAll(filter(hidden,"tenant",targetId),pageable),this::detail);
+    public PageResponse<ReviewDetailResponse> admin(
+        String actor,
+        ReviewType type,
+        Boolean hidden,
+        String targetId,
+        int page,
+        int size
+    ) {
+        permission(actor, "REVIEW_READ");
+        var pageable = pageable(page, size);
+        return switch (type) {
+        case ROOM -> page(rooms.findAll(filter(hidden, "room", targetId), pageable), this::detail);
+        case LANDLORD -> page(landlords.findAll(filter(hidden, "landlord", targetId), pageable), this::detail);
+        case TENANT -> page(tenants.findAll(filter(hidden, "tenant", targetId), pageable), this::detail);
         };
     }
 
     @Override
     @Transactional
-    public ReviewDetailResponse visibility(String actor,ReviewType type,String id,ReviewVisibilityRequest body) {
-        User admin=permission(actor,"REVIEW_MODERATE");
-        if(body.hidden()==null) throw new AppException(INVALID_REQUEST);
-        String reason=body.hidden()?required(body.reason(),500):null;
-        var entry=locked(type,id);
+    public ReviewDetailResponse visibility(
+        String actor,
+        ReviewType type,
+        String id,
+        ReviewVisibilityRequest body
+    ) {
+        User admin = permission(actor, "REVIEW_MODERATE");
+        if (body.hidden() == null) {
+            throw new AppException(INVALID_REQUEST);
+        }
+
+        String reason = body.hidden() ? required(body.reason(), 500) : null;
+        var entry = locked(type, id);
         entry.setHidden(body.hidden());
-        entry.setHiddenBy(body.hidden()?admin:null);
-        entry.setHiddenAt(body.hidden()?LocalDateTime.now(clock):null);
+        entry.setHiddenBy(body.hidden() ? admin : null);
+        entry.setHiddenAt(body.hidden() ? LocalDateTime.now(clock) : null);
         entry.setHiddenReason(reason);
-        switch(type) {case ROOM -> rooms.flush(); case LANDLORD -> landlords.flush(); case TENANT -> tenants.flush();}
+        switch (type) {
+        case ROOM -> rooms.flush();
+        case LANDLORD -> landlords.flush();
+        case TENANT -> tenants.flush();
+        }
+
         return detail(entry);
     }
 
-    private ReviewEntry locked(ReviewType type,String id) {
-        return switch(type) {
-            case ROOM -> rooms.lock(id).orElseThrow(()->new AppException(ROOM_REVIEW_NOT_FOUND));
-            case LANDLORD -> landlords.lock(id).orElseThrow(()->new AppException(LANDLORD_REVIEW_NOT_FOUND));
-            case TENANT -> tenants.lock(id).orElseThrow(()->new AppException(TENANT_REVIEW_NOT_FOUND));
+    private ReviewEntry locked(ReviewType type, String id) {
+        return switch (type) {
+        case ROOM -> rooms.lock(id).orElseThrow(() -> new AppException(ROOM_REVIEW_NOT_FOUND));
+        case LANDLORD -> landlords.lock(id).orElseThrow(() -> new AppException(LANDLORD_REVIEW_NOT_FOUND));
+        case TENANT -> tenants.lock(id).orElseThrow(() -> new AppException(TENANT_REVIEW_NOT_FOUND));
         };
     }
-    private String existing(ReviewType type,String id) {
-        return switch(type) {
-            case ROOM -> rooms.findByRentalAgreement_Id(id).map(RoomReview::getId).orElse(null);
-            case LANDLORD -> landlords.findByRentalAgreement_Id(id).map(LandlordReview::getId).orElse(null);
-            case TENANT -> tenants.findByRentalAgreement_Id(id).map(TenantReview::getId).orElse(null);
+
+    private String existing(ReviewType type, String id) {
+        return switch (type) {
+        case ROOM -> rooms.findByRentalAgreement_Id(id).map(RoomReview::getId).orElse(null);
+        case LANDLORD -> landlords.findByRentalAgreement_Id(id).map(LandlordReview::getId).orElse(null);
+        case TENANT -> tenants.findByRentalAgreement_Id(id).map(TenantReview::getId).orElse(null);
         };
     }
+
     private ErrorCode duplicate(ReviewType type) {
-        return switch(type) {case ROOM -> ROOM_REVIEW_EXISTED;case LANDLORD -> LANDLORD_REVIEW_EXISTED;case TENANT -> TENANT_REVIEW_EXISTED;};
+        return switch (type) {
+        case ROOM -> ROOM_REVIEW_EXISTED;
+        case LANDLORD -> LANDLORD_REVIEW_EXISTED;
+        case TENANT -> TENANT_REVIEW_EXISTED;
+        };
     }
+
     private boolean eligible(RentalAgreement agreement) {
-        return CONFIRMED.contains(agreement.getStatus()) && agreement.getLandlordConfirmedAt()!=null
-            && agreement.getTenantConfirmedAt()!=null && agreement.getStartDate()!=null
-            && !agreement.getStartDate().isAfter(LocalDate.now(clock));
+        return CONFIRMED.contains(agreement.getStatus()) &&
+            agreement.getLandlordConfirmedAt() != null &&
+            agreement.getTenantConfirmedAt() != null &&
+            agreement.getStartDate() != null &&
+            !agreement.getStartDate().isAfter(LocalDate.now(clock));
     }
-    private void requireAuthor(String actor,ReviewType type,RentalAgreement agreement) {
-        if (!actor.equals(type==ReviewType.TENANT?agreement.getLandlord().getId():agreement.getTenant().getId()))
+
+    private void requireAuthor(
+        String actor,
+        ReviewType type,
+        RentalAgreement agreement
+    ) {
+        if (
+            !actor.equals(type == ReviewType.TENANT ? agreement.getLandlord().getId() : agreement.getTenant().getId())
+        ) {
             throw new AppException(NOT_AGREEMENT_PARTY);
-        if(agreement.getTenant().getId().equals(agreement.getLandlord().getId())) throw new AppException(CANNOT_REVIEW_SELF);
+        }
+
+        if (agreement.getTenant().getId().equals(agreement.getLandlord().getId())) {
+            throw new AppException(CANNOT_REVIEW_SELF);
+        }
     }
-    private User user(String id,RoleCode role) {
-        User user=users.findByIdWithRolesAndPermissions(id).orElseThrow(()->new AppException(USER_NOT_FOUND));
-        if(user.getStatus()!=UserStatus.ACTIVE || (role!=null && !hasRole(user,role))) throw new AppException(UNAUTHORIZED);
+
+    private User user(String id, RoleCode role) {
+        User user = users.findByIdWithRolesAndPermissions(id).orElseThrow(() -> new AppException(USER_NOT_FOUND));
+        if (user.getStatus() != UserStatus.ACTIVE || (role != null && !hasRole(user, role))) {
+            throw new AppException(UNAUTHORIZED);
+        }
+
         return user;
     }
-    private User permission(String actor,String code) {
-        var viewer=user(actor,null);
-        if(!hasPermission(viewer,code)) throw new AppException(UNAUTHORIZED);
+
+    private User permission(String actor, String code) {
+        var viewer = user(actor, null);
+        if (!hasPermission(viewer, code)) {
+            throw new AppException(UNAUTHORIZED);
+        }
+
         return viewer;
     }
-    private boolean hasPermission(User user,String code) {
-        return user.getUserRoles().stream().flatMap(ur->ur.getRole().getRolePermissions().stream())
-            .anyMatch(rp->code.equals(rp.getPermission().getCode()));
+
+    private boolean hasPermission(User user, String code) {
+        return user.getUserRoles()
+            .stream()
+            .flatMap(ur -> ur.getRole().getRolePermissions().stream())
+            .anyMatch(rp -> code.equals(rp.getPermission().getCode()));
     }
-    private boolean hasRole(User user,RoleCode role) {
-        return user.getUserRoles().stream().anyMatch(ur->ur.getRole().getCode()==role);
+
+    private boolean hasRole(User user, RoleCode role) {
+        return user.getUserRoles().stream().anyMatch(ur -> ur.getRole().getCode() == role);
     }
+
     private ReviewResponse response(ReviewEntry entry) {
         ReviewResponse dto;
         boolean matches;
         var agreement = entry.getRentalAgreement();
-        if(entry instanceof RoomReview r) {
+        if (entry instanceof RoomReview r) {
             dto = mapper.toResponse(r);
             matches = r.getRoom().getId().equals(agreement.getRoom().getId());
-        } else if(entry instanceof LandlordReview r) {
+        } else if (entry instanceof LandlordReview r) {
             dto = mapper.toResponse(r);
             matches = r.getLandlord().getId().equals(agreement.getLandlord().getId());
         } else {
@@ -290,63 +514,147 @@ public class ReviewServiceImpl implements ReviewService {
             dto = mapper.toResponse(r);
             matches = r.getLandlord().getId().equals(agreement.getLandlord().getId());
         }
-        boolean verified = matches && eligible(agreement)
-                && entry.getTenant().getId().equals(agreement.getTenant().getId());
-        return new ReviewResponse(dto.id(), dto.type(), dto.rating(), dto.comment(), dto.landlordReply(),
-                dto.authorName(), dto.authorAvatarUrl(), dto.createdAt(), dto.updatedAt(), verified, dto.textStatus(), dto.replyStatus());
+
+        boolean verified = matches &&
+            eligible(agreement) &&
+            entry.getTenant().getId().equals(agreement.getTenant().getId());
+        return new ReviewResponse(
+            dto.id(),
+            dto.type(),
+            dto.rating(),
+            dto.comment(),
+            dto.landlordReply(),
+            dto.authorName(),
+            dto.authorAvatarUrl(),
+            dto.createdAt(),
+            dto.updatedAt(),
+            verified,
+            dto.textStatus(),
+            dto.replyStatus()
+        );
     }
+
     private ReviewDetailResponse detail(ReviewEntry entry) {
-        return new ReviewDetailResponse(response(entry),entry.getRentalAgreement().getId(),Boolean.TRUE.equals(entry.getHidden()),
-            entry.getHiddenBy()==null?null:entry.getHiddenBy().getId(),entry.getHiddenAt(),entry.getHiddenReason(),
-            targetId(entry),targetName(entry));
+        return new ReviewDetailResponse(
+            response(entry),
+            entry.getRentalAgreement().getId(),
+            Boolean.TRUE.equals(entry.getHidden()),
+            entry.getHiddenBy() == null ? null : entry.getHiddenBy().getId(),
+            entry.getHiddenAt(),
+            entry.getHiddenReason(),
+            targetId(entry),
+            targetName(entry)
+        );
     }
+
     private String targetId(ReviewEntry entry) {
-        if(entry instanceof RoomReview review) return review.getRoom().getId();
-        if(entry instanceof LandlordReview review) return review.getLandlord().getId();
+        if (entry instanceof RoomReview review) {
+            return review.getRoom().getId();
+        }
+
+        if (entry instanceof LandlordReview review) {
+            return review.getLandlord().getId();
+        }
+
         return entry.getTenant().getId();
     }
+
     private String targetName(ReviewEntry entry) {
-        if(entry instanceof RoomReview review)
-            return review.getRoom().getProperty().getName()+" - "+review.getRoom().getRoomNumber();
-        if(entry instanceof LandlordReview review) return review.getLandlord().getFullName();
+        if (entry instanceof RoomReview review) {
+            return review.getRoom().getProperty().getName() + " - " + review.getRoom().getRoomNumber();
+        }
+
+        if (entry instanceof LandlordReview review) {
+            return review.getLandlord().getFullName();
+        }
+
         return entry.getTenant().getFullName();
     }
-    private static <T> Specification<T> filter(Boolean hidden,String path,String targetId) {
-        return (root,query,cb)->{
-            var predicates=new ArrayList<jakarta.persistence.criteria.Predicate>();
-            if(hidden!=null) predicates.add(cb.equal(root.get("hidden"),hidden));
-            if(targetId!=null) {
-                Path<?> target=root;
-                for(String part:path.split("\\.")) target=target.get(part);
-                predicates.add(cb.equal(target.get("id"),targetId));
+
+    private static <T> Specification<T> filter(
+        Boolean hidden,
+        String path,
+        String targetId
+    ) {
+        return (root, query, cb) -> {
+            var predicates = new ArrayList<Predicate>();
+            if (hidden != null) {
+                predicates.add(cb.equal(root.get("hidden"), hidden));
             }
-            return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+
+            if (targetId != null) {
+                Path<?> target = root;
+                for (String part : path.split("\\.")) {
+                    target = target.get(part);
+                }
+
+                predicates.add(cb.equal(target.get("id"), targetId));
+            }
+
+            return cb.and(predicates.toArray(Predicate[]::new));
         };
     }
-    private static Pageable pageable(int page,int size) {
-        if(page<0 || size<1 || size>50) throw new AppException(INVALID_REQUEST);
-        return PageRequest.of(page,size,Sort.by(Sort.Direction.DESC,"createdAt","id"));
+
+    private static Pageable pageable(int page, int size) {
+        if (page < 0 || size < 1 || size > 50) {
+            throw new AppException(INVALID_REQUEST);
+        }
+
+        return PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt", "id"));
     }
-    private static <T,R> PageResponse<R> page(Page<T> page,Function<T,R> map) {
-        return PageResponse.<R>builder().currentPage(page.getNumber()).pageSize(page.getSize())
-            .totalPages(page.getTotalPages()).totalElements(page.getTotalElements()).data(page.getContent().stream().map(map).toList()).build();
+
+    private static <T, R> PageResponse<R> page(Page<T> page, Function<T, R> map) {
+        return PageResponse.<R>builder()
+            .currentPage(page.getNumber())
+            .pageSize(page.getSize())
+            .totalPages(page.getTotalPages())
+            .totalElements(page.getTotalElements())
+            .data(page.getContent().stream().map(map).toList())
+            .build();
     }
+
     private static ReviewSummaryResponse summary(List<RatingCount> counts) {
-        var distribution=new LinkedHashMap<Integer,Long>();
-        for(int star=1;star<=5;star++) distribution.put(star,0L);
-        long total=0,sum=0,replied=0;
-        for(var row:counts) {distribution.put(row.getRating(),row.getTotal());total+=row.getTotal();sum+=row.getRating()*row.getTotal();replied+=row.getReplied()==null?0:row.getReplied();}
-        return new ReviewSummaryResponse(total,total==0?null:BigDecimal.valueOf(sum).divide(BigDecimal.valueOf(total),1,RoundingMode.HALF_UP),distribution,
-                total==0?null:(int)Math.round(100.0*replied/total));
+        var distribution = new LinkedHashMap<Integer, Long>();
+        for (int star = 1; star <= 5; star++) {
+            distribution.put(star, 0L);
+        }
+
+        long total = 0;
+        long sum = 0;
+        long replied = 0;
+        for (var row : counts) {
+            distribution.put(row.getRating(), row.getTotal());
+            total += row.getTotal();
+            sum += row.getRating() * row.getTotal();
+            replied += row.getReplied() == null ? 0 : row.getReplied();
+        }
+
+        return new ReviewSummaryResponse(
+            total,
+            total == 0 ? null : BigDecimal.valueOf(sum).divide(BigDecimal.valueOf(total), 1, RoundingMode.HALF_UP),
+            distribution,
+            total == 0 ? null : (int) Math.round(100.0 * replied / total)
+        );
     }
-    private static String text(String value,int max) {
-        if(value==null) return null;
-        if(value.length()>max) throw new AppException(INVALID_REQUEST);
+
+    private static String text(String value, int max) {
+        if (value == null) {
+            return null;
+        }
+
+        if (value.length() > max) {
+            throw new AppException(INVALID_REQUEST);
+        }
+
         return value.strip();
     }
-    private static String required(String value,int max) {
-        String result=text(value,max);
-        if(result==null || result.isBlank()) throw new AppException(INVALID_REQUEST);
+
+    private static String required(String value, int max) {
+        String result = text(value, max);
+        if (result == null || result.isBlank()) {
+            throw new AppException(INVALID_REQUEST);
+        }
+
         return result;
     }
 }

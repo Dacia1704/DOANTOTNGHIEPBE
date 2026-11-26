@@ -1,5 +1,8 @@
 package com.tamdaptit.rentalmanagement.listing.entity;
 
+import java.time.LocalDateTime;
+
+import com.tamdaptit.rentalmanagement.identity.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -13,11 +16,9 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import com.tamdaptit.rentalmanagement.identity.entity.User;
+import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UuidGenerator;
-import lombok.experimental.FieldDefaults;
-import java.time.LocalDateTime;
 
 /**
  * N-N users <-> listings: nguoi thue luu tin dang yeu thich.
@@ -32,7 +33,6 @@ import java.time.LocalDateTime;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class SavedListing {
-
     @Id
     @UuidGenerator
     @Column(length = 36)

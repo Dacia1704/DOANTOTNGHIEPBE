@@ -1,7 +1,10 @@
 package com.tamdaptit.rentalmanagement.auth.service.impl;
 
-import jakarta.validation.constraints.Email;
-import lombok.RequiredArgsConstructor;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Locale;
+
 import com.tamdaptit.rentalmanagement.auth.dto.request.ForgotPasswordRequest;
 import com.tamdaptit.rentalmanagement.auth.dto.request.LoginRequest;
 import com.tamdaptit.rentalmanagement.auth.dto.request.LogoutRequest;
@@ -33,17 +36,15 @@ import com.tamdaptit.rentalmanagement.identity.mapper.UserMapper;
 import com.tamdaptit.rentalmanagement.identity.repository.RoleRepository;
 import com.tamdaptit.rentalmanagement.identity.repository.UserRepository;
 import com.tamdaptit.rentalmanagement.identity.repository.UserRoleRepository;
-import java.util.List;
-import java.util.Locale;
+import io.jsonwebtoken.Claims;
+import jakarta.validation.constraints.Email;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.time.Duration;
-import java.time.LocalDateTime;
-import io.jsonwebtoken.Claims;
 
 @Service
 @RequiredArgsConstructor
@@ -73,43 +74,53 @@ public class AuthServiceImpl implements AuthService {
 
         if (userRepository.existsByEmailIgnoreCase(email)) {
             throw new AppException(
-                    ErrorCode.EMAIL_ALREADY_EXISTS,
-                    String.format("Email %s đã tồn tại", email));
+                ErrorCode.EMAIL_ALREADY_EXISTS,
+                String.format("Email %s đã tồn tại", email)
+            );
         }
 
         String phone = request.phone().trim();
         if (userRepository.existsByPhone(phone)) {
             throw new AppException(
-                    ErrorCode.PHONE_ALREADY_EXISTS,
-                    String.format("Số điện thoại %s đã tồn tại", phone));
+                ErrorCode.PHONE_ALREADY_EXISTS,
+                String.format("Số điện thoại %s đã tồn tại", phone)
+            );
         }
 
         String citizenId = blankToNull(request.citizenId());
         if (citizenId != null && userRepository.existsByCitizenId(citizenId)) {
             throw new AppException(
-                    ErrorCode.CITIZEN_ID_ALREADY_EXISTS,
-                    String.format("Số CCCD/CMND %s đã tồn tại", citizenId));
+                ErrorCode.CITIZEN_ID_ALREADY_EXISTS,
+                String.format("Số CCCD/CMND %s đã tồn tại", citizenId)
+            );
         }
 
         // ADMIN chi duoc gan tu API noi bo, khong cho tu dang ky tu public.
         if (!PUBLIC_ROLE_CODES.contains(request.roleCode())) {
             throw new AppException(
-                    ErrorCode.INVALID_REGISTER_ROLE,
-                    "Chỉ có thể đăng ký tài khoản với vai trò người thuê hoặc chủ nhà");
+                ErrorCode.INVALID_REGISTER_ROLE,
+                "Chỉ có thể đăng ký tài khoản với vai trò người thuê hoặc chủ nhà"
+            );
         }
 
         Role role = roleRepository.findByCode(request.roleCode())
-                .orElseThrow(() -> new AppException(
-                        ErrorCode.ROLE_NOT_FOUND,
-                        String.format("Không tìm thấy vai trò %s", request.roleCode())));
+            .orElseThrow(
+                () -> new AppException(
+                    ErrorCode.ROLE_NOT_FOUND,
+                    String.format("Không tìm thấy vai trò %s", request.roleCode())
+                )
+            );
 
-        User user = userMapper.toUser(new RegisterRequest(
+        User user = userMapper.toUser(
+            new RegisterRequest(
                 email,
                 phone,
                 request.password(),
                 request.fullName().trim(),
                 citizenId,
-                request.roleCode()));
+                request.roleCode()
+            )
+        );
 
         user.setPassword(passwordEncoder.encode(request.password()));
         user.setEmailVerifiedAt(null);
@@ -120,8 +131,8 @@ public class AuthServiceImpl implements AuthService {
 
         // Nap lai user kem roles + permissions de build authorities
         User userWithRoles = userRepository
-                .findByIdWithRolesAndPermissions(savedUser.getId())
-                .orElse(savedUser);
+            .findByIdWithRolesAndPermissions(savedUser.getId())
+            .orElse(savedUser);
 
         List<String> authorities = jwtTokenService.buildAuthorities(userWithRoles);
         String accessToken = jwtTokenService.generateAccessToken(userWithRoles);
@@ -136,16 +147,20 @@ public class AuthServiceImpl implements AuthService {
     public LoginResponse login(LoginRequest request) {
         String email = normalizeEmail(request.email());
         User user = userRepository.findByEmailWithRolesAndPermissions(email)
-                .orElseThrow(() -> new AppException(
-                        ErrorCode.INVALID_CREDENTIALS,
-                        "Email hoặc mật khẩu không đúng"));
+            .orElseThrow(
+                () -> new AppException(
+                    ErrorCode.INVALID_CREDENTIALS,
+                    "Email hoặc mật khẩu không đúng"
+                )
+            );
 
         ensureActive(user);
 
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
             throw new AppException(
-                    ErrorCode.INVALID_CREDENTIALS,
-                    "Email hoặc mật khẩu không đúng");
+                ErrorCode.INVALID_CREDENTIALS,
+                "Email hoặc mật khẩu không đúng"
+            );
         }
 
         List<String> authorities = jwtTokenService.buildAuthorities(user);
@@ -154,11 +169,12 @@ public class AuthServiceImpl implements AuthService {
         saveRefreshToken(user, rawRefreshToken);
 
         return authMapper.toLoginResponse(
-                user,
-                authorities,
-                accessToken,
-                rawRefreshToken,
-                jwtTokenService.getAccessTokenExpiresAt());
+            user,
+            authorities,
+            accessToken,
+            rawRefreshToken,
+            jwtTokenService.getAccessTokenExpiresAt()
+        );
     }
 
     /**
@@ -175,8 +191,8 @@ public class AuthServiceImpl implements AuthService {
 
         // Khoá dong token de tranh hai request dong thoi cung cap cap token moi.
         RefreshToken refreshToken = refreshTokenRepository
-                .findByTokenForUpdate(HashUtils.sha256Hex(request.refreshToken()))
-                .orElseThrow(() -> new AppException(ErrorCode.INVALID_REFRESH_TOKEN));
+            .findByTokenForUpdate(HashUtils.sha256Hex(request.refreshToken()))
+            .orElseThrow(() -> new AppException(ErrorCode.INVALID_REFRESH_TOKEN));
 
         if (refreshToken.getExpiresAt().isBefore(LocalDateTime.now())) {
             refreshToken.setRevoked(true);
@@ -185,13 +201,14 @@ public class AuthServiceImpl implements AuthService {
         }
 
         User user = userRepository
-                .findByIdForUpdate(refreshToken.getUser().getId())
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+            .findByIdForUpdate(refreshToken.getUser().getId())
+            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
         Number version = (Number) claims.get("authVersion");
         if (user.getAuthVersion() != (version == null ? 0 : version.intValue())) {
             throw new AppException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
+
         ensureActive(user);
 
         // Thu hoi token cu truoc khi cap token moi (rotation)
@@ -203,21 +220,23 @@ public class AuthServiceImpl implements AuthService {
         saveRefreshToken(user, rawRefreshToken);
 
         return authMapper.toRefreshTokenResponse(
-                accessToken,
-                rawRefreshToken,
-                jwtTokenService.getAccessTokenExpiresAt());
+            accessToken,
+            rawRefreshToken,
+            jwtTokenService.getAccessTokenExpiresAt()
+        );
     }
 
     @Override
     @Transactional
     public void logout(LogoutRequest request) {
         RefreshToken refreshToken = refreshTokenRepository
-                .findByTokenAndRevokedFalse(HashUtils.sha256Hex(request.refreshToken()))
-                .orElseThrow(() -> new AppException(ErrorCode.INVALID_REFRESH_TOKEN));
+            .findByTokenAndRevokedFalse(HashUtils.sha256Hex(request.refreshToken()))
+            .orElseThrow(() -> new AppException(ErrorCode.INVALID_REFRESH_TOKEN));
 
         if (!refreshToken.getUser().getId().equals(currentUserId())) {
             throw new AppException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
+
         refreshToken.setRevoked(true);
         refreshTokenRepository.save(refreshToken);
     }
@@ -228,6 +247,7 @@ public class AuthServiceImpl implements AuthService {
             if (!jwtTokenService.isRefreshToken(token)) {
                 throw new AppException(ErrorCode.INVALID_REFRESH_TOKEN);
             }
+
             return claims;
         } catch (AppException ex) {
             throw ex;
@@ -240,6 +260,7 @@ public class AuthServiceImpl implements AuthService {
         if (user.getStatus() == UserStatus.BLOCKED) {
             throw new AppException(ErrorCode.USER_BLOCKED);
         }
+
         if (user.getStatus() == UserStatus.INACTIVE) {
             throw new AppException(ErrorCode.USER_INACTIVE);
         }
@@ -247,13 +268,14 @@ public class AuthServiceImpl implements AuthService {
 
     private void saveRefreshToken(User user, String rawRefreshToken) {
         refreshTokenRepository.save(
-                RefreshToken.builder()
-                        .user(user)
-                        // Chi luu SHA-256 hex; rawRefreshToken tra ve client mot lan duy nhat.
-                        .token(HashUtils.sha256Hex(rawRefreshToken))
-                        .expiresAt(LocalDateTime.now().plus(Duration.ofMillis(refreshExpiration)))
-                        .revoked(false)
-                        .build());
+            RefreshToken.builder()
+                .user(user)
+                // Chi luu SHA-256 hex; rawRefreshToken tra ve client mot lan duy nhat.
+                .token(HashUtils.sha256Hex(rawRefreshToken))
+                .expiresAt(LocalDateTime.now().plus(Duration.ofMillis(refreshExpiration)))
+                .revoked(false)
+                .build()
+        );
     }
 
     private String normalizeEmail(String email) {
@@ -264,6 +286,7 @@ public class AuthServiceImpl implements AuthService {
         if (value == null || value.isBlank()) {
             return null;
         }
+
         return value.trim();
     }
 
@@ -272,6 +295,7 @@ public class AuthServiceImpl implements AuthService {
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new AppException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
+
         return authentication.getName();
     }
 
@@ -299,8 +323,9 @@ public class AuthServiceImpl implements AuthService {
     public void resetPassword(ResetPasswordRequest request) {
         if (!request.newPassword().equals(request.confirmPassword())) {
             throw new AppException(
-                    ErrorCode.PASSWORD_CONFIRMATION_MISMATCH,
-                    "Xac nhan mat khau moi khong khop");
+                ErrorCode.PASSWORD_CONFIRMATION_MISMATCH,
+                "Xac nhan mat khau moi khong khop"
+            );
         }
 
         String email = normalizeEmail(request.email());
@@ -309,12 +334,13 @@ public class AuthServiceImpl implements AuthService {
         otpService.verify(email, request.otp(), OtpPurpose.FORGOT_PASSWORD);
 
         User user = userRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new AppException(ErrorCode.EMAIL_NOT_FOUND));
+            .orElseThrow(() -> new AppException(ErrorCode.EMAIL_NOT_FOUND));
 
         if (passwordEncoder.matches(request.newPassword(), user.getPassword())) {
             throw new AppException(
-                    ErrorCode.PASSWORD_UNCHANGED,
-                    "Mat khau moi phai khac mat khau hien tai");
+                ErrorCode.PASSWORD_UNCHANGED,
+                "Mat khau moi phai khac mat khau hien tai"
+            );
         }
 
         user.setPassword(passwordEncoder.encode(request.newPassword()));
@@ -336,7 +362,7 @@ public class AuthServiceImpl implements AuthService {
         otpService.checkCooldown(email, OtpPurpose.EMAIL_VERIFY);
 
         User user = userRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new AppException(ErrorCode.EMAIL_NOT_FOUND));
+            .orElseThrow(() -> new AppException(ErrorCode.EMAIL_NOT_FOUND));
 
         if (user.getEmailVerifiedAt() != null) {
             throw new AppException(ErrorCode.EMAIL_ALREADY_VERIFIED);
@@ -352,7 +378,7 @@ public class AuthServiceImpl implements AuthService {
         String email = normalizeEmail(request.email());
 
         User user = userRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new AppException(ErrorCode.EMAIL_NOT_FOUND));
+            .orElseThrow(() -> new AppException(ErrorCode.EMAIL_NOT_FOUND));
 
         if (user.getEmailVerifiedAt() != null) {
             throw new AppException(ErrorCode.EMAIL_ALREADY_VERIFIED);

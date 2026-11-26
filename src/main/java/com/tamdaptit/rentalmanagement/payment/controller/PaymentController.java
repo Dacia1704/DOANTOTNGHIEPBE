@@ -3,9 +3,14 @@ package com.tamdaptit.rentalmanagement.payment.controller;
 import com.tamdaptit.rentalmanagement.common.dto.ApiResponse;
 import com.tamdaptit.rentalmanagement.common.dto.PageResponse;
 import com.tamdaptit.rentalmanagement.payment.dto.request.PaymentRequest;
-import com.tamdaptit.rentalmanagement.payment.dto.response.*;
-import com.tamdaptit.rentalmanagement.payment.service.PaymentService;
+import com.tamdaptit.rentalmanagement.payment.dto.response.InvoiceResponse;
+import com.tamdaptit.rentalmanagement.payment.dto.response.PaymentCheckoutResponse;
+import com.tamdaptit.rentalmanagement.payment.dto.response.PaymentResponse;
+import com.tamdaptit.rentalmanagement.payment.dto.response.VnPayIpnResponse;
+import com.tamdaptit.rentalmanagement.payment.dto.response.VnPayQueryResponse;
+import com.tamdaptit.rentalmanagement.payment.dto.response.VnPayReturnResponse;
 import com.tamdaptit.rentalmanagement.payment.service.PaymentQueryService;
+import com.tamdaptit.rentalmanagement.payment.service.PaymentService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +18,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
 @RestController
@@ -31,8 +42,11 @@ public class PaymentController {
 
     @PostMapping("/vnpay/checkout")
     @PreAuthorize("hasRole('LANDLORD')")
-    public ApiResponse<PaymentCheckoutResponse> checkout(Authentication auth,
-            @Valid @RequestBody PaymentRequest request, HttpServletRequest http) {
+    public ApiResponse<PaymentCheckoutResponse> checkout(
+        Authentication auth,
+        @Valid @RequestBody PaymentRequest request,
+        HttpServletRequest http
+    ) {
         return ApiResponse.success(service.checkout(auth.getName(), request, http.getRemoteAddr()));
     }
 
@@ -65,22 +79,29 @@ public class PaymentController {
 
     @GetMapping
     @PreAuthorize("hasRole('LANDLORD')")
-    public ApiResponse<PageResponse<PaymentResponse>> history(Authentication auth,
-            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
+    public ApiResponse<PageResponse<PaymentResponse>> history(
+        Authentication auth,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size
+    ) {
         return ApiResponse.success(service.getHistory(auth.getName(), page, size));
     }
 
     @GetMapping("/review")
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<PageResponse<PaymentResponse>> review(
-            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size
+    ) {
         return ApiResponse.success(service.getReviewQueue(page, size));
     }
 
     @GetMapping("/all")
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<PageResponse<PaymentResponse>> all(
-            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size
+    ) {
         return ApiResponse.success(service.getAllPayments(page, size));
     }
 

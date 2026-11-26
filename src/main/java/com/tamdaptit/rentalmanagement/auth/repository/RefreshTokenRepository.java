@@ -1,20 +1,20 @@
 package com.tamdaptit.rentalmanagement.auth.repository;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
 import com.tamdaptit.rentalmanagement.auth.entity.RefreshToken;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import jakarta.persistence.LockModeType;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
 
 @Repository
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, String> {
-
     void deleteAllByUser_Id(String userId);
 
     Optional<RefreshToken> findByTokenAndRevokedFalse(String tokenHash);
@@ -39,8 +39,10 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Stri
      * Thu hoi tat ca token cua mot user (dang xuat o moi thiet bi).
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("UPDATE RefreshToken rt SET rt.revoked = true "
-            + "WHERE rt.user.id = :userId AND rt.revoked = false")
+    @Query(
+        "UPDATE RefreshToken rt SET rt.revoked = true "
+            + "WHERE rt.user.id = :userId AND rt.revoked = false"
+    )
     int revokeAllByUserId(@Param("userId") String userId);
 
     /**

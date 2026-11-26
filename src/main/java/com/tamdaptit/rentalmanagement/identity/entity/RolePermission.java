@@ -14,14 +14,17 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.UuidGenerator;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.UuidGenerator;
 
 @Entity
-@Table(name = "role_permissions", uniqueConstraints = @UniqueConstraint(
+@Table(
+    name = "role_permissions",
+    uniqueConstraints = @UniqueConstraint(
         name = "UX_role_permissions_role_permission",
-        columnNames = {"role_id", "permission_id"}
-))
+        columnNames = { "role_id", "permission_id" }
+    )
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -29,7 +32,6 @@ import lombok.experimental.FieldDefaults;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class RolePermission {
-
     @Id
     @UuidGenerator
     @Column(length = 36)

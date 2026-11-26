@@ -1,30 +1,47 @@
 package com.tamdaptit.rentalmanagement.room.repository;
 
+import java.math.BigDecimal;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+
 import com.tamdaptit.rentalmanagement.room.entity.Room;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
+import com.tamdaptit.rentalmanagement.room.entity.enums.RoomRentalStatus;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.QueryHint;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import com.tamdaptit.rentalmanagement.room.entity.enums.RoomRentalStatus;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import java.util.List;
 
 @Repository
 public interface RoomRepository extends JpaRepository<Room, String> {
     boolean existsByIdAndProperty_Id(String id, String propertyId);
 
-    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
-    @org.springframework.data.jpa.repository.QueryHints(@jakarta.persistence.QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))
     @Query("select r from Room r where r.id = :roomId")
-    java.util.Optional<Room> findByIdForUpdate(@Param("roomId") String roomId);
+    Optional<Room> findByIdForUpdate(@Param("roomId") String roomId);
 
     List<Room> findByProperty_IdOrderByRoomNumberAsc(String propertyId);
-    boolean existsByProperty_IdAndRoomNumberAndIdNot(String propertyId, String roomNumber, String id);
+
+    boolean existsByProperty_IdAndRoomNumberAndIdNot(
+        String propertyId,
+        String roomNumber,
+        String id
+    );
+
     long countByProperty_Id(String propertyId);
+
     boolean existsByProperty_IdAndRentalStatus(String propertyId, RoomRentalStatus status);
-    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"roomType", "property", "property.province", "property.ward"})
-    List<Room> findAllByProperty_IdIn(java.util.Collection<String> propertyIds);
+
+    @EntityGraph(attributePaths = { "roomType", "property", "property.province", "property.ward" })
+    List<Room> findAllByProperty_IdIn(Collection<String> propertyIds);
 
     boolean existsByRoomType_Id(String roomTypeId);
 
@@ -38,10 +55,16 @@ public interface RoomRepository extends JpaRepository<Room, String> {
               and (:minPrice is null or r.price >= :minPrice)
               and (:maxPrice is null or r.price <= :maxPrice)
             """)
-    Page<Room> search(@Param("ownerId") String ownerId, @Param("typeId") String typeId,
-            @Param("provinceId") String provinceId, @Param("wardId") String wardId,
-            @Param("status") RoomRentalStatus status, @Param("minPrice") java.math.BigDecimal minPrice,
-            @Param("maxPrice") java.math.BigDecimal maxPrice, Pageable pageable);
+    Page<Room> search(
+        @Param("ownerId") String ownerId,
+        @Param("typeId") String typeId,
+        @Param("provinceId") String provinceId,
+        @Param("wardId") String wardId,
+        @Param("status") RoomRentalStatus status,
+        @Param("minPrice") BigDecimal minPrice,
+        @Param("maxPrice") BigDecimal maxPrice,
+        Pageable pageable
+    );
 
     @Query("""
             select r from Room r join fetch r.roomType join fetch r.property p join fetch p.province join fetch p.ward
@@ -55,11 +78,18 @@ public interface RoomRepository extends JpaRepository<Room, String> {
               and (select count(distinct ra.amenity.id) from RoomAmenity ra
                    where ra.room.id = r.id and ra.amenity.id in :amenityIds) = :amenityCount
             """)
-    Page<Room> searchWithAmenities(@Param("ownerId") String ownerId, @Param("typeId") String typeId,
-            @Param("provinceId") String provinceId, @Param("wardId") String wardId,
-            @Param("status") RoomRentalStatus status, @Param("minPrice") java.math.BigDecimal minPrice,
-            @Param("maxPrice") java.math.BigDecimal maxPrice, @Param("amenityIds") List<String> amenityIds,
-            @Param("amenityCount") long amenityCount, Pageable pageable);
+    Page<Room> searchWithAmenities(
+        @Param("ownerId") String ownerId,
+        @Param("typeId") String typeId,
+        @Param("provinceId") String provinceId,
+        @Param("wardId") String wardId,
+        @Param("status") RoomRentalStatus status,
+        @Param("minPrice") BigDecimal minPrice,
+        @Param("maxPrice") BigDecimal maxPrice,
+        @Param("amenityIds") List<String> amenityIds,
+        @Param("amenityCount") long amenityCount,
+        Pageable pageable
+    );
 
     @Query("""
             select r from Room r join fetch r.roomType join fetch r.property p join fetch p.province join fetch p.ward
@@ -73,11 +103,18 @@ public interface RoomRepository extends JpaRepository<Room, String> {
               and (select count(distinct lower(ra.amenity.name)) from RoomAmenity ra
                    where ra.room.id = r.id and lower(ra.amenity.name) in :amenityNames) = :amenityCount
             """)
-    Page<Room> searchWithAmenityNames(@Param("ownerId") String ownerId, @Param("typeName") String typeName,
-            @Param("provinceId") String provinceId, @Param("wardId") String wardId,
-            @Param("status") RoomRentalStatus status, @Param("minPrice") java.math.BigDecimal minPrice,
-            @Param("maxPrice") java.math.BigDecimal maxPrice, @Param("amenityNames") List<String> amenityNames,
-            @Param("amenityCount") long amenityCount, Pageable pageable);
+    Page<Room> searchWithAmenityNames(
+        @Param("ownerId") String ownerId,
+        @Param("typeName") String typeName,
+        @Param("provinceId") String provinceId,
+        @Param("wardId") String wardId,
+        @Param("status") RoomRentalStatus status,
+        @Param("minPrice") BigDecimal minPrice,
+        @Param("maxPrice") BigDecimal maxPrice,
+        @Param("amenityNames") List<String> amenityNames,
+        @Param("amenityCount") long amenityCount,
+        Pageable pageable
+    );
 
     @Query("""
             select r from Room r join fetch r.roomType join fetch r.property p join fetch p.province join fetch p.ward
@@ -89,13 +126,21 @@ public interface RoomRepository extends JpaRepository<Room, String> {
               and (:minPrice is null or r.price >= :minPrice)
               and (:maxPrice is null or r.price <= :maxPrice)
             """)
-    Page<Room> searchByTypeName(@Param("ownerId") String ownerId, @Param("typeName") String typeName,
-            @Param("provinceId") String provinceId, @Param("wardId") String wardId,
-            @Param("status") RoomRentalStatus status, @Param("minPrice") java.math.BigDecimal minPrice,
-            @Param("maxPrice") java.math.BigDecimal maxPrice, Pageable pageable);
+    Page<Room> searchByTypeName(
+        @Param("ownerId") String ownerId,
+        @Param("typeName") String typeName,
+        @Param("provinceId") String provinceId,
+        @Param("wardId") String wardId,
+        @Param("status") RoomRentalStatus status,
+        @Param("minPrice") BigDecimal minPrice,
+        @Param("maxPrice") BigDecimal maxPrice,
+        Pageable pageable
+    );
 
-    @Query("select r from Room r join fetch r.roomType join fetch r.property p join fetch p.province join fetch p.ward where r.id = :id")
-    java.util.Optional<Room> findDetailedById(@Param("id") String id);
+    @Query(
+        "select r from Room r join fetch r.roomType join fetch r.property p join fetch p.province join fetch p.ward where r.id = :id"
+    )
+    Optional<Room> findDetailedById(@Param("id") String id);
 
     @Query("""
             select r from Room r
@@ -106,6 +151,8 @@ public interface RoomRepository extends JpaRepository<Room, String> {
             """)
     List<Room> findAllForRoomType(@Param("roomTypeId") String roomTypeId);
 
-    @Query("select r from Room r join fetch r.property p join fetch p.province join fetch p.ward where p.landlord.id = :landlordId")
+    @Query(
+        "select r from Room r join fetch r.property p join fetch p.province join fetch p.ward where p.landlord.id = :landlordId"
+    )
     List<Room> findAllForCategories(@Param("landlordId") String landlordId);
 }

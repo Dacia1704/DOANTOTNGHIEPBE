@@ -36,7 +36,7 @@ Truy vấn công khai chỉ trả PUBLISHED còn hạn, chọn tin mới nhất 
 
 ### Hành vi
 
-1. Khách chọn đúng một Room thuộc Property của tin PUBLISHED còn hạn, nhập thông tin và gửi yêu cầu. Nhiều khách có thể cùng PENDING; một khách chỉ có một PENDING/phòng. Gửi lại payload giống hệt trả request ban đầu; payload khác trả 409. Không dùng Idempotency-Key riêng: unique pending guard + so sánh toàn bộ payload là cơ chế replay.
+1. Khách chọn đúng một Room thuộc Property của tin PUBLISHED còn hạn, nhập thông tin và gửi yêu cầu. Một yêu cầu PENDING còn hạn giữ phòng ngay trong lúc chờ chủ trọ duyệt; khách khác nhận 409 ROOM_UNAVAILABLE. Room được khóa PESSIMISTIC_WRITE trước khi đọc các yêu cầu PENDING và tạo yêu cầu mới, nên hai khách đặt cùng lúc chỉ một khách thành công. Cùng khách gửi lại payload giống hệt trả request ban đầu; payload khác trả 409 REQUEST_ALREADY_PENDING. Hủy, từ chối hoặc hết hạn yêu cầu sẽ giải phóng giữ chỗ; yêu cầu hết hạn không giữ phòng dù job chưa chạy.
 2. Chủ trọ chấp nhận: request ACCEPTED, hợp đồng PENDING_CONFIRMATION giữ phòng 48 giờ, snapshot tên/thông tin các bên, tài sản, giá/phí, thời hạn và điều khoản. Tự từ chối các PENDING khác cùng phòng. Accept lại cùng request trả hợp đồng cũ.
 3. Worker lấy job đã commit, render PDF tiếng Việt bằng JasperReports + Noto Sans (OFL kèm font), upload Cloudinary raw/authenticated. PDF READY chỉ sau khi lưu file và SHA-256 thành công. File cố định sau phát hành.
 4. Khách tải PDF qua API có JWT. Angular kiểm tra SHA-256 của chính blob đã tải trước khi bật xác nhận. Khách đồng ý đúng phiên bản → ACTIVE và Room RENTED trong cùng giao dịch. Chủ trọ không thể xác nhận thay khách.
@@ -44,7 +44,7 @@ Truy vấn công khai chỉ trả PUBLISHED còn hạn, chọn tin mới nhất 
 
 Mọi ngày nghiệp vụ theo Asia/Ho_Chi_Minh; ngày kết thúc = `start.plusMonths(months).minusDays(1)`, bao gồm trường hợp cuối tháng. MVP không đặt trước nhiều khoảng thời gian trên cùng phòng.
 
-WHOLE dùng quy ước hiện có: đúng một Room đại diện. Mapping nhiều Room trả lỗi, không tự sửa/tạo dữ liệu. `bookingAvailability` do BE tính gồm AVAILABLE/HELD/RENTED/MAINTENANCE; FE không dùng AVAILABLE vật lý để suy ra có thể đặt.
+WHOLE dùng quy ước hiện có: đúng một Room đại diện. Mapping nhiều Room trả lỗi, không tự sửa/tạo dữ liệu. `bookingAvailability` do BE tính gồm AVAILABLE/PENDING_APPROVAL/HELD/RENTED/MAINTENANCE; PENDING_APPROVAL là có yêu cầu thuê còn hạn chờ chủ trọ duyệt, HELD là có hợp đồng chờ khách xác nhận. FE không dùng AVAILABLE vật lý để suy ra có thể đặt.
 
 ### Cơ sở dữ liệu và giao dịch
 
@@ -74,11 +74,13 @@ app:
     contract-terms: "Nội dung điều khoản đã được chủ sản phẩm rà soát và phê duyệt"
 ```
 
-Cloudinary dùng bean/config `app.cloudinary` sẵn có. Runtime PDF bắt buộc `resource_type=raw`, `type=authenticated`; không dùng hàm uploadRaw public của ImageStorage. Endpoint BE kiểm tra party/admin trước khi tải qua signed API, đối chiếu SHA-256, trả application/pdf, no-store, inline hoặc attachment khi `download=true`. Không trả publicId/URL Cloudinary ra FE.
+Ảnh và PDF dùng chung `FileStorageService` / `CloudinaryFileStorage` cùng bean/config `app.cloudinary` sẵn có. PDF dùng `uploadPrivatePdf`, `downloadPrivatePdf`, `deletePrivatePdf` với `resource_type=raw`, `type=authenticated`, giới hạn 10 MiB và URL ký có hạn 60 giây. Endpoint BE kiểm tra party/admin trước khi tải qua signed API, đối chiếu SHA-256, trả application/pdf, no-store, inline hoặc attachment khi `download=true`. Không trả publicId/URL Cloudinary ra FE.
+
+Trong `rental/service` chỉ giữ hai interface `RentalService` và `RentalContractService`. Các class triển khai nằm trong `service/impl`; `RentalContractServiceImpl` xử lý định dạng, render, tải và cập nhật trạng thái tạo PDF. `RentalJob` trong `rental/job` điều phối hết hạn, render/upload và cleanup. Các bước claim/complete/fail được gọi qua Spring bean để giữ transaction ngắn và thứ tự khóa Room trước Agreement; render và thao tác Cloudinary chạy ngoài transaction. Refactor này không thêm bảng hay migration; tiếp tục dùng dữ liệu retry/audit hiện có.
 
 ### Mẫu hợp đồng JasperReports
 
-`src/main/resources/reports/rental-contract.jrxml` là mẫu A4 gồm quốc hiệu, thông tin Bên A/Bên B và bốn mục: nội dung thuê, trách nhiệm Bên A, trách nhiệm Bên B, điều khoản thực hiện. `RentalContractPdfService` compile mẫu một lần, fill từ snapshot bằng `JREmptyDataSource`, rồi xuất bằng `JRPdfExporter`. JasperReports core, PDF và JDT module cùng phiên bản 7.0.8; JDT hỗ trợ compile mẫu bằng classloader khi chạy Spring Boot executable JAR. PDFBox chỉ dùng trong test để đọc/kiểm tra kết quả.
+`src/main/resources/reports/rental-contract.jrxml` là mẫu A4 gồm quốc hiệu, thông tin Bên A/Bên B và bốn mục: nội dung thuê, trách nhiệm Bên A, trách nhiệm Bên B, điều khoản thực hiện. `RentalContractServiceImpl` compile mẫu một lần, fill từ snapshot bằng `JREmptyDataSource`, rồi xuất bằng `JRPdfExporter`. JasperReports core, PDF và JDT module cùng phiên bản 7.0.8; JDT hỗ trợ compile mẫu bằng classloader khi chạy Spring Boot executable JAR.
 
 Tiền được trình bày theo định dạng Việt Nam và có bằng chữ cho tiền thuê, tiền cọc; ngày thuê hiển thị dd/MM/yyyy. Số người tối đa lấy từ snapshot của phòng. Snapshot mới lưu thêm CCCD chủ trọ; các snapshot cũ vẫn đọc được. Ngày/nơi cấp CCCD, địa chỉ thường trú chủ trọ và ngày thanh toán chưa được thu thập trong luồng hiện tại nên để dòng chấm, không tự suy đoán. `app.rental.contract-terms` vẫn được chốt vào snapshot và hiển thị trong phần thỏa thuận bổ sung.
 
@@ -87,10 +89,10 @@ Font thường và đậm được đóng gói, nhúng vào PDF qua `jasperrepor
 Kiểm tra mẫu độc lập với MySQL/Cloudinary và tạo bản xem thử bằng dữ liệu tổng hợp:
 
 ```powershell
-.\mvnw.cmd '-Dtest=RentalContractPdfServiceTest' '-Drental.pdf.preview=target/contract-preview' test
+.\mvnw.cmd '-Dtest=RentalContractServiceTest' '-Drental.pdf.preview=target/contract-preview' test
 ```
 
-PDF và ảnh từng trang nằm trong `target/contract-preview/`. Sửa mẫu chỉ ảnh hưởng các lần tạo PDF tiếp theo, không thay file của hợp đồng đã phát hành.
+PDF tổng hợp nằm trong `target/contract-preview/`. Sửa mẫu chỉ ảnh hưởng các lần tạo PDF tiếp theo, không thay file của hợp đồng đã phát hành.
 
 **Giới hạn cần xử lý trước production:** repo chưa có framework mã hóa trường dữ liệu cá nhân. CCCD/địa chỉ và contract_snapshot hiện lưu plaintext trong MySQL; response list không chứa chúng, detail chỉ trả CCCD đã mask, PDF giới hạn đúng party/admin. Cần cấu hình mã hóa storage/backup, quản lý khóa, phân quyền DB và retention. Mẫu điều khoản mặc định được đánh dấu tham khảo; phải thay bằng template đã duyệt. Xác nhận UI là đồng ý điện tử trong ứng dụng; không mô tả là chữ ký số chứng thực.
 

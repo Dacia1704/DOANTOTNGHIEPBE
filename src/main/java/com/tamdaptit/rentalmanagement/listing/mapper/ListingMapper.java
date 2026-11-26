@@ -1,8 +1,8 @@
 package com.tamdaptit.rentalmanagement.listing.mapper;
 
-import com.tamdaptit.rentalmanagement.property.dto.response.PropertyResponse;
 import com.tamdaptit.rentalmanagement.listing.dto.response.ListingResponse;
 import com.tamdaptit.rentalmanagement.listing.entity.Listing;
+import com.tamdaptit.rentalmanagement.property.dto.response.PropertyResponse;
 import com.tamdaptit.rentalmanagement.subscription.dto.response.BoostAllocationResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -21,7 +21,11 @@ public interface ListingMapper {
     @Mapping(target = "rentalMode", source = "listing.property.rentalMode")
     @Mapping(target = "landlordName", source = "listing.property.landlord.fullName")
     @Mapping(target = "boostAllocation", source = "boostAllocation")
-    ListingResponse toResponse(Listing listing, int effectivePriority, int selectedPriority,
-            PropertyResponse property,
-            BoostAllocationResponse boostAllocation);
+    ListingResponse toResponse(
+        Listing listing,
+        int effectivePriority,
+        int selectedPriority,
+        PropertyResponse property,
+        BoostAllocationResponse boostAllocation
+    );
 }

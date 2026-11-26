@@ -1,5 +1,11 @@
 package com.tamdaptit.rentalmanagement.common.config;
 
+import java.time.Duration;
+import java.util.Collection;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -13,46 +19,70 @@ import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.transaction.TransactionAwareCacheDecorator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.redis.cache.*;
+import org.springframework.data.redis.cache.BatchStrategies;
+import org.springframework.data.redis.cache.RedisCacheConfiguration;
+import org.springframework.data.redis.cache.RedisCacheManager;
+import org.springframework.data.redis.cache.RedisCacheWriter;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.serializer.*;
-import java.time.Duration;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.RedisSerializationContext;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 @Configuration
 @EnableCaching
 public class CacheConfig {
     @Bean
-    public CacheManager cacheManager(RedisConnectionFactory factory,
-            @Value("${app.cache.ttl:30m}") Duration ttl) {
+    public CacheManager cacheManager(
+        RedisConnectionFactory factory,
+        @Value("${app.cache.ttl:30m}") Duration ttl
+    ) {
         var mapper = new ObjectMapper().registerModule(new JavaTimeModule());
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        mapper.activateDefaultTyping(BasicPolymorphicTypeValidator.builder()
+        mapper.activateDefaultTyping(
+            BasicPolymorphicTypeValidator.builder()
                 .allowIfSubType("com.tamdaptit.rentalmanagement.")
-                .allowIfSubType("java.util.").allowIfSubType("java.lang.").allowIfSubType("java.time.").build(),
-                ObjectMapper.DefaultTyping.EVERYTHING,JsonTypeInfo.As.PROPERTY);
+                .allowIfSubType("java.util.")
+                .allowIfSubType("java.lang.")
+                .allowIfSubType("java.time.")
+                .build(),
+            ObjectMapper.DefaultTyping.EVERYTHING,
+            JsonTypeInfo.As.PROPERTY
+        );
         var config = RedisCacheConfiguration.defaultCacheConfig()
-                .computePrefixWith(name -> "rental:v1:"+name+"::")
-                .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
-                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(new GenericJackson2JsonRedisSerializer(mapper)))
-                .entryTtl(ttl).disableCachingNullValues();
+            .computePrefixWith(name -> "rental:v1:" + name + "::")
+            .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
+            .serializeValuesWith(
+                RedisSerializationContext.SerializationPair
+                    .fromSerializer(new GenericJackson2JsonRedisSerializer(mapper))
+            )
+            .entryTtl(ttl)
+            .disableCachingNullValues();
         // Spring Data 4.1 defaults to asynchronous writes; invalidation must finish before returning.
-        var writer = RedisCacheWriter.create(factory, options -> options
-                .batchStrategy(BatchStrategies.scan(100)).immediateWrites());
-        var redis = RedisCacheManager.builder(writer).cacheDefaults(config)
-                .initialCacheNames(Set.of("amenities","roomTypes","propertyTypes","provinces","wards")).build();
+        var writer = RedisCacheWriter.create(
+            factory,
+            options -> options
+                .batchStrategy(BatchStrategies.scan(100))
+                .immediateWrites()
+        );
+        var redis = RedisCacheManager.builder(writer)
+            .cacheDefaults(config)
+            .initialCacheNames(Set.of("amenities", "roomTypes", "propertyTypes", "provinces", "wards"))
+            .build();
         redis.afterPropertiesSet();
         return new CacheManager() {
-            private final Map<String,Cache> caches = new ConcurrentHashMap<>();
+            private final Map<String, Cache> caches = new ConcurrentHashMap<>();
+
             public Cache getCache(String name) {
                 return caches.computeIfAbsent(name, key -> {
                     Cache target = redis.getCache(key);
                     // Resilience also applies to operations deferred until after transaction commit.
-                    return target==null ? null : new TransactionAwareCacheDecorator(new ResilientCache(target));
+                    return target == null ? null : new TransactionAwareCacheDecorator(new ResilientCache(target));
                 });
             }
-            public Collection<String> getCacheNames() { return redis.getCacheNames(); }
+
+            public Collection<String> getCacheNames() {
+                return redis.getCacheNames();
+            }
         };
     }
 }

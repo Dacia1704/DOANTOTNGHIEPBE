@@ -1,5 +1,12 @@
 package com.tamdaptit.rentalmanagement.community;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import com.tamdaptit.rentalmanagement.common.exception.AppException;
 import com.tamdaptit.rentalmanagement.common.exception.ErrorCode;
 import com.tamdaptit.rentalmanagement.community.dto.CommunityDtos.CommentInput;
@@ -9,7 +16,7 @@ import com.tamdaptit.rentalmanagement.discovery.FeedRanking;
 import com.tamdaptit.rentalmanagement.listing.repository.ListingRepository;
 import com.tamdaptit.rentalmanagement.moderation.service.ContentModerationService;
 import com.tamdaptit.rentalmanagement.notification.service.NotificationPublisher;
-import com.tamdaptit.rentalmanagement.storage.service.ImageStorageService;
+import com.tamdaptit.rentalmanagement.storage.service.FileStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,23 +27,22 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.contains;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("Phần 1: Quản lý cộng đồng & Kiểm duyệt - CommunityService")
 class CommunityServiceTest {
-
     @Mock
     private JdbcTemplate jdbc;
 
@@ -47,7 +53,7 @@ class CommunityServiceTest {
     private ContentModerationService moderation;
 
     @Mock
-    private ImageStorageService images;
+    private FileStorageService images;
 
     @Mock
     private ListingRepository listings;
@@ -65,7 +71,14 @@ class CommunityServiceTest {
     @BeforeEach
     void setUp() {
         communityService = new CommunityServiceImpl(
-                jdbc, access, moderation, images, listings, clock, discovery, notifications
+            jdbc,
+            access,
+            moderation,
+            images,
+            listings,
+            clock,
+            discovery,
+            notifications
         );
     }
 
@@ -84,27 +97,33 @@ class CommunityServiceTest {
     @DisplayName("Thả reaction không hợp lệ bị từ chối với INVALID_REQUEST")
     void testInvalidReactionType() {
         doNothing().when(access).active("user-1");
-        List<Map<String, Object>> mockPost = List.of(Map.of("id", "post-1", "status", "VISIBLE", "author_status", "ACTIVE"));
+        List<Map<String, Object>> mockPost = List
+            .of(Map.of("id", "post-1", "status", "VISIBLE", "author_status", "ACTIVE"));
         when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(mockPost);
 
         assertThatThrownBy(() -> communityService.reaction("user-1", "POST", "post-1", "ANGRY"))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.INVALID_REQUEST);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.INVALID_REQUEST);
     }
 
     @Test
     @DisplayName("Thả reaction hợp lệ (LIKE, LOVE, WOW) được chấp nhận")
     void testValidReaction() {
         doNothing().when(access).active("user-1");
-        List<Map<String, Object>> mockPost = List.of(Map.of("id", "post-1", "status", "VISIBLE", "author_status", "ACTIVE"));
+        List<Map<String, Object>> mockPost = List
+            .of(Map.of("id", "post-1", "status", "VISIBLE", "author_status", "ACTIVE"));
         when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(mockPost);
 
         communityService.reaction("user-1", "POST", "post-1", "LOVE");
 
         verify(jdbc, times(1)).update(
-                contains("community_reactions"),
-                eq("POST"), eq("post-1"), eq("user-1"), eq("LOVE"), any()
+            contains("community_reactions"),
+            eq("POST"),
+            eq("post-1"),
+            eq("user-1"),
+            eq("LOVE"),
+            any()
         );
     }
 
@@ -112,14 +131,17 @@ class CommunityServiceTest {
     @DisplayName("Gửi reaction với giá trị null sẽ xóa bỏ cảm xúc đã thả")
     void testRemoveReactionWhenNull() {
         doNothing().when(access).active("user-1");
-        List<Map<String, Object>> mockPost = List.of(Map.of("id", "post-1", "status", "VISIBLE", "author_status", "ACTIVE"));
+        List<Map<String, Object>> mockPost = List
+            .of(Map.of("id", "post-1", "status", "VISIBLE", "author_status", "ACTIVE"));
         when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(mockPost);
 
         communityService.reaction("user-1", "POST", "post-1", null);
 
         verify(jdbc, times(1)).update(
-                contains("DELETE FROM community_reactions WHERE target_type=? AND target_id=? AND user_id=?"),
-                eq("POST"), eq("post-1"), eq("user-1")
+            contains("DELETE FROM community_reactions WHERE target_type=? AND target_id=? AND user_id=?"),
+            eq("POST"),
+            eq("post-1"),
+            eq("user-1")
         );
     }
 
@@ -128,13 +150,14 @@ class CommunityServiceTest {
     void testUnauthorizedDelete() {
         doNothing().when(access).active("stranger");
         when(access.admin("stranger")).thenReturn(false);
-        List<Map<String, Object>> mockPost = List.of(Map.of("id", "post-1", "author_id", "author-user", "status", "VISIBLE", "author_status", "ACTIVE"));
+        List<Map<String, Object>> mockPost = List
+            .of(Map.of("id", "post-1", "author_id", "author-user", "status", "VISIBLE", "author_status", "ACTIVE"));
         when(jdbc.queryForList(anyString(), any(Object.class))).thenReturn(mockPost);
 
         assertThatThrownBy(() -> communityService.delete("stranger", "POST", "post-1"))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.UNAUTHORIZED);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.UNAUTHORIZED);
     }
 
     @Test
@@ -142,14 +165,16 @@ class CommunityServiceTest {
     void testAuthorizedDelete() {
         doNothing().when(access).active("author-user");
         when(access.admin("author-user")).thenReturn(false);
-        List<Map<String, Object>> mockPost = List.of(Map.of("id", "post-1", "author_id", "author-user", "status", "VISIBLE", "author_status", "ACTIVE"));
+        List<Map<String, Object>> mockPost = List
+            .of(Map.of("id", "post-1", "author_id", "author-user", "status", "VISIBLE", "author_status", "ACTIVE"));
         when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(mockPost);
 
         communityService.delete("author-user", "POST", "post-1");
 
         verify(jdbc, times(1)).update(
-                contains("UPDATE community_posts SET deleted_at=? WHERE id=?"),
-                any(), eq("post-1")
+            contains("UPDATE community_posts SET deleted_at=? WHERE id=?"),
+            any(),
+            eq("post-1")
         );
     }
 
@@ -159,8 +184,22 @@ class CommunityServiceTest {
         doNothing().when(access).lockActor("user-1");
         when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class))).thenReturn(0);
 
-        List<Map<String, Object>> mockPost = List.of(Map.of("id", "post-1", "status", "VISIBLE", "author_status", "ACTIVE", "author_id", "author-1"));
-        List<Map<String, Object>> mockChildComment = List.of(Map.of("id", "comment-child", "post_id", "post-1", "parent_id", "root-comment", "status", "VISIBLE", "author_status", "ACTIVE"));
+        List<Map<String, Object>> mockPost = List
+            .of(Map.of("id", "post-1", "status", "VISIBLE", "author_status", "ACTIVE", "author_id", "author-1"));
+        List<Map<String, Object>> mockChildComment = List.of(
+            Map.of(
+                "id",
+                "comment-child",
+                "post_id",
+                "post-1",
+                "parent_id",
+                "root-comment",
+                "status",
+                "VISIBLE",
+                "author_status",
+                "ACTIVE"
+            )
+        );
 
         when(jdbc.queryForList(contains("community_posts"), any(Object[].class))).thenReturn(mockPost);
         when(jdbc.queryForList(contains("community_comments"), any(Object[].class))).thenReturn(mockChildComment);
@@ -168,23 +207,23 @@ class CommunityServiceTest {
         CommentInput input = new CommentInput("Bình luận reply cấp 2", "comment-child", null, null);
 
         assertThatThrownBy(() -> communityService.comment("user-1", "post-1", null, input))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.INVALID_REQUEST);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.INVALID_REQUEST);
     }
 
     @Test
     @DisplayName("Truy vấn feed với tab không hợp lệ ném INVALID_REQUEST")
     void testFeedInvalidTab() {
         assertThatThrownBy(() -> communityService.feed("user-1", "TRENDING", null, null))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.INVALID_REQUEST);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.INVALID_REQUEST);
 
         assertThatThrownBy(() -> communityService.feed("user-1", "UNKNOWN", null, null))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.INVALID_REQUEST);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.INVALID_REQUEST);
     }
 
     @Test
@@ -193,9 +232,9 @@ class CommunityServiceTest {
         doNothing().when(access).active("user-1");
 
         assertThatThrownBy(() -> communityService.follow("user-1", "user-1", true))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.INVALID_REQUEST);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.INVALID_REQUEST);
     }
 
     @Test
@@ -204,12 +243,17 @@ class CommunityServiceTest {
         doNothing().when(access).active("user-1");
         doNothing().when(access).active("author-2");
         when(jdbc.update(contains("INSERT IGNORE INTO community_follows"), eq("user-1"), eq("author-2")))
-                .thenReturn(1);
+            .thenReturn(1);
 
         communityService.follow("user-1", "author-2", true);
 
         verify(notifications, times(1)).enqueue(
-                eq("author-2"), any(), contains("Người theo dõi mới"), any(), any(), any()
+            eq("author-2"),
+            any(),
+            contains("Người theo dõi mới"),
+            any(),
+            any(),
+            any()
         );
     }
 
@@ -217,13 +261,26 @@ class CommunityServiceTest {
     @DisplayName("Không cho phép tự báo cáo bài viết của chính mình")
     void testCannotReportSelf() {
         doNothing().when(access).lockActor("author-user");
-        List<Map<String, Object>> mockPost = List.of(Map.of("id", "post-1", "author_id", "author-user", "status", "VISIBLE", "author_status", "ACTIVE", "version", 1L));
+        List<Map<String, Object>> mockPost = List.of(
+            Map.of(
+                "id",
+                "post-1",
+                "author_id",
+                "author-user",
+                "status",
+                "VISIBLE",
+                "author_status",
+                "ACTIVE",
+                "version",
+                1L
+            )
+        );
         when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(mockPost);
 
         assertThatThrownBy(() -> communityService.report("author-user", "POST", "post-1", "Spam"))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.CANNOT_REPORT_SELF);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.CANNOT_REPORT_SELF);
     }
 
     @Test
@@ -232,9 +289,9 @@ class CommunityServiceTest {
         doThrow(new AppException(ErrorCode.UNAUTHORIZED)).when(access).requireAdmin("non-admin");
 
         assertThatThrownBy(() -> communityService.pin("non-admin", "post-1", true))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.UNAUTHORIZED);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.UNAUTHORIZED);
     }
 
     @Test
@@ -242,12 +299,25 @@ class CommunityServiceTest {
     void testAppealVisiblePostRejected() {
         doNothing().when(access).lockActor("author-1");
         // Bài viết vẫn đang VISIBLE thì không thể tạo kháng nghị
-        List<Map<String, Object>> mockPost = List.of(Map.of("id", "post-1", "author_id", "author-1", "status", "VISIBLE", "author_status", "ACTIVE", "version", 1L));
+        List<Map<String, Object>> mockPost = List.of(
+            Map.of(
+                "id",
+                "post-1",
+                "author_id",
+                "author-1",
+                "status",
+                "VISIBLE",
+                "author_status",
+                "ACTIVE",
+                "version",
+                1L
+            )
+        );
         when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(mockPost);
 
         assertThatThrownBy(() -> communityService.requestReview("author-1", "post-1", "Mong xem xét lại"))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.UNAUTHORIZED);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.UNAUTHORIZED);
     }
 }

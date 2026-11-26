@@ -1,17 +1,18 @@
 package com.tamdaptit.rentalmanagement.storage.service;
 
-import com.tamdaptit.rentalmanagement.common.exception.AppException;
-import com.tamdaptit.rentalmanagement.common.exception.ErrorCode;
-import org.springframework.stereotype.Component;
-import org.springframework.web.multipart.MultipartFile;
-import javax.imageio.ImageIO;
-import javax.imageio.ImageReader;
-import javax.imageio.stream.ImageInputStream;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.Locale;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
+
+import com.tamdaptit.rentalmanagement.common.exception.AppException;
+import com.tamdaptit.rentalmanagement.common.exception.ErrorCode;
+import org.springframework.stereotype.Component;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * Kiem tra tinh hop le cua anh truoc khi day len bo luu tru.
@@ -21,7 +22,6 @@ import java.util.Locale;
  */
 @Component
 public class ImageValidator {
-
     static final long MAX_BYTES = 5L * 1024 * 1024;
     static final int MAX_DIMENSION = 4096;
 
@@ -42,6 +42,7 @@ public class ImageValidator {
         if (file == null || file.isEmpty()) {
             throw new AppException(ErrorCode.IMAGE_INVALID);
         }
+
         if (file.getSize() > maxBytes) {
             throw new AppException(ErrorCode.IMAGE_INVALID);
         }
@@ -60,6 +61,7 @@ public class ImageValidator {
         if (detected == null) {
             throw new AppException(ErrorCode.IMAGE_INVALID);
         }
+
         // File thuc su la JPEG thi content type phai la image/jpeg (va nguoc lai).
         if (!detected.equals(contentType)) {
             throw new AppException(ErrorCode.IMAGE_INVALID);
@@ -69,10 +71,16 @@ public class ImageValidator {
         if (image == null) {
             throw new AppException(ErrorCode.IMAGE_INVALID);
         }
-        if (image.getWidth() < 1 || image.getHeight() < 1
-                || image.getWidth() > MAX_DIMENSION || image.getHeight() > MAX_DIMENSION) {
+
+        if (
+            image.getWidth() < 1 ||
+                image.getHeight() < 1 ||
+                image.getWidth() > MAX_DIMENSION ||
+            image.getHeight() > MAX_DIMENSION
+        ) {
             throw new AppException(ErrorCode.IMAGE_INVALID);
         }
+
         return bytes;
     }
 
@@ -89,10 +97,12 @@ public class ImageValidator {
             if (input == null) {
                 return null;
             }
+
             Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
             if (!readers.hasNext()) {
                 return null;
             }
+
             ImageReader reader = readers.next();
             try {
                 reader.setInput(input);
@@ -100,9 +110,11 @@ public class ImageValidator {
                 if ("jpeg".equals(format) || "jpg".equals(format)) {
                     return JPEG;
                 }
+
                 if ("png".equals(format)) {
                     return PNG;
                 }
+
                 return null;
             } finally {
                 reader.dispose();
@@ -117,10 +129,12 @@ public class ImageValidator {
             if (input == null) {
                 return null;
             }
+
             Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
             if (!readers.hasNext()) {
                 return null;
             }
+
             ImageReader reader = readers.next();
             try {
                 reader.setInput(input);

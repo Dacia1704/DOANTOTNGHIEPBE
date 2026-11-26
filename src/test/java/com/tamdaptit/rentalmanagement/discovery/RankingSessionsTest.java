@@ -1,5 +1,11 @@
 package com.tamdaptit.rentalmanagement.discovery;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.util.List;
+import java.util.Map;
+
 import com.tamdaptit.rentalmanagement.common.exception.AppException;
 import com.tamdaptit.rentalmanagement.common.exception.ErrorCode;
 import com.tamdaptit.rentalmanagement.discovery.RankingSessions.Snapshot;
@@ -12,22 +18,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.util.List;
-import java.util.Map;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Phần 3: Tìm kiếm & Gợi ý phòng trọ - RankingSessions Token & Pagination Cache")
 class RankingSessionsTest {
-
     @Mock
     private CacheManager cacheManager;
 
@@ -81,9 +82,9 @@ class RankingSessionsTest {
 
         // Client gửi request trang 2 nhưng scope thay đổi (ví dụ đổi bộ lọc giá)
         assertThatThrownBy(() -> rankingSessions.get(created.id(), "LISTING:hn:price_min=5000000"))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.FEED_SESSION_EXPIRED);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.FEED_SESSION_EXPIRED);
     }
 
     @Test
@@ -92,9 +93,9 @@ class RankingSessionsTest {
         when(cache.get("non-existent-session", Snapshot.class)).thenReturn(null);
 
         assertThatThrownBy(() -> rankingSessions.get("non-existent-session", "LISTING:hn"))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.FEED_SESSION_EXPIRED);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.FEED_SESSION_EXPIRED);
     }
 
     @Test
@@ -111,8 +112,8 @@ class RankingSessionsTest {
         when(cache.get(created.id(), Snapshot.class)).thenReturn(created);
 
         assertThatThrownBy(() -> futureSessions.get(created.id(), "LISTING:hn"))
-                .isInstanceOf(AppException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.FEED_SESSION_EXPIRED);
+            .isInstanceOf(AppException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.FEED_SESSION_EXPIRED);
     }
 }

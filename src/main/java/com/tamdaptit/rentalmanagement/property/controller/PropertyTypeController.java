@@ -33,9 +33,11 @@ public class PropertyTypeController {
     @GetMapping
     @Operation(summary = "Lấy danh sách loại bất động sản có phân trang")
     public ApiResponse<PageResponse<PropertyTypeResponse>> getAll(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        return ApiResponse.success("Lấy danh sách loại bất động sản thành công", propertyTypeService.getAll(page, size));
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size
+    ) {
+        return ApiResponse
+            .success("Lấy danh sách loại bất động sản thành công", propertyTypeService.getAll(page, size));
     }
 
     @GetMapping("/{id}")
@@ -55,7 +57,10 @@ public class PropertyTypeController {
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Cập nhật loại bất động sản")
-    public ApiResponse<PropertyTypeResponse> update(@PathVariable String id, @RequestBody @Valid PropertyTypeRequest request) {
+    public ApiResponse<PropertyTypeResponse> update(
+        @PathVariable String id,
+        @RequestBody @Valid PropertyTypeRequest request
+    ) {
         return ApiResponse.success("Cập nhật loại bất động sản thành công", propertyTypeService.update(id, request));
     }
 

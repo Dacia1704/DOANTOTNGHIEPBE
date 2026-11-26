@@ -1,26 +1,27 @@
 package com.tamdaptit.rentalmanagement.subscription.service.impl;
 
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+
 import com.tamdaptit.rentalmanagement.common.dto.PageResponse;
 import com.tamdaptit.rentalmanagement.common.exception.AppException;
 import com.tamdaptit.rentalmanagement.common.exception.ErrorCode;
-import com.tamdaptit.rentalmanagement.subscription.dto.request.ServicePackageRequest;
 import com.tamdaptit.rentalmanagement.subscription.dto.request.ServicePackagePriceRequest;
-import com.tamdaptit.rentalmanagement.subscription.dto.response.ServicePackageResponse;
+import com.tamdaptit.rentalmanagement.subscription.dto.request.ServicePackageRequest;
 import com.tamdaptit.rentalmanagement.subscription.dto.response.ServicePackagePriceResponse;
+import com.tamdaptit.rentalmanagement.subscription.dto.response.ServicePackageResponse;
 import com.tamdaptit.rentalmanagement.subscription.entity.ServicePackage;
 import com.tamdaptit.rentalmanagement.subscription.entity.ServicePackagePrice;
 import com.tamdaptit.rentalmanagement.subscription.mapper.ServicePackageMapper;
-import com.tamdaptit.rentalmanagement.subscription.repository.ServicePackageRepository;
 import com.tamdaptit.rentalmanagement.subscription.repository.ServicePackagePriceRepository;
+import com.tamdaptit.rentalmanagement.subscription.repository.ServicePackageRepository;
 import com.tamdaptit.rentalmanagement.subscription.service.ServicePackageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -31,22 +32,38 @@ public class ServicePackageServiceImpl implements ServicePackageService {
     private final ServicePackageMapper mapper;
 
     @Override
-    public PageResponse<ServicePackageResponse> getAll(int page, int size, boolean includeInactive) {
-        var result = packageRepository.findCatalog(includeInactive, PageRequest.of(
-                Math.max(page, 0), Math.clamp(size, 1, 100), Sort.by("name", "id")));
+    public PageResponse<ServicePackageResponse> getAll(
+        int page,
+        int size,
+        boolean includeInactive
+    ) {
+        var result = packageRepository.findCatalog(
+            includeInactive,
+            PageRequest.of(
+                Math.max(page, 0),
+                Math.clamp(size, 1, 100),
+                Sort.by("name", "id")
+            )
+        );
         return PageResponse.<ServicePackageResponse>builder()
-                .currentPage(result.getNumber()).pageSize(result.getSize())
-                .totalPages(result.getTotalPages()).totalElements(result.getTotalElements())
-                .data(result.getContent().stream().map(mapper::toResponse).toList()).build();
+            .currentPage(result.getNumber())
+            .pageSize(result.getSize())
+            .totalPages(result.getTotalPages())
+            .totalElements(result.getTotalElements())
+            .data(result.getContent().stream().map(mapper::toResponse).toList())
+            .build();
     }
 
     @Override
     public ServicePackageResponse getById(String id, boolean includeInactive) {
         ServicePackage entity = findPackage(id);
-        if (!includeInactive && (!entity.getActive()
-                || (!isFree(entity) && !priceRepository.existsByPackageEntity_IdAndActiveTrue(id)))) {
+        if (
+            !includeInactive &&
+            (!entity.getActive() || (!isFree(entity) && !priceRepository.existsByPackageEntity_IdAndActiveTrue(id)))
+        ) {
             throw new AppException(ErrorCode.SERVICE_PACKAGE_NOT_FOUND);
         }
+
         return mapper.toResponse(entity);
     }
 
@@ -57,10 +74,12 @@ public class ServicePackageServiceImpl implements ServicePackageService {
         if (packageRepository.existsByCodeIgnoreCase(code)) {
             throw new AppException(ErrorCode.SERVICE_PACKAGE_CODE_EXISTS);
         }
+
         validateRights(request);
         if ("FREE".equals(code)) {
             validateFree(request);
         }
+
         ServicePackage entity = mapper.toEntity(request);
         entity.setCode(code);
         entity.setName(request.name().trim());
@@ -75,9 +94,11 @@ public class ServicePackageServiceImpl implements ServicePackageService {
         if (isFree(entity)) {
             validateFree(request);
         }
+
         if (packageRepository.existsByCodeIgnoreCaseAndIdNot(code, id)) {
             throw new AppException(ErrorCode.SERVICE_PACKAGE_CODE_EXISTS);
         }
+
         validateRights(request);
         mapper.update(request, entity);
         entity.setCode(code);
@@ -92,6 +113,7 @@ public class ServicePackageServiceImpl implements ServicePackageService {
         if (isFree(entity) && !active) {
             throw new AppException(ErrorCode.DEFAULT_SERVICE_PACKAGE_PROTECTED);
         }
+
         entity.setActive(active);
         return mapper.toResponse(packageRepository.saveAndFlush(entity));
     }
@@ -102,6 +124,7 @@ public class ServicePackageServiceImpl implements ServicePackageService {
         if (!includeInactive && !entity.getActive()) {
             throw new AppException(ErrorCode.SERVICE_PACKAGE_NOT_FOUND);
         }
+
         return priceRepository.findCatalog(packageId, includeInactive).stream().map(mapper::toResponse).toList();
     }
 
@@ -113,6 +136,7 @@ public class ServicePackageServiceImpl implements ServicePackageService {
         if (priceRepository.existsByPackageEntity_IdAndDurationMonths(packageId, request.durationMonths())) {
             throw new AppException(ErrorCode.SERVICE_PACKAGE_PRICE_EXISTS);
         }
+
         ServicePackagePrice price = mapper.toEntity(request);
         price.setPackageEntity(entity);
         return mapper.toResponse(priceRepository.saveAndFlush(price));
@@ -120,21 +144,35 @@ public class ServicePackageServiceImpl implements ServicePackageService {
 
     @Override
     @Transactional
-    public ServicePackagePriceResponse updatePrice(String packageId, String priceId, ServicePackagePriceRequest request) {
+    public ServicePackagePriceResponse updatePrice(
+        String packageId,
+        String priceId,
+        ServicePackagePriceRequest request
+    ) {
         findPaidPackage(packageId);
         ServicePackagePrice price = findPrice(packageId, priceId);
         validateDuration(request.durationMonths());
-        if (priceRepository.existsByPackageEntity_IdAndDurationMonthsAndIdNot(
-                packageId, request.durationMonths(), priceId)) {
+        if (
+            priceRepository.existsByPackageEntity_IdAndDurationMonthsAndIdNot(
+                packageId,
+                request.durationMonths(),
+                priceId
+            )
+        ) {
             throw new AppException(ErrorCode.SERVICE_PACKAGE_PRICE_EXISTS);
         }
+
         mapper.update(request, price);
         return mapper.toResponse(priceRepository.saveAndFlush(price));
     }
 
     @Override
     @Transactional
-    public ServicePackagePriceResponse setPriceActive(String packageId, String priceId, boolean active) {
+    public ServicePackagePriceResponse setPriceActive(
+        String packageId,
+        String priceId,
+        boolean active
+    ) {
         findPaidPackage(packageId);
         ServicePackagePrice price = findPrice(packageId, priceId);
         price.setActive(active);
@@ -143,7 +181,7 @@ public class ServicePackageServiceImpl implements ServicePackageService {
 
     private ServicePackage findPackage(String id) {
         return packageRepository.findById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.SERVICE_PACKAGE_NOT_FOUND));
+            .orElseThrow(() -> new AppException(ErrorCode.SERVICE_PACKAGE_NOT_FOUND));
     }
 
     private ServicePackage findPaidPackage(String id) {
@@ -151,12 +189,13 @@ public class ServicePackageServiceImpl implements ServicePackageService {
         if (isFree(entity)) {
             throw new AppException(ErrorCode.DEFAULT_SERVICE_PACKAGE_PROTECTED);
         }
+
         return entity;
     }
 
     private ServicePackagePrice findPrice(String packageId, String priceId) {
         return priceRepository.findByIdAndPackageEntity_Id(priceId, packageId)
-                .orElseThrow(() -> new AppException(ErrorCode.SERVICE_PACKAGE_PRICE_NOT_FOUND));
+            .orElseThrow(() -> new AppException(ErrorCode.SERVICE_PACKAGE_PRICE_NOT_FOUND));
     }
 
     private boolean isFree(ServicePackage entity) {
@@ -171,16 +210,24 @@ public class ServicePackageServiceImpl implements ServicePackageService {
 
     private void validateRights(ServicePackageRequest request) {
         long slots = (long) request.highPrioritySlots() + request.lowPrioritySlots();
-        if ((request.maxListings() != null && slots > request.maxListings())
-                || (request.defaultPriorityLevel() == 1 && request.lowPrioritySlots() != 0)) {
+        if (
+            (request.maxListings() != null && slots > request.maxListings()) ||
+            (request.defaultPriorityLevel() == 1 && request.lowPrioritySlots() != 0)
+        ) {
             throw new AppException(ErrorCode.INVALID_SERVICE_PACKAGE);
         }
     }
 
     private void validateFree(ServicePackageRequest request) {
-        if (!"FREE".equalsIgnoreCase(request.code()) || !Integer.valueOf(3).equals(request.maxListings())
-                || request.highPrioritySlots() != 0 || request.lowPrioritySlots() != 0
-                || request.defaultPriorityLevel() != 0 || request.hasStats() || !request.active()) {
+        if (
+            !"FREE".equalsIgnoreCase(request.code()) ||
+                !Integer.valueOf(3).equals(request.maxListings()) ||
+                request.highPrioritySlots() != 0 ||
+                request.lowPrioritySlots() != 0 ||
+                request.defaultPriorityLevel() != 0 ||
+                request.hasStats() ||
+            !request.active()
+        ) {
             throw new AppException(ErrorCode.DEFAULT_SERVICE_PACKAGE_PROTECTED);
         }
     }

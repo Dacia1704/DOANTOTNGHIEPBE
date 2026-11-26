@@ -19,7 +19,9 @@ function Invoke-SetupNative {
     } finally {
         $ErrorActionPreference = $previousPreference
     }
-    if ($commandExitCode -ne 0) { throw "$Command failed with exit code $commandExitCode" }
+    if ($commandExitCode -ne 0) {
+        throw "$Command failed with exit code $commandExitCode"
+    }
 }
 $backendRoot = Split-Path -Parent $PSScriptRoot
 Push-Location $backendRoot

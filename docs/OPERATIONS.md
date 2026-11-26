@@ -147,7 +147,7 @@ Từ BE, với MySQL 8 local; URL chỉ chấp nhận localhost/127.0.0.1. Test 
 
 15 test gồm transactions song song bằng CountDownLatch, duplicate submit/accept, accept-vs-submit, confirm-vs-timeout cả trước/đúng boundary, unique DB bypass, khác phòng cùng ACTIVE, bàn giao/lịch sử, WHOLE/foreign room, RBAC/IDOR, PDF Unicode/hash/snapshot, storage fail/retry, lease recovery, MySQL timeout 3 giây, room status bypass và migration conflict/repair.
 
-`CloudinaryRentalPdfStorageTest` opt-in qua RENTAL_TEST_CLOUDINARY=true và ba biến RENTAL_TEST_CLOUD_NAME/KEY/SECRET: roundtrip thật, unsigned URL bị từ chối, xóa tệp tổng hợp trong finally. Không chạy mặc định để tránh phụ thuộc external account.
+`RentalContractServiceTest` kiểm tra render PDF tổng hợp, SHA-256, quyền tải, claim/retry và các tham số lưu PDF riêng tư của `CloudinaryFileStorage`. Chạy local không cần tài khoản Cloudinary; kiểm thử này không chứng minh cấu hình hoặc quyền truy cập của tài khoản Cloudinary thật.
 
 Từ FE:
 

@@ -9,8 +9,9 @@ import org.mapstruct.Mapping;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 
 @Mapper(
-        componentModel = "spring",
-        nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    componentModel = "spring",
+    nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE
+)
 public interface UserMapper {
 
     /**
@@ -22,6 +23,9 @@ public interface UserMapper {
     @Mapping(target = "phone", source = "phone")
     @Mapping(target = "fullName", source = "fullName")
     @Mapping(target = "citizenId", source = "citizenId")
-    @Mapping(target = "status", expression = "java(com.tamdaptit.rentalmanagement.identity.entity.enums.UserStatus.ACTIVE)")
+    @Mapping(
+        target = "status",
+        expression = "java(com.tamdaptit.rentalmanagement.identity.entity.enums.UserStatus.ACTIVE)"
+    )
     User toUser(RegisterRequest request);
 }

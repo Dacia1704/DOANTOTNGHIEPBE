@@ -1,8 +1,15 @@
 package com.tamdaptit.rentalmanagement.subscription.controller;
 
+import java.util.List;
+
 import com.tamdaptit.rentalmanagement.common.dto.ApiResponse;
 import com.tamdaptit.rentalmanagement.common.dto.PageResponse;
 import com.tamdaptit.rentalmanagement.subscription.dto.request.CatalogStatusRequest;
+import com.tamdaptit.rentalmanagement.subscription.dto.request.ServicePackagePriceRequest;
+import com.tamdaptit.rentalmanagement.subscription.dto.request.ServicePackageRequest;
+import com.tamdaptit.rentalmanagement.subscription.dto.response.ServicePackagePriceResponse;
+import com.tamdaptit.rentalmanagement.subscription.dto.response.ServicePackageResponse;
+import com.tamdaptit.rentalmanagement.subscription.service.ServicePackageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -17,12 +24,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import com.tamdaptit.rentalmanagement.subscription.dto.request.ServicePackageRequest;
-import com.tamdaptit.rentalmanagement.subscription.dto.request.ServicePackagePriceRequest;
-import com.tamdaptit.rentalmanagement.subscription.dto.response.ServicePackageResponse;
-import com.tamdaptit.rentalmanagement.subscription.dto.response.ServicePackagePriceResponse;
-import com.tamdaptit.rentalmanagement.subscription.service.ServicePackageService;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/service-packages")
@@ -35,9 +36,10 @@ public class ServicePackageController {
     @PreAuthorize("hasRole('ADMIN') or (hasRole('LANDLORD') and !#includeInactive)")
     @Operation(summary = "Danh sách gói; chỉ admin được xem cả gói chưa bán")
     public ApiResponse<PageResponse<ServicePackageResponse>> getAll(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "false") boolean includeInactive) {
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size,
+        @RequestParam(defaultValue = "false") boolean includeInactive
+    ) {
         return ApiResponse.success(service.getAll(page, size, includeInactive));
     }
 
@@ -45,8 +47,9 @@ public class ServicePackageController {
     @PreAuthorize("hasRole('ADMIN') or (hasRole('LANDLORD') and !#includeInactive)")
     @Operation(summary = "Chi tiết gói dịch vụ")
     public ApiResponse<ServicePackageResponse> getById(
-            @PathVariable String id,
-            @RequestParam(defaultValue = "false") boolean includeInactive) {
+        @PathVariable String id,
+        @RequestParam(defaultValue = "false") boolean includeInactive
+    ) {
         return ApiResponse.success(service.getById(id, includeInactive));
     }
 
@@ -61,7 +64,9 @@ public class ServicePackageController {
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Admin cập nhật quyền lợi; giữ nguyên snapshot đã mua")
     public ApiResponse<ServicePackageResponse> update(
-            @PathVariable String id, @RequestBody @Valid ServicePackageRequest request) {
+        @PathVariable String id,
+        @RequestBody @Valid ServicePackageRequest request
+    ) {
         return ApiResponse.success("Cập nhật gói dịch vụ thành công", service.update(id, request));
     }
 
@@ -69,7 +74,9 @@ public class ServicePackageController {
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Admin bật hoặc ngừng bán gói")
     public ApiResponse<ServicePackageResponse> setActive(
-            @PathVariable String id, @RequestBody @Valid CatalogStatusRequest request) {
+        @PathVariable String id,
+        @RequestBody @Valid CatalogStatusRequest request
+    ) {
         return ApiResponse.success("Cập nhật trạng thái gói thành công", service.setActive(id, request.active()));
     }
 
@@ -77,8 +84,9 @@ public class ServicePackageController {
     @PreAuthorize("hasRole('ADMIN') or (hasRole('LANDLORD') and !#includeInactive)")
     @Operation(summary = "Các mức giá theo thời hạn của gói")
     public ApiResponse<List<ServicePackagePriceResponse>> getPrices(
-            @PathVariable String packageId,
-            @RequestParam(defaultValue = "false") boolean includeInactive) {
+        @PathVariable String packageId,
+        @RequestParam(defaultValue = "false") boolean includeInactive
+    ) {
         return ApiResponse.success(service.getPrices(packageId, includeInactive));
     }
 
@@ -86,7 +94,9 @@ public class ServicePackageController {
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Admin thêm giá cho 1, 3, 6 hoặc 12 tháng")
     public ApiResponse<ServicePackagePriceResponse> createPrice(
-            @PathVariable String packageId, @RequestBody @Valid ServicePackagePriceRequest request) {
+        @PathVariable String packageId,
+        @RequestBody @Valid ServicePackagePriceRequest request
+    ) {
         return ApiResponse.success("Thêm giá gói thành công", service.createPrice(packageId, request));
     }
 
@@ -94,8 +104,10 @@ public class ServicePackageController {
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Admin cập nhật mức giá của đúng gói")
     public ApiResponse<ServicePackagePriceResponse> updatePrice(
-            @PathVariable String packageId, @PathVariable String priceId,
-            @RequestBody @Valid ServicePackagePriceRequest request) {
+        @PathVariable String packageId,
+        @PathVariable String priceId,
+        @RequestBody @Valid ServicePackagePriceRequest request
+    ) {
         return ApiResponse.success("Cập nhật giá gói thành công", service.updatePrice(packageId, priceId, request));
     }
 
@@ -103,9 +115,13 @@ public class ServicePackageController {
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Admin bật hoặc ngừng bán một thời hạn")
     public ApiResponse<ServicePackagePriceResponse> setPriceActive(
-            @PathVariable String packageId, @PathVariable String priceId,
-            @RequestBody @Valid CatalogStatusRequest request) {
-        return ApiResponse.success("Cập nhật trạng thái giá thành công",
-                service.setPriceActive(packageId, priceId, request.active()));
+        @PathVariable String packageId,
+        @PathVariable String priceId,
+        @RequestBody @Valid CatalogStatusRequest request
+    ) {
+        return ApiResponse.success(
+            "Cập nhật trạng thái giá thành công",
+            service.setPriceActive(packageId, priceId, request.active())
+        );
     }
 }
