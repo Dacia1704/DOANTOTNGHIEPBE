@@ -142,12 +142,15 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Allow dev frontends (Angular FE, etc.)
+        // Allow dev and production frontends
         configuration.setAllowedOrigins(
             List.of(
+                "https://trotot.online",
+                "https://www.trotot.online",
                 "http://localhost:4200",
                 "http://localhost:3000",
-                "http://localhost:5173"
+                "http://localhost:5173",
+                "http://localhost"
             )
         );
 
